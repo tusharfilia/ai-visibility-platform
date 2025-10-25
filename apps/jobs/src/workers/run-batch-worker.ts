@@ -19,8 +19,8 @@ export class RunBatchWorker {
       {
         connection,
         concurrency: 2,
-        removeOnComplete: 50,
-        removeOnFail: 25,
+        removeOnComplete: { count: 50 },
+        removeOnFail: { count: 25 },
       }
     );
 

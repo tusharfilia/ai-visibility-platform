@@ -18,8 +18,8 @@ export class DailyAggregationsWorker {
       {
         connection,
         concurrency: 1,
-        removeOnComplete: 30,
-        removeOnFail: 15,
+        removeOnComplete: { count: 30 },
+        removeOnFail: { count: 15 },
       }
     );
 

@@ -5,7 +5,8 @@
 
 import { Worker, Job } from 'bullmq';
 import { prisma } from '@ai-visibility/db';
-import { createProvider, EngineKey } from '@ai-visibility/providers';
+import { createProvider } from '@ai-visibility/providers';
+import { EngineKey } from '@ai-visibility/shared';
 import { extractMentions, extractCitations, classifySentiment } from '@ai-visibility/parser';
 import { RunPromptPayload } from '../queues';
 import { createHash } from 'crypto';
@@ -20,8 +21,8 @@ export class RunPromptWorker {
       {
         connection,
         concurrency: 5,
-        removeOnComplete: 100,
-        removeOnFail: 50,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       }
     );
 

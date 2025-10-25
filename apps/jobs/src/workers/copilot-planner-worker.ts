@@ -21,8 +21,8 @@ export class CopilotPlannerWorker {
       {
         connection,
         concurrency: 1,
-        removeOnComplete: 20,
-        removeOnFail: 10,
+        removeOnComplete: { count: 20 },
+        removeOnFail: { count: 10 },
       }
     );
 
