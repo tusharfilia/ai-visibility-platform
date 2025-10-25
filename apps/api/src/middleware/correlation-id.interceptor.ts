@@ -24,7 +24,7 @@ export class CorrelationIdInterceptor implements NestInterceptor {
     response.setHeader('x-request-id', correlationId);
     
     // Add correlation ID to request for logging
-    request.correlationId = correlationId;
+    (request as any).correlationId = correlationId;
     
     return next.handle().pipe(
       tap(() => {

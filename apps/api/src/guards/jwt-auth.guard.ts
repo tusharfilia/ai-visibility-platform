@@ -7,7 +7,7 @@ import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  canActivate(context: ExecutionContext): boolean | Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> | import('rxjs').Observable<boolean> {
     const debug = process.env.DEBUG_JWT_MODE === 'true' && process.env.NODE_ENV !== 'production';
     if (debug) {
       const req = context.switchToHttp().getRequest();

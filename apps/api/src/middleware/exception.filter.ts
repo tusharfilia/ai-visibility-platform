@@ -49,11 +49,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     });
 
     // Send error response
-    const errorResponse = createErrorResponse({
+    const errorResponse = {
       code,
       message,
       details,
-    });
+    };
 
     response.status(status).json(errorResponse);
   }

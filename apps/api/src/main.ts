@@ -29,7 +29,7 @@ async function bootstrap() {
   // CORS configuration
   const allowList = (configService.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173'))
     .split(',')
-    .map(s => s.trim())
+    .map((s: string) => s.trim())
     .filter(Boolean);
   
   app.enableCors({
@@ -88,15 +88,15 @@ async function bootstrap() {
   });
 
   // Health check endpoint
-  app.use('/healthz', (req, res) => {
+  app.use('/healthz', (req: any, res: any) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
   // Readiness check endpoint
-  app.use('/readyz', async (req, res) => {
+  app.use('/readyz', async (req: any, res: any) => {
     try {
       // Check database connection
-      const { prisma } = await import('@ai-visibility/db');
+      const { prisma } = await import('@prisma/client');
       await prisma.$queryRaw`SELECT 1`;
       
       // Check Redis connection
@@ -107,7 +107,7 @@ async function bootstrap() {
       
       res.status(200).json({ status: 'ready', timestamp: new Date().toISOString() });
     } catch (error) {
-      res.status(503).json({ status: 'not ready', error: error.message });
+      res.status(503).json({ status: 'not ready', error: (error as Error).message });
     }
   });
 

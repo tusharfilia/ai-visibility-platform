@@ -42,7 +42,9 @@
     "prom-client": "^15.0.0",
     "jwks-rsa": "^3.0.1",
     "@nestjs/bullmq": "^10.0.1",
-    "bullmq": "^4.15.0"
+    "bullmq": "^4.15.0",
+    "rxjs": "^7.8.1",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.2.1",

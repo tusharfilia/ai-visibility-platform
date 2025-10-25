@@ -35,6 +35,6 @@ export class AuthService {
       },
     });
 
-    return memberships.map(membership => membership.workspace);
+    return memberships.map((membership: any) => membership.workspace);
   }
 }
