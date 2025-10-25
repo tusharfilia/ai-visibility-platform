@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm --filter @ai-visibility/db build && pnpm --filter @ai-visibility/shared build && pnpm --filter @ai-visibility/parser build && pnpm --filter @ai-visibility/providers build && pnpm --filter @ai-visibility/optimizer build && pnpm --filter @ai-visibility/copilot build && pnpm --filter @ai-visibility/api build && pnpm --filter @ai-visibility/jobs build",
     "start": "pnpm --filter @ai-visibility/api start",
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint",
@@ -16,10 +16,10 @@
     "test": "pnpm -r test",
     "test:watch": "pnpm -r test:watch",
     "clean": "pnpm -r clean",
-    "db:migrate": "pnpm --filter @ai-visibility-platform/db migrate",
-    "db:seed": "pnpm --filter @ai-visibility-platform/db seed",
-    "db:push": "pnpm --filter @ai-visibility-platform/db push",
-    "db:studio": "pnpm --filter @ai-visibility-platform/db studio",
+    "db:migrate": "pnpm --filter @ai-visibility/db migrate",
+    "db:seed": "pnpm --filter @ai-visibility/db seed",
+    "db:push": "pnpm --filter @ai-visibility/db push",
+    "db:studio": "pnpm --filter @ai-visibility/db studio",
     "docker:up": "docker compose -f infra/docker-compose.yml up -d",
     "docker:down": "docker compose -f infra/docker-compose.yml down",
     "docker:logs": "docker compose -f infra/docker-compose.yml logs -f"
