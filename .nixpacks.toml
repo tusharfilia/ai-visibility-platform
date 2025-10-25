@@ -6,3 +6,6 @@ cmds = ["pnpm run build"]
 
 [start]
 cmd = "pnpm --filter @ai-visibility/api start"
+
+[providers]
+nodejs = "22"
