@@ -1,7 +1,8 @@
 {
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "pnpm install --no-frozen-lockfile && pnpm run build"
+    "installCommand": "pnpm install --no-frozen-lockfile",
+    "buildCommand": "pnpm run build"
   },
   "deploy": {
     "startCommand": "pnpm --filter @ai-visibility/api start",
