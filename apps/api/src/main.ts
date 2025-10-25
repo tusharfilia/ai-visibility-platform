@@ -96,7 +96,7 @@ async function bootstrap() {
   app.use('/readyz', async (req: any, res: any) => {
     try {
       // Check database connection
-      const { prisma } = await import('@ai-visibility/db');
+      const { prisma } = await import('@prisma/client');
       await prisma.$queryRaw`SELECT 1`;
       
       // Check Redis connection
