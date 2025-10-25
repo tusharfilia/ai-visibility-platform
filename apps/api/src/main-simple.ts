@@ -16,7 +16,7 @@ async function bootstrap() {
     const port = process.env.PORT || 8080;
     
     // Simple health check
-    app.use('/healthz', (req, res) => {
+    app.use('/healthz', (req: any, res: any) => {
       res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     });
     
