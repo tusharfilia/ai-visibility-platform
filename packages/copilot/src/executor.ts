@@ -121,7 +121,7 @@ export class CopilotExecutor {
       return {
         success: false,
         actionId: `action_${Date.now()}`,
-        status: CopilotActionStatus.FAILED,
+        status: CopilotActionStatus.REJECTED,
         error: errorMessage,
         executionTime,
         auditLog,
