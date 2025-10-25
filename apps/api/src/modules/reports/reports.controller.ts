@@ -8,7 +8,7 @@ import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
 @ApiBearerAuth()
 export class ReportsController {
   @Get()
-  async getReports(@Request() req: any) {
+  async getReports(@Request() req: any): Promise<any> {
     return { reports: [] };
   }
 }

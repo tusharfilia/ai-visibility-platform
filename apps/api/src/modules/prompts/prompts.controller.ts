@@ -8,12 +8,12 @@ import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
 @ApiBearerAuth()
 export class PromptsController {
   @Get()
-  async getPrompts(@Request() req: any) {
+  async getPrompts(@Request() req: any): Promise<any> {
     return { prompts: [] };
   }
 
   @Post()
-  async createPrompt(@Body() body: any, @Request() req: any) {
+  async createPrompt(@Body() body: any, @Request() req: any): Promise<any> {
     return { prompt: body };
   }
 }

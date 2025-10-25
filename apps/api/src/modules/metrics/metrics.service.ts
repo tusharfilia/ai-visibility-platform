@@ -9,7 +9,7 @@ import { PrismaService } from '../database/prisma.service';
 export class MetricsService {
   constructor(private prisma: PrismaService) {}
 
-  async getOverview(workspaceId: string, from?: Date, to?: Date) {
+  async getOverview(workspaceId: string, from?: Date, to?: Date): Promise<any> {
     const whereClause: any = { workspaceId };
     
     if (from || to) {
@@ -55,7 +55,7 @@ export class MetricsService {
     };
   }
 
-  async getTopDomains(workspaceId: string, limit: number = 50) {
+  async getTopDomains(workspaceId: string, limit: number = 50): Promise<any> {
     const citations = await this.prisma.citation.findMany({
       where: {
         answer: {

@@ -19,7 +19,7 @@ export class AdminController {
   ) {}
 
   @Get('system')
-  async getSystem(@Request() req: any) {
+  async getSystem(@Request() req: any): Promise<any> {
     const [runPrompt, runBatch, dailyAgg, planner] = await Promise.all([
       this.runPromptQ.getWaitingCount(),
       this.runBatchQ.getWaitingCount(),

@@ -23,7 +23,7 @@ export class MetricsController {
     @Request() req: any,
     @Query('from') from?: string,
     @Query('to') to?: string,
-  ) {
+  ): Promise<any> {
     const workspaceId = req.user.workspaceId;
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
@@ -38,7 +38,7 @@ export class MetricsController {
   async getTopDomains(
     @Request() req: any,
     @Query('limit') limit?: number,
-  ) {
+  ): Promise<any> {
     const workspaceId = req.user.workspaceId;
     return this.metricsService.getTopDomains(workspaceId, limit || 50);
   }
