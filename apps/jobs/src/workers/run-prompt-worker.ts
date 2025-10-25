@@ -52,21 +52,21 @@ export class RunPromptWorker {
       }
 
       // Get prompt and engine
-      const prompt = await prisma.prompt.findUnique({
-        where: { id: promptId },
-      });
+      const promptResult = await this.dbPool.query(
+        'SELECT * FROM "Prompt" WHERE id = $1',
+        [promptId]
+      );
+      const prompt = promptResult.rows[0];
       
       if (!prompt) {
         throw new Error(`Prompt not found: ${promptId}`);
       }
 
-      const engine = await prisma.engine.findFirst({
-        where: { 
-          workspaceId,
-          key: engineKey as EngineKey,
-          enabled: true,
-        },
-      });
+      const engineResult = await this.dbPool.query(
+        'SELECT * FROM "Engine" WHERE "workspaceId" = $1 AND key = $2 AND enabled = true',
+        [workspaceId, engineKey]
+      );
+      const engine = engineResult.rows[0];
       
       if (!engine) {
         throw new Error(`Engine not found or disabled: ${engineKey}`);
