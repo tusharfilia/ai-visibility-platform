@@ -95,9 +95,13 @@ async function bootstrap() {
   // Readiness check endpoint
   app.use('/readyz', async (req: any, res: any) => {
     try {
-      // Check database connection
-      const { prisma } = await import('@ai-visibility/db');
-      await prisma.$queryRaw`SELECT 1`;
+      // Check database connection using simple pg
+      const { Pool } = await import('pg');
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const client = await pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      await pool.end();
       
       // Check Redis connection
       const { Redis } = await import('ioredis');
