@@ -3,7 +3,13 @@
  * Transforms content with TL;DR, FAQ, quotes, and JSON-LD
  */
 
-import { Citation } from '../parser/src/citations';
+// Define Citation interface locally to avoid build order issues
+export interface Citation {
+  url: string;
+  domain: string;
+  confidence?: number;
+  rank?: number;
+}
 
 export interface ContentMetadata {
   title?: string;
