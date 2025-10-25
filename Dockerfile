@@ -15,6 +15,9 @@ RUN pnpm install --no-frozen-lockfile
 # Generate Prisma client in the workspace root
 RUN pnpm --filter @ai-visibility/db generate
 
+# Build the db package first
+RUN pnpm --filter @ai-visibility/db build
+
 # Build the application
 RUN pnpm run build
 
