@@ -3,7 +3,7 @@
  * Transforms content with TL;DR, FAQ, quotes, and JSON-LD
  */
 
-import { Citation } from '@ai-visibility/parser/citations';
+import { Citation } from '@ai-visibility/parser';
 
 export interface ContentMetadata {
   title?: string;

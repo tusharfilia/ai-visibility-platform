@@ -92,7 +92,7 @@ export class ContentRuleEngine implements RuleEngine {
             type: customRule.id,
             generator: (content, metadata) => {
               const match = content.match(customRule.pattern);
-              return customRule.extractor(match || [] as RegExpMatchArray);
+              return customRule.extractor(match || [] as unknown as RegExpMatchArray);
             },
             priority: customRule.priority,
           });
