@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "pnpm -r build",
+    "start": "pnpm --filter @ai-visibility/api start",
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
