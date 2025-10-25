@@ -1,0 +1,264 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConnectionType {
+  GBP
+  YELP
+  FB
+  APPLE
+  WEBFLOW
+  WP
+  NOTION
+  HUBSPOT
+  PIPEDRIVE
+}
+
+enum EngineKey {
+  PERPLEXITY
+  AIO
+  BRAVE
+}
+
+enum Intent {
+  BEST
+  ALTERNATIVES
+  PRICING
+  VS
+  HOWTO
+}
+
+enum RunStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum Sentiment {
+  POS
+  NEU
+  NEG
+}
+
+enum CopilotActionType {
+  ADD_FAQ
+  ADD_TLDR
+  ADD_CITATIONS
+  FIX_SCHEMA
+  REVIEW_CAMPAIGN
+}
+
+enum CopilotActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXECUTED
+}
+
+enum AlertType {
+  SOV_DROP
+  ENGINE_LOSS
+  COMPETITOR_OVERTAKE
+  HALLUCINATION
+}
+
+model User {
+  id         String  @id @default(cuid())
+  email      String  @unique
+  externalId String? // Lovable Cloud user id
+  createdAt  DateTime @default(now())
+  members    WorkspaceMember[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id        String @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  members   WorkspaceMember[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String @id @default(cuid())
+  userId      String
+  workspaceId String
+  createdAt   DateTime @default(now())
+  
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model Connection {
+  id          String         @id @default(cuid())
+  workspaceId String
+  type        ConnectionType
+  status      String
+  config      Json?
+  lastSyncAt  DateTime?
+  createdAt   DateTime       @default(now())
+
+  @@index([workspaceId, type])
+  @@map("connections")
+}
+
+model Engine {
+  id               String    @id @default(cuid())
+  workspaceId      String
+  key              EngineKey
+  enabled          Boolean   @default(true)
+  config           Json?
+  dailyBudgetCents Int       @default(0)
+  concurrency      Int       @default(2)
+  region           String?
+  lastRunAt        DateTime?
+  avgLatencyMs     Int?
+  createdAt        DateTime  @default(now())
+
+  @@index([workspaceId, key])
+  @@map("engines")
+}
+
+model Prompt {
+  id            String @id @default(cuid())
+  workspaceId   String
+  text          String
+  canonicalText String?
+  intent        Intent
+  vertical      String?
+  active        Boolean @default(true)
+  tags          String[]
+  createdAt     DateTime @default(now())
+
+  @@index([workspaceId, active, intent])
+  @@map("prompts")
+}
+
+model PromptRun {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  promptId        String
+  engineId        String
+  model           String?
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  status          RunStatus
+  costCents       Int       @default(0)
+  idempotencyKey  String
+  errorMsg        String?
+
+  @@index([workspaceId, promptId, engineId, startedAt])
+  @@unique([idempotencyKey])
+  @@map("prompt_runs")
+}
+
+model Answer {
+  id          String @id @default(cuid())
+  promptRunId String
+  rawText     String   // consider TTL purge for privacy
+  jsonPayload Json?
+  createdAt   DateTime @default(now())
+
+  @@map("answers")
+}
+
+model Mention {
+  id        String    @id @default(cuid())
+  answerId  String
+  brand     String
+  position  Int?
+  sentiment Sentiment
+  snippet   String
+
+  @@map("mentions")
+}
+
+model Citation {
+  id         String  @id @default(cuid())
+  answerId   String
+  url        String
+  domain     String
+  rank       Int?
+  confidence Float?
+
+  @@index([domain])
+  @@map("citations")
+}
+
+model MetricDaily {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  engineKey      EngineKey
+  date           DateTime
+  promptSOV      Float
+  coverage       Float
+  citationCount  Int
+  aioImpressions Int
+
+  @@index([workspaceId, date])
+  @@map("metric_daily")
+}
+
+model CopilotRule {
+  id              String @id @default(cuid())
+  workspaceId     String
+  fullAuto        Boolean @default(true)
+  requireApproval Boolean @default(false)
+  maxPagesPerWeek Int     @default(5)
+  enabledActions  String[] // CopilotActionType values
+  intensity       Int      @default(2) // 1-3
+  config          Json?
+
+  @@map("copilot_rules")
+}
+
+model CopilotAction {
+  id          String             @id @default(cuid())
+  workspaceId String
+  actionType  CopilotActionType
+  targetUrl   String
+  diff        String
+  status      CopilotActionStatus @default(PENDING)
+  createdAt   DateTime           @default(now())
+  approverId  String?
+  approvedAt  DateTime?
+  actionHash String?   // tamper-evidence
+
+  @@map("copilot_actions")
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  workspaceId String
+  type        AlertType
+  payload     Json
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  @@map("alerts")
+}
+
+model AuditLog {
+  id          String  @id @default(cuid())
+  workspaceId String
+  actorUserId String?
+  action      String
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@map("audit_logs")
+}

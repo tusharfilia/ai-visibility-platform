@@ -1,0 +1,83 @@
+[
+  {
+    "prompt": "What are the best project management tools for small teams?",
+    "response": {
+      "engine": "PERPLEXITY",
+      "promptId": "prompt_best_tools",
+      "answerText": "Based on the latest information, here are the top project management tools for small teams: 1. **Asana** - Excellent for task management and team collaboration. 2. **Trello** - Simple kanban boards perfect for small teams. 3. **Monday.com** - Highly customizable with great automation features. 4. **Notion** - All-in-one workspace with project management capabilities. 5. **ClickUp** - Feature-rich with time tracking and reporting.",
+      "mentions": [
+        {
+          "brand": "Asana",
+          "position": 1,
+          "sentiment": "POS",
+          "snippet": "Excellent for task management and team collaboration"
+        },
+        {
+          "brand": "Trello",
+          "position": 2,
+          "sentiment": "POS",
+          "snippet": "Simple kanban boards perfect for small teams"
+        },
+        {
+          "brand": "Monday.com",
+          "position": 3,
+          "sentiment": "POS",
+          "snippet": "Highly customizable with great automation features"
+        },
+        {
+          "brand": "Notion",
+          "position": 4,
+          "sentiment": "POS",
+          "snippet": "All-in-one workspace with project management capabilities"
+        },
+        {
+          "brand": "ClickUp",
+          "position": 5,
+          "sentiment": "POS",
+          "snippet": "Feature-rich with time tracking and reporting"
+        }
+      ],
+      "citations": [
+        {
+          "url": "https://asana.com",
+          "domain": "asana.com",
+          "confidence": 0.95
+        },
+        {
+          "url": "https://trello.com",
+          "domain": "trello.com",
+          "confidence": 0.92
+        },
+        {
+          "url": "https://monday.com",
+          "domain": "monday.com",
+          "confidence": 0.88
+        },
+        {
+          "url": "https://notion.so",
+          "domain": "notion.so",
+          "confidence": 0.90
+        },
+        {
+          "url": "https://clickup.com",
+          "domain": "clickup.com",
+          "confidence": 0.85
+        }
+      ],
+      "meta": {
+        "provider": "Perplexity AI",
+        "version": "1.0.0",
+        "model": "llama-3.1-sonar-large-128k-online",
+        "tokens": 750,
+        "latency": 450
+      },
+      "timestamp": "2024-01-15T10:30:00Z"
+    },
+    "metadata": {
+      "model": "llama-3.1-sonar-large-128k-online",
+      "tokens": 750,
+      "latency": 450,
+      "cost": 0.15
+    }
+  }
+]

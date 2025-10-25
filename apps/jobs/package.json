@@ -1,0 +1,31 @@
+{
+  "name": "@ai-visibility/jobs",
+  "version": "1.0.0",
+  "description": "BullMQ workers and schedulers for AI Visibility Platform",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@ai-visibility/shared": "workspace:*",
+    "@ai-visibility/db": "workspace:*",
+    "@ai-visibility/providers": "workspace:*",
+    "@ai-visibility/parser": "workspace:*",
+    "@ai-visibility/copilot": "workspace:*",
+    "bullmq": "^4.15.0",
+    "ioredis": "^5.3.2",
+    "cron": "^3.1.6",
+    "prom-client": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}
