@@ -4,7 +4,7 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import { prisma } from '@ai-visibility/db';
+import { Pool } from 'pg';
 import { createProvider } from '@ai-visibility/providers';
 import { EngineKey } from '@ai-visibility/shared';
 import { extractMentions, extractCitations, classifySentiment } from '@ai-visibility/parser';
@@ -13,8 +13,13 @@ import { createHash } from 'crypto';
 
 export class RunPromptWorker {
   private worker: Worker;
+  private dbPool: Pool;
 
   constructor(connection: any) {
+    this.dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
     this.worker = new Worker(
       'runPrompt',
       this.processJob.bind(this),
@@ -36,11 +41,12 @@ export class RunPromptWorker {
     
     try {
       // Check idempotency
-      const existingRun = await prisma.promptRun.findUnique({
-        where: { idempotencyKey },
-      });
+      const existingRunResult = await this.dbPool.query(
+        'SELECT id FROM "PromptRun" WHERE "idempotencyKey" = $1',
+        [idempotencyKey]
+      );
       
-      if (existingRun) {
+      if (existingRunResult.rows.length > 0) {
         console.log(`Prompt run already exists: ${idempotencyKey}`);
         return;
       }

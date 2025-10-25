@@ -4,7 +4,7 @@
  */
 
 import { Redis } from 'ioredis';
-import { prisma, connectDatabase, disconnectDatabase } from '@ai-visibility/db';
+// Database connection will be handled by individual workers
 import { RunPromptWorker } from './workers/run-prompt-worker';
 import { RunBatchWorker } from './workers/run-batch-worker';
 import { DailyAggregationsWorker } from './workers/daily-aggregations-worker';
@@ -61,8 +61,7 @@ async function startApplication(): Promise<void> {
   try {
     console.log('Starting AI Visibility Jobs Application...');
     
-    // Connect to database
-    await connectDatabase();
+  // Database connections will be handled by individual workers
     
     // Start workers
     await startWorkers();
@@ -97,8 +96,7 @@ async function shutdownApplication(): Promise<void> {
     // Shutdown queues
     await shutdownQueues();
     
-    // Disconnect from database
-    await disconnectDatabase();
+    // Database connections are handled by individual workers
     
     console.log('Application shut down successfully');
     

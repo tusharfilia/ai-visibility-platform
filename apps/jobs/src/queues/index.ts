@@ -4,7 +4,7 @@
 
 import { Queue, Worker, QueueEvents } from 'bullmq';
 import { Redis } from 'ioredis';
-import { prisma } from '@ai-visibility/db';
+// Database operations will be handled by individual workers
 
 // Redis connection
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
