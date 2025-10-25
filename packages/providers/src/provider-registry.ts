@@ -3,7 +3,7 @@
  */
 
 import { EngineKey } from '@ai-visibility/shared';
-import { Provider, ProviderFactory, ProviderRegistry as IProviderRegistry } from './types';
+import { Provider, ProviderFactory as IProviderFactory, ProviderRegistry as IProviderRegistry } from './types';
 import { PerplexityProvider } from './perplexity-provider';
 import { AioProvider } from './aio-provider';
 import { BraveProvider } from './brave-provider';
@@ -32,7 +32,7 @@ export class ProviderRegistry implements IProviderRegistry {
   }
 }
 
-export class ProviderFactory implements ProviderFactory {
+export class ProviderFactory implements IProviderFactory {
   private registry: ProviderRegistry;
 
   constructor(registry?: ProviderRegistry) {

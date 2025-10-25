@@ -14,6 +14,9 @@ export interface ProviderConfig {
     requestsPerMinute: number;
     requestsPerHour: number;
   };
+  simulateLatency?: boolean;
+  simulateErrors?: boolean;
+  errorRate?: number;
 }
 
 // Provider response metadata
