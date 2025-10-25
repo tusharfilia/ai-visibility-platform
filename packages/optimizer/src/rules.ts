@@ -90,7 +90,10 @@ export class ContentRuleEngine implements RuleEngine {
         case 'jsonld':
           rules.jsonLdRules.push({
             type: customRule.id,
-            generator: (content, metadata) => customRule.extractor(content.match(customRule.pattern) || []),
+            generator: (content, metadata) => {
+              const match = content.match(customRule.pattern);
+              return customRule.extractor(match || []);
+            },
             priority: customRule.priority,
           });
           break;
