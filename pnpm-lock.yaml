@@ -1,0 +1,17 @@
+lockfileVersion: '6.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+dependencies:
+  '@ai-visibility/api': 'workspace:*'
+  '@ai-visibility/db': 'workspace:*'
+  '@ai-visibility/jobs': 'workspace:*'
+  '@ai-visibility/copilot': 'workspace:*'
+  '@ai-visibility/optimizer': 'workspace:*'
+  '@ai-visibility/parser': 'workspace:*'
+  '@ai-visibility/providers': 'workspace:*'
+  '@ai-visibility/shared': 'workspace:*'
+
+packages: {}
