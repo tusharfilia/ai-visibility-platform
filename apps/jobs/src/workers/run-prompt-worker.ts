@@ -4,7 +4,7 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import { prisma } from '@ai-visibility/db';
+import { prisma } from '@ai-visibility-platform/db';
 import { createProvider } from '@ai-visibility/providers';
 import { EngineKey } from '@ai-visibility/shared';
 import { extractMentions, extractCitations, classifySentiment } from '@ai-visibility/parser';

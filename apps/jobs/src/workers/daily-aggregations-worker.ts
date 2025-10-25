@@ -4,7 +4,7 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import { prisma } from '@ai-visibility/db';
+import { prisma } from '@ai-visibility-platform/db';
 import { EngineKey } from '@ai-visibility/shared';
 import { DailyAggregationsPayload } from '../queues';
 

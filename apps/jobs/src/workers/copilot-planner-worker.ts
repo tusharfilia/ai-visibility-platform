@@ -4,7 +4,7 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import { prisma } from '@ai-visibility/db';
+import { prisma } from '@ai-visibility-platform/db';
 import { CopilotPlannerPayload } from '../queues';
 import { getEffectivePolicy } from '@ai-visibility/copilot';
 import { planActions } from '@ai-visibility/copilot';
