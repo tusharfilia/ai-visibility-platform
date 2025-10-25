@@ -24,5 +24,5 @@ RUN pnpm run build
 # Expose port
 EXPOSE 8080
 
-# Start the API service with simple main
-CMD ["node", "apps/api/dist/main-simple.js"]
+# Start the API service with ultra-minimal main
+CMD ["node", "apps/api/dist/main-ultra-minimal.js"]
