@@ -32,13 +32,11 @@ async function main() {
   // Create workspace member
   await prisma.workspaceMember.upsert({
     where: { 
-      workspaceId_userId: {
-        workspaceId: workspace.id,
-        userId: user.id,
-      }
+      id: 'workspace-member-123'
     },
     update: {},
     create: {
+      id: 'workspace-member-123',
       userId: user.id,
       workspaceId: workspace.id,
     },
@@ -50,7 +48,7 @@ async function main() {
   const engines = [
     {
       id: 'engine-perplexity-123',
-      key: 'PERPLEXITY',
+      key: 'PERPLEXITY' as const,
       enabled: true,
       dailyBudgetCents: 1000, // $10
       concurrency: 2,
@@ -58,7 +56,7 @@ async function main() {
     },
     {
       id: 'engine-aio-123',
-      key: 'AIO',
+      key: 'AIO' as const,
       enabled: true,
       dailyBudgetCents: 500, // $5
       concurrency: 1,
@@ -66,7 +64,7 @@ async function main() {
     },
     {
       id: 'engine-brave-123',
-      key: 'BRAVE',
+      key: 'BRAVE' as const,
       enabled: true,
       dailyBudgetCents: 200, // $2
       concurrency: 3,
@@ -93,7 +91,7 @@ async function main() {
       id: 'prompt-best-123',
       text: 'What are the best project management tools for small teams?',
       canonicalText: 'best project management tools small teams',
-      intent: 'BEST',
+      intent: 'BEST' as const,
       vertical: 'software',
       tags: ['project-management', 'small-teams', 'tools'],
     },
@@ -101,7 +99,7 @@ async function main() {
       id: 'prompt-alternatives-123',
       text: 'What are alternatives to Asana for task management?',
       canonicalText: 'alternatives to Asana task management',
-      intent: 'ALTERNATIVES',
+      intent: 'ALTERNATIVES' as const,
       vertical: 'software',
       tags: ['asana', 'alternatives', 'task-management'],
     },
@@ -109,7 +107,7 @@ async function main() {
       id: 'prompt-howto-123',
       text: 'How to implement agile methodology in remote teams?',
       canonicalText: 'how to implement agile methodology remote teams',
-      intent: 'HOWTO',
+      intent: 'HOWTO' as const,
       vertical: 'management',
       tags: ['agile', 'remote-teams', 'methodology'],
     },
@@ -155,19 +153,16 @@ async function main() {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
 
-    for (const engineKey of ['PERPLEXITY', 'AIO', 'BRAVE']) {
+    for (const engineKey of ['PERPLEXITY', 'AIO', 'BRAVE'] as const) {
       await prisma.metricDaily.upsert({
         where: {
-          workspaceId_engineKey_date: {
-            workspaceId: workspace.id,
-            engineKey: engineKey as any,
-            date: date,
-          },
+          id: `metric-${workspace.id}-${engineKey}-${date.toISOString().split('T')[0]}`
         },
         update: {},
         create: {
+          id: `metric-${workspace.id}-${engineKey}-${date.toISOString().split('T')[0]}`,
           workspaceId: workspace.id,
-          engineKey: engineKey as any,
+          engineKey: engineKey,
           date: date,
           promptSOV: Math.random() * 100,
           coverage: Math.random() * 100,
