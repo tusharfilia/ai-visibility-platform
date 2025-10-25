@@ -35,7 +35,7 @@ export class AdminController {
     };
 
     // simple DB check
-    const dbOk = await this.prisma.$queryRaw`SELECT 1 as ok`;
+    const dbOk = await this.prisma.$queryRaw('SELECT 1 as ok');
 
     return {
       queues: { runPrompt, runBatch, dailyAgg, planner },
