@@ -34,14 +34,14 @@ export class MetricsService {
     }
 
     // Calculate averages
-    const avgSOV = metrics.reduce((sum, m) => sum + m.promptSOV, 0) / metrics.length;
-    const avgCoverage = metrics.reduce((sum, m) => sum + m.coverage, 0) / metrics.length;
-    const totalCitations = metrics.reduce((sum, m) => sum + m.citationCount, 0);
+    const avgSOV = metrics.reduce((sum: number, m: any) => sum + m.promptSOV, 0) / metrics.length;
+    const avgCoverage = metrics.reduce((sum: number, m: any) => sum + m.coverage, 0) / metrics.length;
+    const totalCitations = metrics.reduce((sum: number, m: any) => sum + m.citationCount, 0);
     const citationVelocity = totalCitations / metrics.length;
-    const totalAioImpressions = metrics.reduce((sum, m) => sum + m.aioImpressions, 0);
+    const totalAioImpressions = metrics.reduce((sum: number, m: any) => sum + m.aioImpressions, 0);
 
     // Generate timeseries
-    const timeseries = metrics.map(m => ({
+    const timeseries = metrics.map((m: any) => ({
       date: m.date.toISOString().split('T')[0],
       sov: m.promptSOV,
     }));
@@ -78,7 +78,7 @@ export class MetricsService {
     });
 
     // Group by domain
-    const domainMap = new Map();
+    const domainMap = new Map<string, any>();
     
     for (const citation of citations) {
       const domain = citation.domain;
@@ -102,12 +102,12 @@ export class MetricsService {
 
     // Convert to array and sort
     const domains = Array.from(domainMap.values())
-      .map(d => ({
+      .map((d: any) => ({
         ...d,
         engines: Array.from(d.engines),
         lastSeen: d.lastSeen.toISOString(),
       }))
-      .sort((a, b) => b.appearances - a.appearances)
+      .sort((a: any, b: any) => b.appearances - a.appearances)
       .slice(0, limit);
 
     return domains;

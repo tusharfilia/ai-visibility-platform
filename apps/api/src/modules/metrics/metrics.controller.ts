@@ -22,7 +22,7 @@ export class MetricsController {
   async getOverview(
     @Request() req: any,
     @Query('from') from?: string,
-    @Query('to') from?: string,
+    @Query('to') to?: string,
   ) {
     const workspaceId = req.user.workspaceId;
     const fromDate = from ? new Date(from) : undefined;
