@@ -15,9 +15,9 @@ import { GlobalExceptionFilter } from './middleware/exception.filter';
 import { CorrelationIdInterceptor } from './middleware/correlation-id.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: new LoggerService(),
-  });
+  console.log('🚀 Starting AI Visibility API...');
+  
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
   const configService = app.get(ConfigService);
   const port = configService.get('PORT', 8080);
@@ -102,12 +102,16 @@ async function bootstrap() {
     }
   });
 
-  await app.listen(port);
-  
-  console.log(`🚀 AI Visibility API running on port ${port}`);
-  console.log(`📚 Swagger docs available at http://localhost:${port}/v1/docs`);
-  console.log(`🏥 Health check available at http://localhost:${port}/healthz`);
-  console.log(`✅ Readiness check available at http://localhost:${port}/readyz`);
+  try {
+    await app.listen(port);
+    console.log(`🚀 AI Visibility API running on port ${port}`);
+    console.log(`📚 Swagger docs available at http://localhost:${port}/v1/docs`);
+    console.log(`🏥 Health check available at http://localhost:${port}/healthz`);
+    console.log(`✅ Readiness check available at http://localhost:${port}/readyz`);
+  } catch (error) {
+    console.error('❌ Failed to start API:', error);
+    process.exit(1);
+  }
 }
 
 bootstrap().catch((error) => {
