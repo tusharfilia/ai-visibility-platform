@@ -13,7 +13,7 @@ COPY . .
 RUN pnpm install --no-frozen-lockfile
 
 # Generate Prisma client in the workspace root
-RUN pnpm --filter @ai-visibility/db prisma generate
+RUN cd packages/db && pnpm prisma generate
 
 # Build the application
 RUN pnpm run build
