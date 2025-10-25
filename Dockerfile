@@ -12,8 +12,8 @@ COPY . .
 # Install dependencies without frozen lockfile
 RUN pnpm install --no-frozen-lockfile
 
-# Generate Prisma client
-RUN pnpm --filter @ai-visibility/db generate
+# Generate Prisma client in the workspace root
+RUN cd packages/db && pnpm prisma generate
 
 # Build the application
 RUN pnpm run build
