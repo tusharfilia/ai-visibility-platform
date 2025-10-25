@@ -4,7 +4,7 @@
  */
 
 import { Redis } from 'ioredis';
-import { prisma, connectDatabase, disconnectDatabase } from '@ai-visibility-platform/db';
+import { prisma, connectDatabase, disconnectDatabase } from '@ai-visibility/db';
 import { RunPromptWorker } from './workers/run-prompt-worker';
 import { RunBatchWorker } from './workers/run-batch-worker';
 import { DailyAggregationsWorker } from './workers/daily-aggregations-worker';
