@@ -171,8 +171,8 @@ export class GEOOptimizationController {
   ): Promise<{ ok: boolean; data: GraphAnalysis }> {
     try {
       // First build the knowledge graph
-      const aiResponses = await this.getMockAIResponses(brandName);
-      const businessData = await this.getMockBusinessData(brandName);
+      const aiResponses = await this.geoDataService.getAIResponses(workspaceId, brandName);
+      const businessData = await this.geoDataService.getBusinessData(workspaceId);
 
       const graph = await this.knowledgeGraphBuilder.buildKnowledgeGraph(
         workspaceId,
@@ -367,22 +367,29 @@ export class GEOOptimizationController {
 
 
   private async getVisibilityScore(brandName: string, workspaceId: string): Promise<GEOVisibilityScore> {
+    const timeRange = this.parseTimeRange('30d');
     const context: ScoringContext = {
       workspaceId,
       brandName,
       competitors: [],
-      timeRange: this.parseTimeRange('30d'),
+      timeRange,
       engines: ['perplexity', 'aio', 'brave'],
       industry: 'technology',
     };
 
-    const rawData = await this.getMockScoringData(brandName, context);
+    const rawData = await this.geoDataService.getScoringData({
+      workspaceId,
+      brandName,
+      startDate: timeRange.start,
+      endDate: timeRange.end,
+      engines: context.engines,
+    });
     return await this.scoringService.calculateVisibilityScore(context, rawData);
   }
 
   private async getKnowledgeGraph(brandName: string, workspaceId: string): Promise<KnowledgeGraph> {
-    const aiResponses = await this.getMockAIResponses(brandName);
-    const businessData = await this.getMockBusinessData(brandName);
+    const aiResponses = await this.geoDataService.getAIResponses(workspaceId, brandName);
+    const businessData = await this.geoDataService.getBusinessData(workspaceId);
 
     return await this.knowledgeGraphBuilder.buildKnowledgeGraph(
       workspaceId,

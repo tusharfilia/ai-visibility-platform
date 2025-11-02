@@ -150,7 +150,7 @@ export class MaturityController {
 
       return {
         ok: true,
-        data: result.rows.map(row => ({
+        data: result.rows.map((row: any) => ({
           date: row.updatedAt,
           overallScore: row.overallScore,
           entityStrength: row.entityStrength,
