@@ -397,10 +397,10 @@ export class ObservabilityService {
     error?: string
   ): Promise<void> {
     const key = `trace:${traceId}:${spanId}`;
-    const data = await this.redis.get(key);
+    const traceData = await this.redis.get(key);
     
-    if (data) {
-      const trace: TraceContext = JSON.parse(data);
+    if (traceData) {
+      const trace: TraceContext = JSON.parse(traceData);
       trace.endTime = new Date();
       trace.duration = trace.endTime.getTime() - trace.startTime.getTime();
       trace.status = status;
@@ -518,7 +518,7 @@ export class ObservabilityService {
   }
 
   private getMetricValue(metric: string, metrics: WorkspaceMetrics): number {
-    const metricMap = {
+    const metricMap: Record<string, number> = {
       'visibility_score': metrics.visibilityScore,
       'mention_count': metrics.mentionCount,
       'sentiment_score': metrics.sentimentScore,
@@ -535,7 +535,7 @@ export class ObservabilityService {
   }
 
   private getSystemMetricValue(metric: string, metrics: SystemMetrics): number {
-    const metricMap = {
+    const metricMap: Record<string, number> = {
       'cpu_usage': metrics.cpuUsage,
       'memory_usage': metrics.memoryUsage,
       'disk_usage': metrics.diskUsage,

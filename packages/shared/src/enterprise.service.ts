@@ -251,6 +251,13 @@ export class WhiteLabelService {
       ${config.branding.customCss || ''}
     `;
   }
+
+  /**
+   * Generate unique config ID
+   */
+  private generateConfigId(): string {
+    return `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
 }
 
 @Injectable()

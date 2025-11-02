@@ -49,7 +49,7 @@ export class EmailService {
         subject: options.subject,
         html: options.html,
         text: options.text,
-        reply_to: options.replyTo,
+        replyTo: options.replyTo,
         attachments: options.attachments,
       });
 
@@ -61,7 +61,7 @@ export class EmailService {
       console.error('Email sending failed:', error);
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }

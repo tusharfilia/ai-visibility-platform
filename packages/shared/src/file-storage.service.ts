@@ -75,7 +75,7 @@ export class FileStorageService {
       };
     } catch (error) {
       console.error('File upload failed:', error);
-      throw new Error(`Failed to upload file: ${error.message}`);
+      throw new Error(`Failed to upload file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -194,7 +194,7 @@ export class FileStorageService {
       return await getSignedUrl(this.s3Client, command, { expiresIn });
     } catch (error) {
       console.error('Failed to generate presigned URL:', error);
-      throw new Error(`Failed to generate presigned URL: ${error.message}`);
+      throw new Error(`Failed to generate presigned URL: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -224,7 +224,7 @@ export class FileStorageService {
       await this.s3Client.send(command);
     } catch (error) {
       console.error('Failed to delete file:', error);
-      throw new Error(`Failed to delete file: ${error.message}`);
+      throw new Error(`Failed to delete file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -264,7 +264,7 @@ export class FileStorageService {
    * Get content type for file extension
    */
   private getContentType(extension: string): string {
-    const contentTypes = {
+    const contentTypes: Record<string, string> = {
       pdf: 'application/pdf',
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       csv: 'text/csv',

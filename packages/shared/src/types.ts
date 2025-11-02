@@ -3,6 +3,10 @@ export enum EngineKey {
   PERPLEXITY = 'PERPLEXITY',
   AIO = 'AIO',
   BRAVE = 'BRAVE',
+  OPENAI = 'OPENAI',
+  ANTHROPIC = 'ANTHROPIC',
+  GEMINI = 'GEMINI',
+  COPILOT = 'COPILOT',
 }
 
 export enum Intent {
@@ -25,6 +29,7 @@ export enum CopilotActionType {
   ADD_CITATIONS = 'ADD_CITATIONS',
   FIX_SCHEMA = 'FIX_SCHEMA',
   REVIEW_CAMPAIGN = 'REVIEW_CAMPAIGN',
+  CORRECT_HALLUCINATION = 'CORRECT_HALLUCINATION',
 }
 
 export enum CopilotActionStatus {
