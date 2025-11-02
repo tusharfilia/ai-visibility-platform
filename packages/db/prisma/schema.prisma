@@ -27,6 +27,10 @@ enum EngineKey {
   PERPLEXITY
   AIO
   BRAVE
+  OPENAI
+  ANTHROPIC
+  GEMINI
+  COPILOT
 }
 
 enum Intent {
@@ -76,16 +80,22 @@ model User {
   email      String  @unique
   externalId String? // Lovable Cloud user id
   createdAt  DateTime @default(now())
+  deletedAt  DateTime?
+  deletedBy  String?
   members    WorkspaceMember[]
 
   @@map("users")
 }
 
 model Workspace {
-  id        String @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  members   WorkspaceMember[]
+  id           String @id @default(cuid())
+  name         String
+  tier         String @default("FREE") // FREE, INSIGHTS, COPILOT
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+  deletedBy    String?
+  members      WorkspaceMember[]
+  invitations  WorkspaceInvitation[]
 
   @@map("workspaces")
 }
@@ -94,6 +104,9 @@ model WorkspaceMember {
   id          String @id @default(cuid())
   userId      String
   workspaceId String
+  role        String @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
+  invitedBy   String?
+  joinedAt    DateTime @default(now())
   createdAt   DateTime @default(now())
   
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -101,6 +114,23 @@ model WorkspaceMember {
 
   @@index([workspaceId, userId])
   @@map("workspace_members")
+}
+
+model WorkspaceInvitation {
+  id          String   @id @default(cuid())
+  workspaceId String
+  email       String
+  role        String   @default("MEMBER") // ADMIN, MEMBER, VIEWER
+  invitedBy   String
+  token       String   @unique
+  expiresAt   DateTime
+  status      String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+  createdAt   DateTime @default(now())
+  
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, email])
+  @@map("workspace_invitations")
 }
 
 model Connection {
@@ -188,14 +218,22 @@ model Mention {
 }
 
 model Citation {
-  id         String  @id @default(cuid())
-  answerId   String
-  url        String
-  domain     String
-  rank       Int?
-  confidence Float?
+  id            String   @id @default(cuid())
+  answerId      String
+  url           String
+  domain        String
+  rank           Int?
+  confidence     Float?
+  sourceType     String?  // 'licensed_publisher' | 'curated' | 'directory' | 'reddit' | 'user_generated'
+  isLicensed     Boolean  @default(false)
+  publisherName String?
+  directoryType String?
+  redditThread   String?
+  authorityScore Float    @default(0)
+  freshness      DateTime?
 
   @@index([domain])
+  @@index([sourceType])
   @@map("citations")
 }
 
@@ -257,9 +295,320 @@ model AuditLog {
   workspaceId String
   actorUserId String?
   action      String
+  resourceType String?
+  resourceId  String?
   payload     Json?
+  ipAddress   String?
+  userAgent   String?
   createdAt   DateTime @default(now())
 
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, resourceType, resourceId])
   @@map("audit_logs")
+}
+
+model CostLedger {
+  id          String @id @default(cuid())
+  workspaceId String
+  provider    String
+  costCents   Int
+  operation   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, provider])
+  @@map("cost_ledger")
+}
+
+model WorkspaceDailyCost {
+  id          String   @id @default(cuid())
+  workspaceId String
+  date        DateTime
+  totalCents  Int
+  provider    String
+  operation   String?
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, date, provider, operation])
+  @@index([workspaceId, date])
+  @@map("workspace_daily_costs")
+}
+
+// Intelligence Layer Models
+
+model PromptCluster {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  prompts     String[] // Array of prompt texts
+  centroid    Float[]  // Embedding centroid
+  size        Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@map("prompt_clusters")
+}
+
+model EmbeddingCache {
+  id        String   @id @default(cuid())
+  text      String   @unique
+  embedding Float[]
+  model     String   // e.g., "text-embedding-3-small"
+  createdAt DateTime @default(now())
+
+  @@map("embedding_cache")
+}
+
+model CitationOpportunity {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  domain          String
+  domainAuthority Float
+  citationCount   Int      // How many times competitors are cited
+  impactScore     Float    // 0-100
+  status          String   @default("identified") // identified, outreach, cited
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([workspaceId, impactScore])
+  @@map("citation_opportunities")
+}
+
+model HallucinationAlert {
+  id          String   @id @default(cuid())
+  workspaceId String
+  engineKey   String   // Which AI engine
+  promptId    String
+  factType    String   // address, hours, services, etc.
+  aiStatement String   // What AI said
+  correctFact String   // What it should be
+  severity    String   // critical, high, medium, low
+  status      String   @default("open") // open, corrected, dismissed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([workspaceId, severity, status])
+  @@map("hallucination_alerts")
+}
+
+model WorkspaceProfile {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  businessName String
+  address     String?
+  phone       String?
+  hours       Json?
+  services    String[]
+  description String?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("workspace_profiles")
+}
+
+model WorkspaceSettings {
+  id                String   @id @default(cuid())
+  workspaceId       String   @unique
+  defaultLlmProvider String  @default("openai") // openai, anthropic, gemini
+  llmModel          String   @default("gpt-4") // gpt-4, claude-3-opus, gemini-pro
+  autoApprovalEnabled Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("workspace_settings")
+}
+
+model DirectorySubmission {
+  id          String   @id @default(cuid())
+  workspaceId String
+  directory   String   // yelp, foursquare, google, etc.
+  status      String   @default("pending") // pending, submitted, verified, failed
+  submittedAt DateTime?
+  verifiedAt  DateTime?
+  errorMessage String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([workspaceId, directory, status])
+  @@map("directory_submissions")
+}
+
+model CorrectionSubmission {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  hallucinationId String
+  platform        String   // perplexity, openai, google, etc.
+  status          String   @default("pending") // pending, submitted, accepted, rejected
+  submittedAt     DateTime?
+  responseAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([workspaceId, platform, status])
+  @@map("correction_submissions")
+}
+
+model WhiteLabelConfig {
+  id            String   @id @default(cuid())
+  workspaceId   String   @unique
+  agencyName    String
+  logoUrl       String?
+  faviconUrl    String?
+  primaryColor  String   @default("#3B82F6")
+  customDomain  String?
+  emailFromName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("white_label_configs")
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  key         String   @unique
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+  revokedAt   DateTime?
+  
+  @@index([workspaceId, key])
+  @@map("api_keys")
+}
+
+model Webhook {
+  id          String   @id @default(cuid())
+  workspaceId String
+  url         String
+  events      String[] // scan.complete, hallucination.detected, etc.
+  secret      String
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  @@index([workspaceId, enabled])
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  webhookId   String
+  event       String
+  payload     Json
+  status      String   @default("pending") // pending, delivered, failed
+  attempts    Int      @default(0)
+  lastAttempt DateTime?
+  createdAt   DateTime @default(now())
+  
+  @@index([webhookId, status])
+  @@map("webhook_deliveries")
+}
+
+model ScheduledReport {
+  id          String   @id @default(cuid())
+  workspaceId String
+  reportType  String   // executive, trend, competitor
+  frequency   String   // daily, weekly, monthly
+  recipients  String[] // Email addresses
+  enabled     Boolean  @default(true)
+  lastSent    DateTime?
+  createdAt   DateTime @default(now())
+  
+  @@index([workspaceId, enabled])
+  @@map("scheduled_reports")
+}
+
+model IndustryBenchmark {
+  id                String   @id @default(cuid())
+  industry          String
+  date              DateTime @db.Date
+  avgVisibilityScore Float
+  medianVisibilityScore Float
+  sampleSize        Int
+  createdAt         DateTime @default(now())
+  
+  @@unique([industry, date])
+  @@map("industry_benchmarks")
+}
+
+model AssistantConversation {
+  id          String   @id @default(cuid())
+  workspaceId String
+  messages    Json[]   // Array of { role, content, timestamp }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([workspaceId, updatedAt])
+  @@map("assistant_conversations")
+}
+
+model ActionFeedback {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  actionType    String   // citation_outreach, content_generation, etc.
+  executedAt    DateTime
+  scoreBefore   Float
+  scoreAfter    Float?
+  scoreChange   Float?
+  effective     Boolean?
+  createdAt     DateTime @default(now())
+  
+  @@index([workspaceId, actionType, effective])
+  @@map("action_feedback")
+}
+
+// GEO Compliance Enhancements
+
+model EntityEvidence {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  entityType    String   // 'workspace' | 'location' | 'product'
+  sourceType    String   // 'licensed_publisher' | 'curated' | 'directory' | 'reddit' | 'user_generated'
+  sourceDomain  String
+  citationUrl   String?
+  evidenceText  String
+  authorityScore Float
+  freshness     DateTime
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([workspaceId, sourceType])
+  @@map("entity_evidence")
+}
+
+model GEOMaturityScore {
+  id                String   @id @default(cuid())
+  workspaceId       String   @unique
+  entityStrength    Float
+  citationDepth      Float
+  structuralClarity  Float
+  updateCadence      Float
+  overallScore       Float
+  maturityLevel      String   // 'beginner' | 'intermediate' | 'advanced' | 'expert'
+  recommendations    Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([workspaceId, overallScore])
+  @@map("geo_maturity_scores")
+}
+
+model EEATScore {
+  id                String   @id @default(cuid())
+  workspaceId       String   @unique
+  experience        Float
+  expertise         Float
+  authoritativeness Float
+  trustworthiness   Float
+  overallScore      Float
+  level             String   // 'low' | 'medium' | 'high' | 'excellent'
+  breakdown         Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([workspaceId, overallScore])
+  @@map("eeat_scores")
 }

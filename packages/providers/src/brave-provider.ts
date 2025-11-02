@@ -35,8 +35,122 @@ export class BraveProvider extends BaseProvider {
       }, 'Brave ask');
     }
     
-    // TODO: Implement real API call using BRAVE_API_KEY
-    throw new Error('Real API calls not implemented yet');
+    // Real Brave Search API call
+    const apiKey = process.env.BRAVE_API_KEY || this.config?.apiKey;
+    if (!apiKey) {
+      throw new Error('BRAVE_API_KEY is required');
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      const searchResponse = await fetch(
+        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(prompt)}&count=10`,
+        {
+          method: 'GET',
+          headers: {
+            'X-Subscription-Token': apiKey,
+            'Accept': 'application/json',
+          },
+        }
+      );
+
+      if (!searchResponse.ok) {
+        const errorText = await searchResponse.text();
+        throw new Error(`Brave API error: ${searchResponse.status} ${errorText}`);
+      }
+
+      const data = await searchResponse.json();
+      
+      // Extract results and build answer
+      const webResults = data.web?.results || [];
+      const answerText = this.buildAnswerFromResults(prompt, webResults);
+      
+      // Extract citations
+      const citations: Array<{ url: string; domain: string; confidence?: number }> = webResults
+        .slice(0, 10)
+        .map((result: any, index: number) => ({
+          url: result.url || '',
+          domain: result.url ? new URL(result.url).hostname.replace('www.', '') : '',
+          confidence: 0.95 - (index * 0.05), // Decrease confidence for lower-ranked results
+        }))
+        .filter((c: any) => c.url);
+
+      // Extract mentions
+      const mentions = this.extractMentions(answerText, options?.brandName || '');
+
+      const latency = Date.now() - startTime;
+
+      return this.createEngineAnswer(
+        prompt,
+        answerText,
+        mentions,
+        citations,
+        {
+          model: 'brave-search',
+          tokens: answerText.length / 4, // Rough token estimate
+          latency,
+          cost: 0.001, // Brave Search pricing
+        }
+      );
+    } catch (error) {
+      console.error('Brave API error:', error);
+      throw new Error(`Brave API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private buildAnswerFromResults(prompt: string, results: any[]): string {
+    if (results.length === 0) {
+      return `I found no results for "${prompt}".`;
+    }
+
+    let answer = `Here's what I found about "${prompt}":\n\n`;
+    
+    results.slice(0, 5).forEach((result, index) => {
+      answer += `${index + 1}. ${result.title || 'Untitled'}\n`;
+      if (result.description) {
+        answer += `   ${result.description}\n`;
+      }
+      answer += `   Source: ${result.url}\n\n`;
+    });
+
+    return answer.trim();
+  }
+
+  private extractMentions(content: string, brandName?: string): Array<{ brand: string; position: number; sentiment: Sentiment; snippet: string }> {
+    const mentions: Array<{ brand: string; position: number; sentiment: Sentiment; snippet: string }> = [];
+    
+    if (brandName) {
+      const brandRegex = new RegExp(brandName, 'gi');
+      const matches = [...content.matchAll(brandRegex)];
+      
+      matches.forEach((match, index) => {
+        const position = match.index || 0;
+        const contextStart = Math.max(0, position - 50);
+        const contextEnd = Math.min(content.length, position + 50);
+        const snippet = content.substring(contextStart, contextEnd);
+        
+        const positiveWords = ['great', 'excellent', 'best', 'amazing', 'good', 'top'];
+        const negativeWords = ['bad', 'worst', 'poor', 'terrible', 'awful'];
+        const context = snippet.toLowerCase();
+        
+        let sentiment = Sentiment.NEUTRAL;
+        if (positiveWords.some(word => context.includes(word))) {
+          sentiment = Sentiment.POS;
+        } else if (negativeWords.some(word => context.includes(word))) {
+          sentiment = Sentiment.NEG;
+        }
+        
+        mentions.push({
+          brand: brandName,
+          position: index + 1,
+          sentiment,
+          snippet,
+        });
+      });
+    }
+    
+    return mentions;
   }
 
   async healthCheck(): Promise<ProviderHealth> {

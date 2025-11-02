@@ -35,18 +35,161 @@ export class PerplexityProvider extends BaseProvider {
       }, 'Perplexity ask');
     }
     
-    // TODO: Implement real API call using PERPLEXITY_API_KEY
-    throw new Error('Real API calls not implemented yet');
+    // Real Perplexity API call
+    const apiKey = process.env.PERPLEXITY_API_KEY || this.config?.apiKey;
+    if (!apiKey) {
+      throw new Error('PERPLEXITY_API_KEY is required');
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: options?.model || 'llama-3.1-sonar-large-128k-online',
+          messages: [
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: options?.temperature || 0.7,
+          max_tokens: options?.maxTokens || 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Perplexity API error: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content || '';
+      const usage = data.usage || {};
+      
+      // Extract citations from Perplexity response
+      const citations: Array<{ url: string; domain: string; confidence?: number }> = [];
+      if (data.citations && Array.isArray(data.citations)) {
+        for (const citation of data.citations) {
+          try {
+            const url = typeof citation === 'string' ? citation : citation.url || citation;
+            const domain = new URL(url).hostname.replace('www.', '');
+            citations.push({ url, domain, confidence: 0.9 });
+          } catch (e) {
+            // Invalid URL, skip
+          }
+        }
+      }
+
+      // Extract mentions from content
+      const mentions = this.extractMentions(content, options?.brandName || '');
+
+      const latency = Date.now() - startTime;
+
+      return this.createEngineAnswer(
+        prompt,
+        content,
+        mentions,
+        citations,
+        {
+          model: data.model || 'llama-3.1-sonar-large-128k-online',
+          tokens: usage.total_tokens || 0,
+          latency,
+          cost: this.calculateCostFromTokens(usage.total_tokens || 0),
+        }
+      );
+    } catch (error) {
+      console.error('Perplexity API error:', error);
+      throw new Error(`Perplexity API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private calculateCostFromTokens(tokens: number): number {
+    // Perplexity pricing: $0.001 per 1K tokens (approximate)
+    return (tokens / 1000) * 0.001;
+  }
+
+  private extractMentions(content: string, brandName?: string): Array<{ brand: string; position: number; sentiment: Sentiment; snippet: string }> {
+    const mentions: Array<{ brand: string; position: number; sentiment: Sentiment; snippet: string }> = [];
+    
+    if (brandName) {
+      const brandRegex = new RegExp(brandName, 'gi');
+      const matches = [...content.matchAll(brandRegex)];
+      
+      matches.forEach((match, index) => {
+        const position = match.index || 0;
+        const contextStart = Math.max(0, position - 50);
+        const contextEnd = Math.min(content.length, position + 50);
+        const snippet = content.substring(contextStart, contextEnd);
+        
+        // Simple sentiment analysis
+        const positiveWords = ['great', 'excellent', 'best', 'amazing', 'good', 'top'];
+        const negativeWords = ['bad', 'worst', 'poor', 'terrible', 'awful'];
+        const context = snippet.toLowerCase();
+        
+        let sentiment = Sentiment.NEUTRAL;
+        if (positiveWords.some(word => context.includes(word))) {
+          sentiment = Sentiment.POS;
+        } else if (negativeWords.some(word => context.includes(word))) {
+          sentiment = Sentiment.NEG;
+        }
+        
+        mentions.push({
+          brand: brandName,
+          position: index + 1,
+          sentiment,
+          snippet,
+        });
+      });
+    }
+    
+    return mentions;
   }
 
   async healthCheck(): Promise<ProviderHealth> {
     try {
-      // Simulate health check
-      await this.simulateLatency(50, 200);
-      
+      const apiKey = process.env.PERPLEXITY_API_KEY || this.config?.apiKey;
+      if (!apiKey) {
+        return {
+          status: 'unhealthy',
+          lastCheck: new Date(),
+          error: 'PERPLEXITY_API_KEY not configured',
+        };
+      }
+
+      const startTime = Date.now();
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-sonar-small-128k-online',
+          messages: [{ role: 'user', content: 'test' }],
+          max_tokens: 10,
+        }),
+      });
+
+      const latency = Date.now() - startTime;
+
+      if (!response.ok) {
+        return {
+          status: 'unhealthy',
+          latency,
+          lastCheck: new Date(),
+          error: `API returned ${response.status}`,
+        };
+      }
+
       return {
         status: 'healthy',
-        latency: Math.random() * 100 + 50,
+        latency,
         lastCheck: new Date(),
       };
     } catch (error) {

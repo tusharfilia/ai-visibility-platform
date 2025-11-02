@@ -35,8 +35,153 @@ export class AioProvider extends BaseProvider {
       }, 'AIO ask');
     }
     
-    // TODO: Implement real API call using SERPAPI_KEY
-    throw new Error('Real API calls not implemented yet');
+    // Real Google AI Overviews via SerpAPI
+    const apiKey = process.env.SERPAPI_KEY || this.config?.apiKey;
+    if (!apiKey) {
+      throw new Error('SERPAPI_KEY is required for Google AI Overviews');
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      // Use SerpAPI to get Google search results with AI Overviews
+      const searchResponse = await fetch(
+        `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(prompt)}&api_key=${apiKey}`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+        }
+      );
+
+      if (!searchResponse.ok) {
+        const errorText = await searchResponse.text();
+        throw new Error(`SerpAPI error: ${searchResponse.status} ${errorText}`);
+      }
+
+      const data = await searchResponse.json();
+      
+      // Extract AI Overview (Google's AI-generated summary)
+      let answerText = '';
+      const citations: Array<{ url: string; domain: string; confidence?: number }> = [];
+      
+      if (data.answer_box) {
+        answerText = data.answer_box.answer || data.answer_box.snippet || '';
+      } else if (data.organic_results && data.organic_results.length > 0) {
+        // Build answer from top organic results
+        answerText = this.buildAnswerFromResults(prompt, data.organic_results);
+      }
+
+      // Extract citations from organic results
+      if (data.organic_results) {
+        data.organic_results.slice(0, 10).forEach((result: any, index: number) => {
+          if (result.link) {
+            try {
+              const domain = new URL(result.link).hostname.replace('www.', '');
+              citations.push({
+                url: result.link,
+                domain,
+                confidence: 0.95 - (index * 0.05),
+              });
+            } catch (e) {
+              // Invalid URL, skip
+            }
+          }
+        });
+      }
+
+      // Extract knowledge graph citations
+      if (data.knowledge_graph?.source?.link) {
+        try {
+          const domain = new URL(data.knowledge_graph.source.link).hostname.replace('www.', '');
+          citations.push({
+            url: data.knowledge_graph.source.link,
+            domain,
+            confidence: 0.98,
+          });
+        } catch (e) {
+          // Invalid URL, skip
+        }
+      }
+
+      // Extract mentions
+      const mentions = this.extractMentions(answerText, options?.brandName || '');
+
+      const latency = Date.now() - startTime;
+
+      return this.createEngineAnswer(
+        prompt,
+        answerText || `No AI Overview available for "${prompt}".`,
+        mentions,
+        citations,
+        {
+          model: 'google-ai-overviews',
+          tokens: answerText.length / 4, // Rough token estimate
+          latency,
+          cost: 0.005, // SerpAPI pricing per request
+        }
+      );
+    } catch (error) {
+      console.error('Google AI Overviews API error:', error);
+      throw new Error(`Google AI Overviews API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private buildAnswerFromResults(prompt: string, results: any[]): string {
+    if (results.length === 0) {
+      return `I found no results for "${prompt}".`;
+    }
+
+    let answer = `Based on Google search results for "${prompt}":\n\n`;
+    
+    results.slice(0, 5).forEach((result, index) => {
+      answer += `${index + 1}. ${result.title || 'Untitled'}\n`;
+      if (result.snippet) {
+        answer += `   ${result.snippet}\n`;
+      }
+      if (result.link) {
+        answer += `   Source: ${result.link}\n\n`;
+      }
+    });
+
+    return answer.trim();
+  }
+
+  private extractMentions(content: string, brandName?: string): Array<{ brand: string; position: number; sentiment: Sentiment; snippet: string }> {
+    const mentions: Array<{ brand: string; position: number; sentiment: Sentiment; snippet: string }> = [];
+    
+    if (brandName) {
+      const brandRegex = new RegExp(brandName, 'gi');
+      const matches = [...content.matchAll(brandRegex)];
+      
+      matches.forEach((match, index) => {
+        const position = match.index || 0;
+        const contextStart = Math.max(0, position - 50);
+        const contextEnd = Math.min(content.length, position + 50);
+        const snippet = content.substring(contextStart, contextEnd);
+        
+        const positiveWords = ['great', 'excellent', 'best', 'amazing', 'good', 'top'];
+        const negativeWords = ['bad', 'worst', 'poor', 'terrible', 'awful'];
+        const context = snippet.toLowerCase();
+        
+        let sentiment = Sentiment.NEUTRAL;
+        if (positiveWords.some(word => context.includes(word))) {
+          sentiment = Sentiment.POS;
+        } else if (negativeWords.some(word => context.includes(word))) {
+          sentiment = Sentiment.NEG;
+        }
+        
+        mentions.push({
+          brand: brandName,
+          position: index + 1,
+          sentiment,
+          snippet,
+        });
+      });
+    }
+    
+    return mentions;
   }
 
   async healthCheck(): Promise<ProviderHealth> {

@@ -1,0 +1,50 @@
+# Railway Production Configuration
+# This file configures the production deployment for Railway
+
+# Build configuration
+[build]
+builder = "nixpacks"
+buildCommand = "pnpm install && pnpm build"
+
+# Deploy configuration
+[deploy]
+startCommand = "pnpm --filter @ai-visibility/api start"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 300
+restartPolicyType = "always"
+
+# Environment variables
+[env]
+NODE_ENV = "production"
+PORT = "8080"
+
+# Scaling configuration
+[scale]
+minInstances = 1
+maxInstances = 10
+targetConcurrency = 100
+
+# Networking
+[networking]
+internalPort = 8080  # Must match PORT environment variable
+externalPort = 443
+protocol = "https"
+
+# Health checks
+[healthcheck]
+path = "/healthz"
+interval = 30
+timeout = 10
+retries = 3
+
+# Logging
+[logging]
+level = "info"
+format = "json"
+
+# Monitoring
+[monitoring]
+enabled = true
+metrics = true
+tracing = true
+

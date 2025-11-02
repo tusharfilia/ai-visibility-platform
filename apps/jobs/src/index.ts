@@ -9,6 +9,9 @@ import { RunPromptWorker } from './workers/run-prompt-worker';
 import { RunBatchWorker } from './workers/run-batch-worker';
 import { DailyAggregationsWorker } from './workers/daily-aggregations-worker';
 import { CopilotPlannerWorker } from './workers/copilot-planner-worker';
+import { EvidenceGraphWorker } from './workers/evidence-graph-worker';
+import { MaturityRecomputeWorker } from './workers/maturity-recompute-worker';
+import { RecommendationRefreshWorker } from './workers/recommendation-refresh-worker';
 import { jobScheduler } from './schedulers';
 import { checkQueueHealth, getQueueMetrics, shutdownQueues } from './queues';
 
@@ -20,6 +23,9 @@ let runPromptWorker: RunPromptWorker;
 let runBatchWorker: RunBatchWorker;
 let dailyAggregationsWorker: DailyAggregationsWorker;
 let copilotPlannerWorker: CopilotPlannerWorker;
+let evidenceGraphWorker: EvidenceGraphWorker;
+let maturityRecomputeWorker: MaturityRecomputeWorker;
+let recommendationRefreshWorker: RecommendationRefreshWorker;
 
 async function startWorkers(): Promise<void> {
   console.log('Starting workers...');
@@ -29,6 +35,9 @@ async function startWorkers(): Promise<void> {
   runBatchWorker = new RunBatchWorker(redis);
   dailyAggregationsWorker = new DailyAggregationsWorker(redis);
   copilotPlannerWorker = new CopilotPlannerWorker(redis);
+  evidenceGraphWorker = new EvidenceGraphWorker(redis);
+  maturityRecomputeWorker = new MaturityRecomputeWorker(redis);
+  recommendationRefreshWorker = new RecommendationRefreshWorker(redis);
   
   console.log('Workers started successfully');
 }
@@ -92,6 +101,9 @@ async function shutdownApplication(): Promise<void> {
     await runBatchWorker?.close();
     await dailyAggregationsWorker?.close();
     await copilotPlannerWorker?.close();
+    await evidenceGraphWorker?.close();
+    await maturityRecomputeWorker?.close();
+    await recommendationRefreshWorker?.close();
     
     // Shutdown queues
     await shutdownQueues();

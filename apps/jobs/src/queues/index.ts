@@ -14,6 +14,9 @@ export const runPromptQueue = new Queue('runPrompt', { connection: redis });
 export const runBatchQueue = new Queue('runBatch', { connection: redis });
 export const dailyAggregationsQueue = new Queue('dailyAggregations', { connection: redis });
 export const copilotPlannerQueue = new Queue('copilotPlanner', { connection: redis });
+export const evidenceGraphQueue = new Queue('evidenceGraph', { connection: redis });
+export const maturityRecomputeQueue = new Queue('maturityRecompute', { connection: redis });
+export const recommendationRefreshQueue = new Queue('recommendationRefresh', { connection: redis });
 
 // Queue events
 export const runPromptEvents = new QueueEvents('runPrompt', { connection: redis });
