@@ -9,6 +9,8 @@ import { loadFixture } from './fixture-loader';
 import { MOCK_PROVIDERS } from './env';
 
 export class BraveProvider extends BaseProvider {
+  readonly engineType: 'search' | 'llm' = 'search';
+
   constructor(config: any = {}) {
     super(EngineKey.BRAVE, 'Brave Search', '1.0.0', config);
   }

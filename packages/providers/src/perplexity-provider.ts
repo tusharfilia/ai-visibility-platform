@@ -9,6 +9,8 @@ import { loadFixture } from './fixture-loader';
 import { MOCK_PROVIDERS } from './env';
 
 export class PerplexityProvider extends BaseProvider {
+  readonly engineType: 'search' | 'llm' = 'search';
+
   constructor(config: any = {}) {
     super(EngineKey.PERPLEXITY, 'Perplexity AI', '1.0.0', config);
   }

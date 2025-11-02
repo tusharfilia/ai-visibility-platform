@@ -23,6 +23,7 @@ export abstract class BaseProvider implements Provider {
   protected config: ProviderConfig;
   protected rateLimitInfo: RateLimitInfo | null = null;
   protected lastRequestTime: Date | null = null;
+  abstract readonly engineType: 'search' | 'llm';
 
   constructor(
     public readonly key: EngineKey,
