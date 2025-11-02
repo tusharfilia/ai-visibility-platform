@@ -230,9 +230,9 @@ export class EmailService {
           
           <div style="background: #FEF2F2; border: 1px solid #FECACA; padding: 16px; border-radius: 8px; margin: 16px 0;">
             <h3 style="color: #DC2626; margin-top: 0;">Current Usage</h3>
-            <p><strong>Current Cost:</strong> ${{CURRENT_COST}}</p>
-            <p><strong>Budget Limit:</strong> ${{BUDGET_LIMIT}}</p>
-            <p><strong>Remaining:</strong> ${{REMAINING}}</p>
+            <p><strong>Current Cost:</strong> $${'{{CURRENT_COST}}'}</p>
+            <p><strong>Budget Limit:</strong> $${'{{BUDGET_LIMIT}}'}</p>
+            <p><strong>Remaining:</strong> $${'{{REMAINING}}'}</p>
           </div>
           
           <p>To avoid service interruption, consider:</p>
