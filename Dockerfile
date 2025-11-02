@@ -10,17 +10,14 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/jobs/package.json ./apps/jobs/
-# Copy all package.json files from packages (using explicit paths for better reliability)
-COPY packages/automation/package.json ./packages/automation/
-COPY packages/content/package.json ./packages/content/
-COPY packages/copilot/package.json ./packages/copilot/
-COPY packages/db/package.json ./packages/db/
-COPY packages/geo/package.json ./packages/geo/
-COPY packages/optimizer/package.json ./packages/optimizer/
-COPY packages/parser/package.json ./packages/parser/
-COPY packages/prompts/package.json ./packages/prompts/
-COPY packages/providers/package.json ./packages/providers/
-COPY packages/shared/package.json ./packages/shared/
+
+# Copy all package.json files from packages directory
+# Use find to copy all package.json files (more resilient than explicit paths)
+RUN mkdir -p packages/automation packages/content packages/copilot packages/db \
+    packages/geo packages/optimizer packages/parser packages/prompts \
+    packages/providers packages/shared
+
+COPY packages/*/package.json ./packages/*/
 
 # Install dependencies (without frozen-lockfile since we don't have one yet)
 FROM base AS deps
