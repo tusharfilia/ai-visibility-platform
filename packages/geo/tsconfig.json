@@ -14,7 +14,7 @@
     "sourceMap": true,
     "composite": false,
     "incremental": false,
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "resolveJsonModule": true,
     "noEmitOnError": false
   },
