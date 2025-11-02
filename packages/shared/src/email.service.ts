@@ -47,7 +47,7 @@ export class EmailService {
         from: options.from || this.defaultFrom,
         to: Array.isArray(options.to) ? options.to : [options.to],
         subject: options.subject,
-        html: options.html,
+        html: options.html || '',
         text: options.text,
         replyTo: options.replyTo,
         attachments: options.attachments,
@@ -251,9 +251,9 @@ export class EmailService {
         Your workspace {{WORKSPACE}} has reached {{THRESHOLD}}% of its monthly budget.
         
         Current Usage:
-        - Current Cost: ${{CURRENT_COST}}
-        - Budget Limit: ${{BUDGET_LIMIT}}
-        - Remaining: ${{REMAINING}}
+        - Current Cost: ${'{{CURRENT_COST}}'}
+        - Budget Limit: ${'{{BUDGET_LIMIT}}'}
+        - Remaining: ${'{{REMAINING}}'}
         
         To avoid service interruption, consider:
         - Increasing your monthly budget

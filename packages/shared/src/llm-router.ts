@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { LLMConfigService, LLMConfig } from './llm-config.service';
-import { BaseLLMProvider, LLMResponse } from '@ai-visibility/providers/llm/base-llm-provider';
+import { BaseLLMProvider } from '@ai-visibility/providers';
+
+export interface LLMResponse {
+  text: string;
+  usage?: { promptTokens: number; completionTokens: number };
+  metadata?: Record<string, any>;
+}
 
 @Injectable()
 export class LLMRouterService {
@@ -21,7 +27,7 @@ export class LLMRouterService {
       return await provider.query(prompt, { ...options, model: config.model });
     } catch (error) {
       // If primary provider fails, try fallback providers
-      console.warn(`Primary LLM provider failed for workspace ${workspaceId}:`, error.message);
+      console.warn(`Primary LLM provider failed for workspace ${workspaceId}:`, error instanceof Error ? error.message : String(error));
       
       const fallbackProviders = this.getFallbackProviders(config.provider);
       
@@ -31,7 +37,7 @@ export class LLMRouterService {
           const provider = await this.createProvider(fallbackConfig);
           return await provider.query(prompt, { ...options, model: fallbackConfig.model });
         } catch (fallbackError) {
-          console.warn(`Fallback provider ${fallbackProvider} also failed:`, fallbackError.message);
+          console.warn(`Fallback provider ${fallbackProvider} also failed:`, fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
           continue;
         }
       }
@@ -46,15 +52,15 @@ export class LLMRouterService {
   private async createProvider(config: LLMConfig): Promise<BaseLLMProvider> {
     switch (config.provider) {
       case 'openai':
-        const { OpenAIProvider } = await import('@ai-visibility/providers/llm/openai-provider');
+        const { OpenAIProvider } = await import('@ai-visibility/providers');
         return new OpenAIProvider({ apiKey: config.apiKey });
       
       case 'anthropic':
-        const { AnthropicProvider } = await import('@ai-visibility/providers/llm/anthropic-provider');
+        const { AnthropicProvider } = await import('@ai-visibility/providers');
         return new AnthropicProvider({ apiKey: config.apiKey });
       
       case 'gemini':
-        const { GeminiProvider } = await import('@ai-visibility/providers/llm/gemini-provider');
+        const { GeminiProvider } = await import('@ai-visibility/providers');
         return new GeminiProvider({ apiKey: config.apiKey });
       
       default:
@@ -72,6 +78,11 @@ export class LLMRouterService {
       'gemini': ['openai', 'anthropic'],
     };
     
+    const fallbackMap: Record<string, string[]> = {
+      'openai': ['anthropic', 'gemini'],
+      'anthropic': ['openai', 'gemini'],
+      'gemini': ['openai', 'anthropic'],
+    };
     return fallbackMap[primaryProvider] || ['openai'];
   }
 

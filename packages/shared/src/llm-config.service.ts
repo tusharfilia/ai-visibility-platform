@@ -70,17 +70,17 @@ export class LLMConfigService {
       
       switch (config.provider) {
         case 'openai':
-          const { OpenAIProvider } = await import('@ai-visibility/providers/llm/openai-provider');
+          const { OpenAIProvider } = await import('@ai-visibility/providers');
           provider = new OpenAIProvider({ apiKey: config.apiKey });
           break;
         
         case 'anthropic':
-          const { AnthropicProvider } = await import('@ai-visibility/providers/llm/anthropic-provider');
+          const { AnthropicProvider } = await import('@ai-visibility/providers');
           provider = new AnthropicProvider({ apiKey: config.apiKey });
           break;
         
         case 'gemini':
-          const { GeminiProvider } = await import('@ai-visibility/providers/llm/gemini-provider');
+          const { GeminiProvider } = await import('@ai-visibility/providers');
           provider = new GeminiProvider({ apiKey: config.apiKey });
           break;
         
@@ -149,7 +149,7 @@ export class LLMConfigService {
       },
     };
 
-    const providerPricing = pricing[provider];
+    const providerPricing = pricing[provider as keyof typeof pricing];
     if (!providerPricing) return 0;
 
     const modelPricing = providerPricing[model];

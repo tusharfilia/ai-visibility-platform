@@ -53,7 +53,7 @@ export interface AlertRule {
   triggerCount: number;
 }
 
-export interface Alert {
+export interface ObservabilityAlert {
   id: string;
   ruleId: string;
   workspaceId?: string;
@@ -369,18 +369,18 @@ export class ObservabilityService {
     spanId: string,
     level: 'debug' | 'info' | 'warn' | 'error',
     message: string,
-    data?: any
+    logData?: any
   ): Promise<void> {
     const key = `trace:${traceId}:${spanId}`;
-    const data = await this.redis.get(key);
+    const traceData = await this.redis.get(key);
     
-    if (data) {
-      const trace: TraceContext = JSON.parse(data);
+    if (traceData) {
+      const trace: TraceContext = JSON.parse(traceData);
       trace.logs.push({
         timestamp: new Date(),
         level,
         message,
-        data,
+        data: logData,
       });
 
       await this.redis.setex(key, 3600, JSON.stringify(trace));
@@ -454,7 +454,7 @@ export class ObservabilityService {
   }
 
   private async triggerAlert(rule: AlertRule, value: number, metrics: WorkspaceMetrics): Promise<void> {
-    const alert: Alert = {
+    const alert: ObservabilityAlert = {
       id: this.generateAlertId(),
       ruleId: rule.id,
       workspaceId: rule.workspaceId,
@@ -487,7 +487,7 @@ export class ObservabilityService {
   }
 
   private async triggerSystemAlert(rule: AlertRule, value: number, metrics: SystemMetrics): Promise<void> {
-    const alert: Alert = {
+    const alert: ObservabilityAlert = {
       id: this.generateAlertId(),
       ruleId: rule.id,
       type: 'system',
@@ -563,7 +563,7 @@ export class ObservabilityService {
     }
   }
 
-  private async sendAlertNotifications(alert: Alert, rule: AlertRule): Promise<void> {
+  private async sendAlertNotifications(alert: ObservabilityAlert, rule: AlertRule): Promise<void> {
     // In a real implementation, this would send emails, Slack messages, etc.
     console.log(`Alert triggered: ${alert.title} - ${alert.message}`);
     
