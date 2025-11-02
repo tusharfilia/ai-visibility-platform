@@ -72,12 +72,6 @@ export class LLMRouterService {
    * Get fallback providers for a given provider
    */
   private getFallbackProviders(primaryProvider: string): string[] {
-    const fallbackMap = {
-      'openai': ['anthropic', 'gemini'],
-      'anthropic': ['openai', 'gemini'],
-      'gemini': ['openai', 'anthropic'],
-    };
-    
     const fallbackMap: Record<string, string[]> = {
       'openai': ['anthropic', 'gemini'],
       'anthropic': ['openai', 'gemini'],
