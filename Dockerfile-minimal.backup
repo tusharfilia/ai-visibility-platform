@@ -11,3 +11,5 @@ EXPOSE 8080
 
 # Start the standalone server
 CMD ["node", "main-standalone.js"]
+
+
