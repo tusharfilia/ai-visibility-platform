@@ -5,6 +5,7 @@
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
+    "baseUrl": "./src",
     "strict": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -17,7 +18,11 @@
     "incremental": false,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "paths": {
+      "@ai-visibility/shared": ["../shared/src"],
+      "@ai-visibility/shared/*": ["../shared/src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts", "src/validation/**/*"]
