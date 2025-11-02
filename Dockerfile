@@ -12,12 +12,22 @@ COPY apps/api/package.json ./apps/api/
 COPY apps/jobs/package.json ./apps/jobs/
 
 # Copy all package.json files from packages directory
-# Use find to copy all package.json files (more resilient than explicit paths)
+# Create all package directories first
 RUN mkdir -p packages/automation packages/content packages/copilot packages/db \
     packages/geo packages/optimizer packages/parser packages/prompts \
     packages/providers packages/shared
 
-COPY packages/*/package.json ./packages/*/
+# Copy package.json files individually (wildcard not reliable in Docker)
+COPY packages/automation/package.json ./packages/automation/package.json
+COPY packages/content/package.json ./packages/content/package.json
+COPY packages/copilot/package.json ./packages/copilot/package.json
+COPY packages/db/package.json ./packages/db/package.json
+COPY packages/geo/package.json ./packages/geo/package.json
+COPY packages/optimizer/package.json ./packages/optimizer/package.json
+COPY packages/parser/package.json ./packages/parser/package.json
+COPY packages/prompts/package.json ./packages/prompts/package.json
+COPY packages/providers/package.json ./packages/providers/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 
 # Install dependencies (without frozen-lockfile since we don't have one yet)
 FROM base AS deps
