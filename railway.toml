@@ -17,6 +17,7 @@ restartPolicyType = "always"
 [env]
 NODE_ENV = "production"
 PORT = "8080"
+CI = "false"  # Disable frozen-lockfile in CI environments
 
 # Scaling configuration
 [scale]
