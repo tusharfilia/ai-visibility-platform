@@ -31,6 +31,9 @@ COPY packages/shared/package.json ./packages/shared/package.json
 
 # Install dependencies (without frozen-lockfile since we don't have one yet)
 FROM base AS deps
+# Skip Puppeteer Chrome download during build to speed up installation
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 RUN pnpm install --no-frozen-lockfile
 
 # Copy source code
