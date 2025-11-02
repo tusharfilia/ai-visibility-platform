@@ -45,6 +45,7 @@ export interface ProviderRequestOptions {
   maxTokens?: number;
   stream?: boolean;
   metadata?: Record<string, any>;
+  brandName?: string;
 }
 
 // Provider response with metadata
@@ -82,6 +83,7 @@ export interface Provider {
   readonly key: EngineKey;
   readonly name: string;
   readonly version: string;
+  readonly engineType: 'search' | 'llm';
   
   // Core methods
   ask(prompt: string, options?: ProviderRequestOptions): Promise<EngineAnswer>;

@@ -60,10 +60,10 @@ export class BraveProvider extends BaseProvider {
         throw new Error(`Brave API error: ${searchResponse.status} ${errorText}`);
       }
 
-      const data = await searchResponse.json();
+      const data = await searchResponse.json() as any;
       
       // Extract results and build answer
-      const webResults = data.web?.results || [];
+      const webResults = (data.web?.results || []) as any[];
       const answerText = this.buildAnswerFromResults(prompt, webResults);
       
       // Extract citations
@@ -134,7 +134,7 @@ export class BraveProvider extends BaseProvider {
         const negativeWords = ['bad', 'worst', 'poor', 'terrible', 'awful'];
         const context = snippet.toLowerCase();
         
-        let sentiment = Sentiment.NEUTRAL;
+        let sentiment = Sentiment.NEU;
         if (positiveWords.some(word => context.includes(word))) {
           sentiment = Sentiment.POS;
         } else if (negativeWords.some(word => context.includes(word))) {

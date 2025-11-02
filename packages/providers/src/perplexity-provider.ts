@@ -68,8 +68,8 @@ export class PerplexityProvider extends BaseProvider {
         throw new Error(`Perplexity API error: ${response.status} ${errorText}`);
       }
 
-      const data = await response.json();
-      const content = data.choices[0]?.message?.content || '';
+      const data = await response.json() as any;
+      const content = data.choices?.[0]?.message?.content || '';
       const usage = data.usage || {};
       
       // Extract citations from Perplexity response
@@ -77,9 +77,9 @@ export class PerplexityProvider extends BaseProvider {
       if (data.citations && Array.isArray(data.citations)) {
         for (const citation of data.citations) {
           try {
-            const url = typeof citation === 'string' ? citation : citation.url || citation;
-            const domain = new URL(url).hostname.replace('www.', '');
-            citations.push({ url, domain, confidence: 0.9 });
+            const url = typeof citation === 'string' ? citation : (citation as any).url || citation;
+            const domain = new URL(url as string).hostname.replace('www.', '');
+            citations.push({ url: url as string, domain, confidence: 0.9 });
           } catch (e) {
             // Invalid URL, skip
           }
@@ -132,7 +132,7 @@ export class PerplexityProvider extends BaseProvider {
         const negativeWords = ['bad', 'worst', 'poor', 'terrible', 'awful'];
         const context = snippet.toLowerCase();
         
-        let sentiment = Sentiment.NEUTRAL;
+        let sentiment = Sentiment.NEU;
         if (positiveWords.some(word => context.includes(word))) {
           sentiment = Sentiment.POS;
         } else if (negativeWords.some(word => context.includes(word))) {

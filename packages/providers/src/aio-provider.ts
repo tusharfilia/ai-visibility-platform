@@ -60,7 +60,7 @@ export class AioProvider extends BaseProvider {
         throw new Error(`SerpAPI error: ${searchResponse.status} ${errorText}`);
       }
 
-      const data = await searchResponse.json();
+      const data = await searchResponse.json() as any;
       
       // Extract AI Overview (Google's AI-generated summary)
       let answerText = '';
@@ -68,13 +68,13 @@ export class AioProvider extends BaseProvider {
       
       if (data.answer_box) {
         answerText = data.answer_box.answer || data.answer_box.snippet || '';
-      } else if (data.organic_results && data.organic_results.length > 0) {
+      } else if (data.organic_results && Array.isArray(data.organic_results) && data.organic_results.length > 0) {
         // Build answer from top organic results
         answerText = this.buildAnswerFromResults(prompt, data.organic_results);
       }
 
       // Extract citations from organic results
-      if (data.organic_results) {
+      if (data.organic_results && Array.isArray(data.organic_results)) {
         data.organic_results.slice(0, 10).forEach((result: any, index: number) => {
           if (result.link) {
             try {
@@ -165,7 +165,7 @@ export class AioProvider extends BaseProvider {
         const negativeWords = ['bad', 'worst', 'poor', 'terrible', 'awful'];
         const context = snippet.toLowerCase();
         
-        let sentiment = Sentiment.NEUTRAL;
+        let sentiment = Sentiment.NEU;
         if (positiveWords.some(word => context.includes(word))) {
           sentiment = Sentiment.POS;
         } else if (negativeWords.some(word => context.includes(word))) {
