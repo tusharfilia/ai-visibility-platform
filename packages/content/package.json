@@ -1,0 +1,24 @@
+{
+  "name": "@ai-visibility/content",
+  "version": "1.0.0",
+  "description": "AI Content Generation Service",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@ai-visibility/shared": "workspace:*",
+    "@ai-visibility/providers": "workspace:*",
+    "@nestjs/common": "^10.2.10",
+    "@nestjs/core": "^10.2.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}
+
