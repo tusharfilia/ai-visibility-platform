@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { LLMConfigService, LLMConfig } from './llm-config.service';
-import { BaseLLMProvider } from '@ai-visibility/providers';
 
 export interface LLMResponse {
   text: string;
   usage?: { promptTokens: number; completionTokens: number };
   metadata?: Record<string, any>;
+}
+
+export interface BaseLLMProvider {
+  query(prompt: string, options?: any): Promise<LLMResponse>;
+  isAvailable(): Promise<boolean>;
 }
 
 @Injectable()
@@ -49,18 +53,22 @@ export class LLMRouterService {
   /**
    * Create provider instance from config
    */
-  private async createProvider(config: LLMConfig): Promise<BaseLLMProvider> {
+  private async createProvider(config: LLMConfig): Promise<any> {
     switch (config.provider) {
+      // Dynamic imports to avoid build-time dependencies
       case 'openai':
-        const { OpenAIProvider } = await import('@ai-visibility/providers');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { OpenAIProvider } = require('@ai-visibility/providers');
         return new OpenAIProvider({ apiKey: config.apiKey });
       
       case 'anthropic':
-        const { AnthropicProvider } = await import('@ai-visibility/providers');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { AnthropicProvider } = require('@ai-visibility/providers');
         return new AnthropicProvider({ apiKey: config.apiKey });
       
       case 'gemini':
-        const { GeminiProvider } = await import('@ai-visibility/providers');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { GeminiProvider } = require('@ai-visibility/providers');
         return new GeminiProvider({ apiKey: config.apiKey });
       
       default:

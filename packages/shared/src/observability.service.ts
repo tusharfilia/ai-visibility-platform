@@ -261,13 +261,13 @@ export class ObservabilityService {
   /**
    * Get active alerts
    */
-  async getActiveAlerts(workspaceId?: string): Promise<Alert[]> {
+  async getActiveAlerts(workspaceId?: string): Promise<ObservabilityAlert[]> {
     const pattern = workspaceId 
       ? `alerts:active:workspace:${workspaceId}:*`
       : 'alerts:active:system:*';
     
     const keys = await this.redis.keys(pattern);
-    const alerts: Alert[] = [];
+    const alerts: ObservabilityAlert[] = [];
     
     for (const key of keys) {
       const data = await this.redis.get(key);
@@ -292,7 +292,7 @@ export class ObservabilityService {
     const data = await this.redis.get(key);
     if (!data) return false;
 
-    const alert: Alert = JSON.parse(data);
+    const alert: ObservabilityAlert = JSON.parse(data);
     alert.status = 'acknowledged';
     alert.acknowledgedAt = new Date();
     alert.acknowledgedBy = userId;
@@ -321,7 +321,7 @@ export class ObservabilityService {
     const data = await this.redis.get(key);
     if (!data) return false;
 
-    const alert: Alert = JSON.parse(data);
+    const alert: ObservabilityAlert = JSON.parse(data);
     alert.status = 'resolved';
     alert.resolvedAt = new Date();
     alert.resolvedBy = userId;

@@ -68,19 +68,23 @@ export class LLMConfigService {
       // Import the appropriate provider based on config
       let provider;
       
+      // Dynamic imports to avoid build-time dependencies
       switch (config.provider) {
         case 'openai':
-          const { OpenAIProvider } = await import('@ai-visibility/providers');
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { OpenAIProvider } = require('@ai-visibility/providers');
           provider = new OpenAIProvider({ apiKey: config.apiKey });
           break;
         
         case 'anthropic':
-          const { AnthropicProvider } = await import('@ai-visibility/providers');
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { AnthropicProvider } = require('@ai-visibility/providers');
           provider = new AnthropicProvider({ apiKey: config.apiKey });
           break;
         
         case 'gemini':
-          const { GeminiProvider } = await import('@ai-visibility/providers');
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { GeminiProvider } = require('@ai-visibility/providers');
           provider = new GeminiProvider({ apiKey: config.apiKey });
           break;
         
@@ -152,7 +156,7 @@ export class LLMConfigService {
     const providerPricing = pricing[provider as keyof typeof pricing];
     if (!providerPricing) return 0;
 
-    const modelPricing = providerPricing[model];
+    const modelPricing = (providerPricing as Record<string, { prompt: number; completion: number }>)[model];
     if (!modelPricing) return 0;
 
     const promptCost = (promptTokens / 1000) * modelPricing.prompt;
