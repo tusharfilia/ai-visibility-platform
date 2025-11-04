@@ -70,6 +70,9 @@ RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/tslib" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/reflect-metadata" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/rxjs" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/node_modules/uid" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/node_modules/class-validator" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/node_modules/class-transformer" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found" && \
