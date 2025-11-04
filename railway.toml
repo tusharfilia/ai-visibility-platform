@@ -8,7 +8,7 @@ buildCommand = "pnpm install && pnpm build"
 
 # Deploy configuration
 [deploy]
-startCommand = "NODE_PATH=/app/node_modules node /app/apps/api/dist/main.js"
+# startCommand is set in Dockerfile CMD - Railway will use Dockerfile CMD when Dockerfile is present
 healthcheckPath = "/healthz"
 healthcheckTimeout = 300
 restartPolicyType = "always"
