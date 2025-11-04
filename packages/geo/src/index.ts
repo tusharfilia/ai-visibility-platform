@@ -46,7 +46,7 @@ export * from './directory/directory-constants';
 // Dashboard services
 export * from './dashboard/dashboard-aggregator.service';
 
-// Validation services (commented out - files may not exist yet)
-// export * from './validation/hallucination-detector';
-// export * from './validation/fact-extractor';
-// export * from './validation/fact-validator';
+// Validation services
+export * from './validation/hallucination-detector';
+export * from './validation/fact-extractor';
+export * from './validation/fact-validator';
