@@ -66,14 +66,12 @@ RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
     find /app/node_modules/.pnpm -type d -path "*/@nestjs/swagger" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/@nestjs/throttler" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/@nestjs/bullmq" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    echo "DEBUG: Copying common dependencies..." && \
+    echo "DEBUG: Copying all dependencies from @nestjs packages..." && \
+    find /app/node_modules/.pnpm -type d \( -path "*/@nestjs/core" -o -path "*/@nestjs/common" -o -path "*/@nestjs/platform-express" -o -path "*/@nestjs/config" -o -path "*/@nestjs/jwt" -o -path "*/@nestjs/passport" -o -path "*/@nestjs/swagger" -o -path "*/@nestjs/throttler" -o -path "*/@nestjs/bullmq" \) -exec sh -c 'pkg_dir="{}"; parent_dir="$$(dirname "$$pkg_dir")"; node_modules_dir="$$parent_dir/node_modules"; if [ -d "$$node_modules_dir" ]; then for dep in "$$node_modules_dir"/*; do if [ -d "$$dep" ] && [ "$$(basename "$$dep")" != "@nestjs" ]; then cp -rL "$$dep" /app/apps/api/node_modules/ 2>/dev/null || true; fi; done; fi' \; && \
+    echo "DEBUG: Copying essential runtime dependencies..." && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/tslib" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/reflect-metadata" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/rxjs" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/uid" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/class-validator" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/class-transformer" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/iterare" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found" && \
