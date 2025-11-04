@@ -1,16 +1,21 @@
-import { OpenAI } from '@azure/openai';
+// Azure OpenAI SDK v2.0.0 - using dynamic require to handle API changes
 import { BaseLLMProvider, LLMResponse, EngineAnswer } from './base-llm-provider';
 import { ProviderConfig } from '../types';
 
 export class CopilotProvider extends BaseLLMProvider {
-  private client: OpenAI;
+  private client: any;
 
   constructor(config: ProviderConfig) {
     super(config);
     if (!config.apiKey || !config.endpoint) {
       throw new Error('Azure OpenAI API key and endpoint are required');
     }
-    this.client = new OpenAI({
+    // Dynamic require to handle @azure/openai v2.0.0 API changes
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const AzureOpenAI = require('@azure/openai');
+    // Try different possible export names
+    const AzureClient = AzureOpenAI.AzureOpenAI || AzureOpenAI.OpenAI || AzureOpenAI.default || AzureOpenAI;
+    this.client = new AzureClient({
       endpoint: config.endpoint,
       apiKey: config.apiKey,
       apiVersion: '2024-02-15-preview',
