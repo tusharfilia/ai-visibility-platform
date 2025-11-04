@@ -56,31 +56,26 @@ COPY --from=build /app/packages ./packages
 # pnpm uses symlinks in node_modules pointing to .pnpm store
 # We need to copy the actual package directories from .pnpm
 RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
-    echo "DEBUG: Searching for individual @nestjs packages..." && \
-    for pkg in core common platform-express config jwt passport swagger throttler bullmq; do \
-      pkg_dir=`find /app/node_modules/.pnpm -type d -path "*/@nestjs/$$pkg" | head -1`; \
-      if [ -n "$$pkg_dir" ] && [ -d "$$pkg_dir" ]; then \
-        echo "Found $$pkg at: $$pkg_dir" && \
-        cp -rL "$$pkg_dir" /app/apps/api/node_modules/@nestjs/; \
-      else \
-        echo "WARNING: $$pkg not found in .pnpm"; \
-      fi; \
-    done && \
+    echo "DEBUG: Copying @nestjs packages..." && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/core" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/common" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/platform-express" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/config" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/jwt" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/passport" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/swagger" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/throttler" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/@nestjs/bullmq" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
     echo "DEBUG: Copying common dependencies..." && \
-    for pkg in tslib reflect-metadata rxjs; do \
-      pkg_dir=`find /app/node_modules/.pnpm -type d -path "*/node_modules/$$pkg" | head -1`; \
-      if [ -n "$$pkg_dir" ] && [ -d "$$pkg_dir" ]; then \
-        cp -rL "$$pkg_dir" /app/apps/api/node_modules/; \
-      fi; \
-    done && \
+    find /app/node_modules/.pnpm -type d -path "*/node_modules/tslib" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/node_modules/reflect-metadata" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/node_modules/rxjs" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found" && \
       ls -la /app/apps/api/node_modules/@nestjs/ | head -10; \
     else \
       echo "ERROR: @nestjs/core not found" && \
-      echo "Testing find command directly:" && \
-      find /app/node_modules/.pnpm -type d -path "*/@nestjs/core" | head -3 && \
       exit 1; \
     fi
 
