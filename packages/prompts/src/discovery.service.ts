@@ -145,6 +145,7 @@ export class PromptDiscoveryService {
     
     return trends.map((text: string) => ({
       text,
+      source: 'trends' as const,
       industry,
       popularity: Math.random() * 100,
       intent: this.detectIntent(text)
@@ -174,6 +175,7 @@ export class PromptDiscoveryService {
       
       return generatedPrompts.map((text: string) => ({
         text,
+        source: 'generated' as const,
         industry,
         intent: this.detectIntent(text)
       }));

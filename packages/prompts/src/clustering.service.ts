@@ -164,10 +164,11 @@ export class ClusteringService {
     const clusters: Cluster[] = [];
     let iterations = 0;
     const maxIterations = 100;
+    let assignments = new Map<number, number[]>();
 
     while (iterations < maxIterations) {
       // Assign points to nearest centroid
-      const assignments = new Map<number, number[]>();
+      assignments = new Map<number, number[]>();
       for (let i = 0; i < numClusters; i++) {
         assignments.set(i, []);
       }
