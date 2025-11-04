@@ -48,12 +48,13 @@ export class PromptGeneratorService {
       });
 
       const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt);
-      const generatedPrompts = this.parseGeneratedPrompts(response.content);
+      const content = response.content || response.text || '';
+      const generatedPrompts = this.parseGeneratedPrompts(content);
 
       return generatedPrompts;
     } catch (error) {
       console.error('Prompt generation failed:', error);
-      throw new Error(`Failed to generate prompts: ${error.message}`);
+      throw new Error(`Failed to generate prompts: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -79,7 +80,8 @@ export class PromptGeneratorService {
 
     try {
       const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt);
-      const variations = JSON.parse(response.content);
+      const content = response.content || response.text || '[]';
+      const variations = JSON.parse(content);
       
       return Array.isArray(variations) ? variations : [];
     } catch (error) {
@@ -115,7 +117,8 @@ export class PromptGeneratorService {
 
     try {
       const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt);
-      const optimization = JSON.parse(response.content);
+      const content = response.content || response.text || '{}';
+      const optimization = JSON.parse(content);
       
       return {
         text: optimization.optimized || originalPrompt,
@@ -163,7 +166,8 @@ export class PromptGeneratorService {
 
     try {
       const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt);
-      const competitorPrompts = JSON.parse(response.content);
+      const content = response.content || response.text || '[]';
+      const competitorPrompts = JSON.parse(content);
       
       return competitorPrompts.map((p: any) => ({
         text: p.query,
@@ -202,7 +206,8 @@ export class PromptGeneratorService {
 
     try {
       const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt);
-      const brandPrompts = JSON.parse(response.content);
+      const content = response.content || response.text || '[]';
+      const brandPrompts = JSON.parse(content);
       
       return brandPrompts.map((p: any) => ({
         text: p.query,

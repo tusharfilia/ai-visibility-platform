@@ -190,7 +190,8 @@ export class EmbeddingsService {
       const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt);
       
       // Parse embeddings from response
-      const embeddings = JSON.parse(response.content);
+      const content = response.content || response.text || '[]';
+      const embeddings = JSON.parse(content);
       
       if (!Array.isArray(embeddings) || embeddings.length !== texts.length) {
         throw new Error('Invalid embeddings response format');

@@ -53,7 +53,7 @@ export class PromptDiscoveryService {
       return uniquePrompts.slice(0, maxPrompts);
     } catch (error) {
       console.error('Prompt discovery failed:', error);
-      throw new Error(`Failed to discover prompts: ${error.message}`);
+      throw new Error(`Failed to discover prompts: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -80,7 +80,7 @@ export class PromptDiscoveryService {
       return savedClusters;
     } catch (error) {
       console.error('Prompt clustering failed:', error);
-      throw new Error(`Failed to cluster prompts: ${error.message}`);
+      throw new Error(`Failed to cluster prompts: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -101,7 +101,7 @@ export class PromptDiscoveryService {
       return updatedClusters;
     } catch (error) {
       console.error('Cluster refresh failed:', error);
-      throw new Error(`Failed to refresh clusters: ${error.message}`);
+      throw new Error(`Failed to refresh clusters: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -141,9 +141,9 @@ export class PromptDiscoveryService {
       ]
     };
 
-    const trends = mockTrends[industry] || mockTrends['general'];
+    const trends = (mockTrends as Record<string, string[]>)[industry] || mockTrends['general'];
     
-    return trends.map(text => ({
+    return trends.map((text: string) => ({
       text,
       industry,
       popularity: Math.random() * 100,
@@ -169,7 +169,8 @@ export class PromptDiscoveryService {
 
     try {
       const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt);
-      const generatedPrompts = JSON.parse(response.content);
+      const content = response.content || response.text || '';
+      const generatedPrompts = JSON.parse(content);
       
       return generatedPrompts.map((text: string) => ({
         text,
@@ -254,7 +255,8 @@ export class PromptDiscoveryService {
 
       try {
         const response = await this.llmRouter.routeLLMRequest(workspaceId, labelingPrompt);
-        const labels = JSON.parse(response.content);
+        const content = response.content || response.text || '{}';
+        const labels = JSON.parse(content);
         
         labeledClusters.push({
           name: labels.name,

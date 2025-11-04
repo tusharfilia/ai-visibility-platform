@@ -184,15 +184,17 @@ export class ClusteringService {
           }
         });
 
-        assignments.get(nearestCentroid)!.push(index);
+        const assigned = assignments.get(nearestCentroid) || [];
+        assigned.push(index);
+        assignments.set(nearestCentroid, assigned);
       });
 
       // Update centroids
       const newCentroids = centroids.map((_, centroidIndex) => {
-        const assignedPoints = assignments.get(centroidIndex)!;
+        const assignedPoints = assignments.get(centroidIndex) || [];
         if (assignedPoints.length === 0) return centroids[centroidIndex];
 
-        const embeddings = assignedPoints.map(index => prompts[index].embedding);
+        const embeddings = assignedPoints.map((index: number) => prompts[index].embedding);
         return this.calculateCentroid(embeddings);
       });
 
@@ -210,13 +212,13 @@ export class ClusteringService {
 
     // Build final clusters
     centroids.forEach((centroid, centroidIndex) => {
-      const assignedPoints = assignments.get(centroidIndex)!;
+      const assignedPoints = assignments.get(centroidIndex) || [];
       
       if (assignedPoints.length > 0) {
         const cluster: Cluster = {
           id: `cluster_${centroidIndex}`,
           centroid,
-          points: assignedPoints.map(index => ({
+          points: assignedPoints.map((index: number) => ({
             text: prompts[index].text,
             embedding: prompts[index].embedding,
             distance: this.calculateDistance(prompts[index].embedding, centroid)
