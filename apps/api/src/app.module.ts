@@ -27,6 +27,7 @@ import { GEOModule } from './modules/geo/geo.module';
 // import { EnterpriseModule } from './modules/enterprise/enterprise.module'; // Temporarily disabled
 import { RecommendationsModule } from './modules/recommendations/recommendations.module';
 import { DirectoryModule } from './modules/directory/directory.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { DirectoryModule } from './modules/directory/directory.module';
     RecommendationsModule,
     DirectoryModule,
   ],
+  controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,

@@ -10,8 +10,8 @@ import { ConfigService } from '@nestjs/config';
 export class HealthController {
   constructor(private configService: ConfigService) {}
 
-  @Get('health')
-  getHealth() {
+  @Get('healthz')
+  getHealthz() {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
@@ -20,8 +20,8 @@ export class HealthController {
     };
   }
 
-  @Get('ready')
-  async getReady() {
+  @Get('readyz')
+  async getReadyz() {
     try {
       // Check environment variables
       const dbUrl = this.configService.get('DATABASE_URL');

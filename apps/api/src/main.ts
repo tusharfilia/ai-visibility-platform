@@ -46,15 +46,14 @@ async function bootstrap() {
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
     });
 
-    // Health check endpoints (must be before global prefix to be accessible at root)
-    app.use('/healthz', (req: any, res: any) => {
+    // Health check endpoints (must be registered before global prefix)
+    const httpAdapter = app.getHttpAdapter();
+    httpAdapter.get('/healthz', (req: any, res: any) => {
       res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
-    // Readiness check endpoint
-    app.use('/readyz', async (req: any, res: any) => {
+    httpAdapter.get('/readyz', async (req: any, res: any) => {
       try {
-        // For now, just return ready - we'll add database checks later
         res.status(200).json({ status: 'ready', timestamp: new Date().toISOString() });
       } catch (error) {
         res.status(503).json({ status: 'not ready', error: (error as Error).message });
