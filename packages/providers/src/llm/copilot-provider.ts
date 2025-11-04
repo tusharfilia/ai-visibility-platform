@@ -1,16 +1,16 @@
-import { AzureOpenAI } from '@azure/openai';
+import { OpenAI } from '@azure/openai';
 import { BaseLLMProvider, LLMResponse, EngineAnswer } from './base-llm-provider';
 import { ProviderConfig } from '../types';
 
 export class CopilotProvider extends BaseLLMProvider {
-  private client: AzureOpenAI;
+  private client: OpenAI;
 
   constructor(config: ProviderConfig) {
     super(config);
     if (!config.apiKey || !config.endpoint) {
       throw new Error('Azure OpenAI API key and endpoint are required');
     }
-    this.client = new AzureOpenAI({
+    this.client = new OpenAI({
       endpoint: config.endpoint,
       apiKey: config.apiKey,
       apiVersion: '2024-02-15-preview',
