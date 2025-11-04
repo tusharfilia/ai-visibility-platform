@@ -52,19 +52,17 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages ./packages
 
-# Create proper symlink for node_modules resolution
+# Copy node_modules to apps/api for proper module resolution
 # Node.js resolves modules starting from the file's directory (/app/apps/api/dist/main.js)
 # It walks up: dist/node_modules -> api/node_modules -> /app/node_modules
-# We need node_modules at /app/apps/api/node_modules pointing to /app/node_modules
+# We need an actual copy (not symlink) at /app/apps/api/node_modules for reliable resolution
 RUN mkdir -p /app/apps/api && \
-    rm -rf /app/apps/api/node_modules && \
-    ln -s /app/node_modules /app/apps/api/node_modules && \
-    # Verify symlink and @nestjs exists
-    test -L /app/apps/api/node_modules && \
+    cp -r /app/node_modules /app/apps/api/node_modules && \
+    # Verify copy and @nestjs exists
     test -d /app/node_modules/@nestjs && \
     test -d /app/apps/api/node_modules/@nestjs && \
-    echo "SUCCESS: Symlink created and @nestjs found" || \
-    (echo "ERROR: Symlink verification failed!" && \
+    echo "SUCCESS: node_modules copied and @nestjs found" || \
+    (echo "ERROR: node_modules copy verification failed!" && \
      ls -la /app/apps/api/ && \
      ls -la /app/node_modules/ | head -10)
 
@@ -84,8 +82,8 @@ CMD ["sh", "-c", "cd /app && \
   echo 'Checking node_modules locations:' && \
   ls -la /app/node_modules/@nestjs 2>/dev/null | head -3 || echo 'WARNING: /app/node_modules/@nestjs not found' && \
   ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -3 || echo 'WARNING: /app/apps/api/node_modules/@nestjs not found' && \
-  echo 'Checking symlink:' && \
-  ls -la /app/apps/api/node_modules 2>/dev/null | head -1 || echo 'WARNING: symlink check failed' && \
+  echo 'Verifying @nestjs/core module exists:' && \
+  test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo 'SUCCESS: @nestjs/core found' || echo 'ERROR: @nestjs/core not found' && \
   echo 'Starting application...' && \
   node apps/api/dist/main.js"]
 
