@@ -58,11 +58,11 @@ COPY --from=build /app/packages ./packages
 RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
     echo "DEBUG: Searching for individual @nestjs packages..." && \
     for pkg in core common platform-express config jwt passport swagger throttler bullmq; do \
-      find /app/node_modules/.pnpm -type d -path "*/@nestjs+$$pkg*/node_modules/@nestjs/$$pkg" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true; \
+      find /app/node_modules/.pnpm -type d -name "$$pkg" -path "*/@nestjs/$$pkg" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true; \
     done && \
     echo "DEBUG: Copying common dependencies..." && \
     for pkg in tslib reflect-metadata rxjs; do \
-      find /app/node_modules/.pnpm -type d -path "*/$$pkg@*/node_modules/$$pkg" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true; \
+      find /app/node_modules/.pnpm -type d -name "$$pkg" -path "*/node_modules/$$pkg" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true; \
     done && \
     echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
@@ -72,6 +72,8 @@ RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
       echo "ERROR: @nestjs/core not found" && \
       echo "Listing .pnpm structure:" && \
       find /app/node_modules/.pnpm -type d -name "@nestjs" | head -5 && \
+      echo "Trying to find @nestjs/core directly..." && \
+      find /app/node_modules/.pnpm -type d -name "core" -path "*/@nestjs/core" | head -3 && \
       exit 1; \
     fi
 
