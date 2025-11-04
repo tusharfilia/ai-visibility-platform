@@ -55,7 +55,8 @@ COPY --from=build /app/packages ./packages
 # Copy node_modules to apps/api, dereferencing symlinks to copy actual files
 # pnpm uses symlinks in node_modules pointing to .pnpm store
 # Using -L flag to dereference symlinks and copy actual files instead
-RUN mkdir -p /app/apps/api && \
+RUN sh -c ' \
+    mkdir -p /app/apps/api && \
     echo "DEBUG: Copying node_modules structure..." && \
     cp -rL /app/node_modules /app/apps/api/node_modules && \
     echo "DEBUG: Creating @nestjs directory and copying packages from .pnpm..." && \
@@ -75,7 +76,8 @@ RUN mkdir -p /app/apps/api && \
     else \
       echo "ERROR: @nestjs/core package.json not found"; \
       ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -10 || echo "No @nestjs packages found"; \
-    fi
+    fi \
+    '
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
