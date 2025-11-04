@@ -86,6 +86,8 @@ function isActionEnabled(action: string, flags: any): boolean {
       return flags.brandDefenseEnabled;
     case CopilotActionType.REVIEW_CAMPAIGN:
       return flags.fullAutoDefault;
+    case CopilotActionType.CORRECT_HALLUCINATION:
+      return flags.brandDefenseEnabled; // Hallucination correction is part of brand defense
     default:
       return false;
   }
