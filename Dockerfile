@@ -52,12 +52,21 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages ./packages
 
-# Create symlink AND copy node_modules to apps/api for maximum compatibility
-# Some Node.js versions don't follow symlinks properly for module resolution
+# Create proper symlink for node_modules resolution
+# Node.js resolves modules starting from the file's directory (/app/apps/api/dist/main.js)
+# It walks up: dist/node_modules -> api/node_modules -> /app/node_modules
+# We need node_modules at /app/apps/api/node_modules pointing to /app/node_modules
 RUN mkdir -p /app/apps/api && \
-    ln -sf /app/node_modules /app/apps/api/node_modules && \
-    # Also ensure @nestjs is accessible (verify it exists)
-    test -d /app/node_modules/@nestjs || (echo "ERROR: @nestjs not found!" && ls -la /app/node_modules/ | head -20)
+    rm -rf /app/apps/api/node_modules && \
+    ln -s /app/node_modules /app/apps/api/node_modules && \
+    # Verify symlink and @nestjs exists
+    test -L /app/apps/api/node_modules && \
+    test -d /app/node_modules/@nestjs && \
+    test -d /app/apps/api/node_modules/@nestjs && \
+    echo "SUCCESS: Symlink created and @nestjs found" || \
+    (echo "ERROR: Symlink verification failed!" && \
+     ls -la /app/apps/api/ && \
+     ls -la /app/node_modules/ | head -10)
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
@@ -69,7 +78,14 @@ EXPOSE 8080
 # This is a fallback - Node.js should find modules via normal resolution
 ENV NODE_PATH=/app/node_modules
 
-# Start the API - ensure we're in /app and use absolute path
-# The cd ensures Node.js resolves modules relative to /app
-CMD ["sh", "-c", "cd /app && pwd && ls -la node_modules/@nestjs 2>/dev/null | head -5 || echo 'node_modules check failed' && node apps/api/dist/main.js"]
+# Start the API - ensure we're in /app and verify module resolution
+CMD ["sh", "-c", "cd /app && \
+  echo 'Working directory:' && pwd && \
+  echo 'Checking node_modules locations:' && \
+  ls -la /app/node_modules/@nestjs 2>/dev/null | head -3 || echo 'WARNING: /app/node_modules/@nestjs not found' && \
+  ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -3 || echo 'WARNING: /app/apps/api/node_modules/@nestjs not found' && \
+  echo 'Checking symlink:' && \
+  ls -la /app/apps/api/node_modules 2>/dev/null | head -1 || echo 'WARNING: symlink check failed' && \
+  echo 'Starting application...' && \
+  node apps/api/dist/main.js"]
 
