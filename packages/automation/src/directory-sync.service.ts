@@ -427,7 +427,7 @@ export class DirectorySyncService {
     } catch (error) {
       // Update submission with failure
       submission.status = 'failed';
-      submission.error = error.message;
+      submission.error = error instanceof Error ? error.message : String(error);
       submission.retryCount++;
       submission.updatedAt = new Date();
 
