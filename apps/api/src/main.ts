@@ -9,6 +9,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import compression from 'compression';
+import * as fs from 'fs';
 import { AppModule } from './app.module';
 import { LoggerService } from './middleware/logger.service';
 import { GlobalExceptionFilter } from './middleware/exception.filter';
@@ -141,6 +142,25 @@ async function bootstrap() {
     process.exit(1);
   }
 }
+
+// Ensure we catch any unhandled errors
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  console.error('Stack:', error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise);
+  console.error('Reason:', reason);
+  process.exit(1);
+});
+
+// Log that we're about to bootstrap
+console.error('📋 Bootstrap starting...');
+console.error('📁 Current directory:', process.cwd());
+console.error('📦 Files in dist:', fs.existsSync('./dist/main.js') ? 'main.js exists' : 'main.js NOT FOUND');
+console.error('📦 Files in current dir:', fs.readdirSync('.').join(', '));
 
 bootstrap().catch((error) => {
   console.error('❌ Failed to start application:', error);
