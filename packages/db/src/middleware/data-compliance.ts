@@ -3,7 +3,7 @@
  * Provides data encryption, export, and deletion capabilities
  */
 
-import { Prisma } from '@prisma/client';
+// NOTE: Prisma types removed - we're using pg directly instead of Prisma Client
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
 export interface ComplianceOptions {
@@ -215,9 +215,12 @@ export class DataComplianceManager {
 
 /**
  * Prisma middleware for automatic data compliance
+ * NOTE: This middleware is not currently used as we're using pg directly instead of Prisma Client
+ * It's kept for reference but will need to be adapted for pg if needed in the future
  */
 export function createComplianceMiddleware(complianceManager: DataComplianceManager) {
-  return async (params: Prisma.MiddlewareParams, next: Prisma.MiddlewareNext) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return async (params: any, next: any) => {
     // Add compliance logic here
     return next(params);
   };

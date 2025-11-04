@@ -1,12 +1,13 @@
 /**
  * Prisma middleware for automatic workspace isolation
  * Ensures all queries are scoped to the current workspace
+ * NOTE: This middleware is not currently used as we're using pg directly instead of Prisma Client
+ * It's kept for reference but will need to be adapted for pg if needed in the future
  */
 
-import { Prisma } from '@prisma/client';
-
 export function createWorkspaceIsolationMiddleware(workspaceId: string) {
-  return async (params: Prisma.MiddlewareParams, next: Prisma.MiddlewareNext) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return async (params: any, next: any) => {
     // Skip middleware for system operations
     if (params.model === 'User' || params.model === 'Workspace') {
       return next(params);
