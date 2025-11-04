@@ -464,8 +464,10 @@ export class PreSignupService {
   ): Promise<string> {
     await this.simulateDelay(800);
     
-    const topCompetitor = competitors[0];
-    const avgCompetitorScore = competitors.reduce((sum, c) => sum + c.score, 0) / competitors.length;
+    const topCompetitor = competitors[0] || { name: 'Unknown', score: 0 };
+    const avgCompetitorScore = competitors.length > 0 
+      ? competitors.reduce((sum, c) => sum + c.score, 0) / competitors.length 
+      : 0;
     
     return `${brandName} currently has a GEO visibility score of ${visibilityScore}/100, positioning it ${visibilityScore > avgCompetitorScore ? 'above' : 'below'} the industry average. The main competitor is ${topCompetitor.name} with a score of ${topCompetitor.score}. Key opportunities include ${opportunities.slice(0, 2).map(o => o.description.toLowerCase()).join(' and ')}, which could improve visibility by an estimated ${this.calculateEstimatedImpact(opportunities)}% within the next quarter.`;
   }
