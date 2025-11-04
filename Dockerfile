@@ -58,7 +58,7 @@ COPY --from=build /app/packages ./packages
 RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
     echo "DEBUG: Searching for individual @nestjs packages..." && \
     for pkg in core common platform-express config jwt passport swagger throttler bullmq; do \
-      pkg_dir=$$(find /app/node_modules/.pnpm -type d -name "$$pkg" -path "*/@nestjs/$$pkg" | head -1) && \
+      pkg_dir=`find /app/node_modules/.pnpm -type d -name "$$pkg" -path "*/@nestjs/$$pkg" | head -1` && \
       if [ -n "$$pkg_dir" ] && [ -d "$$pkg_dir" ]; then \
         echo "Found $$pkg at: $$pkg_dir" && \
         cp -rL "$$pkg_dir" /app/apps/api/node_modules/@nestjs/; \
@@ -66,7 +66,7 @@ RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
     done && \
     echo "DEBUG: Copying common dependencies..." && \
     for pkg in tslib reflect-metadata rxjs; do \
-      pkg_dir=$$(find /app/node_modules/.pnpm -type d -name "$$pkg" -path "*/node_modules/$$pkg" | head -1) && \
+      pkg_dir=`find /app/node_modules/.pnpm -type d -name "$$pkg" -path "*/node_modules/$$pkg" | head -1` && \
       if [ -n "$$pkg_dir" ] && [ -d "$$pkg_dir" ]; then \
         cp -rL "$$pkg_dir" /app/apps/api/node_modules/; \
       fi; \
