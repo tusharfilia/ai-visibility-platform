@@ -97,10 +97,10 @@ export class CopilotProvider extends BaseLLMProvider {
   async isAvailable(): Promise<boolean> {
     try {
       // Test with a simple request
-      await this.client.getChatCompletions('gpt-4', [
-        { role: 'user', content: 'test' }
-      ], {
-        maxTokens: 10,
+      await this.client.chat.completions.create({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'test' }],
+        max_tokens: 10,
       });
       return true;
     } catch (error) {
