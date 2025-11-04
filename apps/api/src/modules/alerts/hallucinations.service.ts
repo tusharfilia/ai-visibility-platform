@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { HallucinationDetectorService } from '@ai-visibility/geo/validation/hallucination-detector.service';
-import { FactExtractorService } from '@ai-visibility/geo/validation/fact-extractor.service';
-import { FactValidatorService } from '@ai-visibility/geo/validation/fact-validator.service';
+import { HallucinationDetectorService, FactExtractorService, FactValidatorService } from '@ai-visibility/geo';
 
 @Injectable()
 export class HallucinationsApiService {

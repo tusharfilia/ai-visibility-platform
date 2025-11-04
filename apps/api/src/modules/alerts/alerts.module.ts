@@ -3,9 +3,7 @@ import { AlertsController } from './alerts.controller';
 import { AlertsService } from './alerts.service';
 import { HallucinationsController } from './hallucinations.controller';
 import { HallucinationsApiService } from './hallucinations.service';
-import { HallucinationDetectorService } from '@ai-visibility/geo/validation/hallucination-detector.service';
-import { FactExtractorService } from '@ai-visibility/geo/validation/fact-extractor.service';
-import { FactValidatorService } from '@ai-visibility/geo/validation/fact-validator.service';
+import { HallucinationDetectorService, FactExtractorService, FactValidatorService } from '@ai-visibility/geo';
 import { LLMRouterService } from '@ai-visibility/shared';
 
 @Module({

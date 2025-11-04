@@ -1,8 +1,6 @@
 import { Controller, Get, Post, Put, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { HallucinationDetectorService } from '@ai-visibility/geo/validation/hallucination-detector.service';
-import { FactExtractorService } from '@ai-visibility/geo/validation/fact-extractor.service';
-import { FactValidatorService } from '@ai-visibility/geo/validation/fact-validator.service';
+import { HallucinationDetectorService, FactExtractorService, FactValidatorService } from '@ai-visibility/geo';
 import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
 import { WorkspaceAccessGuard } from '../../guards/workspace-access.guard';
 
