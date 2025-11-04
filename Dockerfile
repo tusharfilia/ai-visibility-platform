@@ -67,19 +67,25 @@ RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
     find /app/node_modules/.pnpm -type d -path "*/@nestjs/throttler" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/@nestjs/bullmq" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
     echo "DEBUG: Copying all dependencies from @nestjs packages..." && \
-    find /app/node_modules/.pnpm -type d \( -path "*/@nestjs/core" -o -path "*/@nestjs/common" -o -path "*/@nestjs/platform-express" -o -path "*/@nestjs/config" -o -path "*/@nestjs/jwt" -o -path "*/@nestjs/passport" -o -path "*/@nestjs/swagger" -o -path "*/@nestjs/throttler" -o -path "*/@nestjs/bullmq" \) -exec sh -c 'pkg_dir="{}"; parent_dir="$$(dirname "$$pkg_dir")"; node_modules_dir="$$parent_dir/node_modules"; if [ -d "$$node_modules_dir" ]; then for dep in "$$node_modules_dir"/*; do if [ -d "$$dep" ] && [ "$$(basename "$$dep")" != "@nestjs" ]; then cp -rL "$$dep" /app/apps/api/node_modules/ 2>/dev/null || true; fi; done; fi' \; && \
+    find /app/node_modules/.pnpm -type d \( -path "*/@nestjs/core" -o -path "*/@nestjs/common" -o -path "*/@nestjs/platform-express" -o -path "*/@nestjs/config" -o -path "*/@nestjs/jwt" -o -path "*/@nestjs/passport" -o -path "*/@nestjs/swagger" -o -path "*/@nestjs/throttler" -o -path "*/@nestjs/bullmq" \) -exec sh -c 'pkg_dir="{}"; node_modules_dir="$$(dirname "$$pkg_dir")"; find "$$node_modules_dir" -mindepth 1 -maxdepth 1 -type d ! -name "@nestjs" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true' \; && \
     echo "DEBUG: Copying essential runtime dependencies..." && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/tslib" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/reflect-metadata" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/rxjs" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    echo "DEBUG: Verifying @nestjs/core..." && \
+    echo "DEBUG: Verifying @nestjs/core and dependencies..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
-      echo "SUCCESS: @nestjs/core found" && \
-      ls -la /app/apps/api/node_modules/@nestjs/ | head -10; \
+      echo "SUCCESS: @nestjs/core found"; \
     else \
       echo "ERROR: @nestjs/core not found" && \
       exit 1; \
-    fi
+    fi && \
+    if [ -d /app/apps/api/node_modules/uid ]; then \
+      echo "SUCCESS: uid dependency found"; \
+    else \
+      echo "WARNING: uid dependency not found, listing node_modules:" && \
+      ls -la /app/apps/api/node_modules/ | head -20; \
+    fi && \
+    ls -la /app/apps/api/node_modules/@nestjs/ | head -10
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
