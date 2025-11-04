@@ -52,25 +52,42 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages ./packages
 
-# Copy node_modules to apps/api, dereferencing symlinks to copy actual files
+# Copy node_modules to apps/api and set up @nestjs packages
 # pnpm uses symlinks in node_modules pointing to .pnpm store
-# Using -L flag to dereference symlinks and copy actual files instead
-RUN mkdir -p /app/apps/api && \
-    cp -rL /app/node_modules /app/apps/api/node_modules && \
-    mkdir -p /app/apps/api/node_modules/@nestjs && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+core*/node_modules/@nestjs/core" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+common*/node_modules/@nestjs/common" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+platform-express*/node_modules/@nestjs/platform-express" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+config*/node_modules/@nestjs/config" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+jwt*/node_modules/@nestjs/jwt" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+passport*/node_modules/@nestjs/passport" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+swagger*/node_modules/@nestjs/swagger" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+throttler*/node_modules/@nestjs/throttler" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs+bullmq*/node_modules/@nestjs/bullmq" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/tslib@*/node_modules/tslib" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/reflect-metadata@*/node_modules/reflect-metadata" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true && \
-    find /app/node_modules/.pnpm -type d -path "*/rxjs@*/node_modules/rxjs" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true && \
-    test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo "SUCCESS: @nestjs/core found" || echo "WARNING: @nestjs/core not found"
+# We need to copy the actual package directories from .pnpm
+RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
+    sh -c ' \
+      echo "DEBUG: Finding @nestjs packages in .pnpm store..."; \
+      nestjs_dir=$$(find /app/node_modules/.pnpm -type d -name "@nestjs" -path "*/node_modules/@nestjs" | head -1); \
+      if [ -n "$$nestjs_dir" ]; then \
+        echo "Found @nestjs directory: $$nestjs_dir"; \
+        for pkg in $$nestjs_dir/*; do \
+          if [ -d "$$pkg" ]; then \
+            pkg_name=$$(basename "$$pkg"); \
+            echo "Copying @nestjs/$$pkg_name..."; \
+            cp -rL "$$pkg" /app/apps/api/node_modules/@nestjs/; \
+          fi; \
+        done; \
+      fi; \
+      echo "DEBUG: Also searching for individual @nestjs packages..."; \
+      for pkg in core common platform-express config jwt passport swagger throttler bullmq; do \
+        find /app/node_modules/.pnpm -type d -path "*/@nestjs+$$pkg*/node_modules/@nestjs/$$pkg" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true; \
+      done; \
+      echo "DEBUG: Copying common dependencies..."; \
+      for pkg in tslib reflect-metadata rxjs; do \
+        find /app/node_modules/.pnpm -type d -path "*/$$pkg@*/node_modules/$$pkg" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true; \
+      done; \
+      echo "DEBUG: Verifying @nestjs/core..."; \
+      if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
+        echo "SUCCESS: @nestjs/core found"; \
+        ls -la /app/apps/api/node_modules/@nestjs/ | head -10; \
+      else \
+        echo "ERROR: @nestjs/core not found"; \
+        echo "Listing .pnpm structure:"; \
+        find /app/node_modules/.pnpm -type d -name "@nestjs" | head -5; \
+        exit 1; \
+      fi \
+    '
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
