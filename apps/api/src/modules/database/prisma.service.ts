@@ -10,17 +10,38 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private pool: Pool;
 
   constructor() {
-    this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    });
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      console.warn('⚠️  DATABASE_URL not set - database operations will fail');
+      // Create a dummy pool that won't be used
+      this.pool = new Pool({
+        connectionString: 'postgresql://localhost:5432/dummy',
+        ssl: false,
+      });
+    } else {
+      this.pool = new Pool({
+        connectionString,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+    }
   }
 
   async onModuleInit() {
-    // Test connection
-    const client = await this.pool.connect();
-    await client.query('SELECT 1');
-    client.release();
+    // Test connection only if DATABASE_URL is set
+    if (!process.env.DATABASE_URL) {
+      console.warn('⚠️  Skipping database connection test - DATABASE_URL not set');
+      return;
+    }
+    
+    try {
+      const client = await this.pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      console.log('✅ Database connection successful');
+    } catch (error) {
+      console.error('❌ Database connection failed:', error instanceof Error ? error.message : String(error));
+      // Don't throw - allow app to start with graceful degradation
+    }
   }
 
   async onModuleDestroy() {

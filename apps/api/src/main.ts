@@ -17,7 +17,11 @@ import { CorrelationIdInterceptor } from './middleware/correlation-id.intercepto
 async function bootstrap() {
   console.log('🚀 Starting AI Visibility API...');
   
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  try {
+    const app = await NestFactory.create(AppModule, { 
+      bufferLogs: true,
+      logger: ['error', 'warn', 'log'] // Enable logging for debugging
+    });
 
   const configService = app.get(ConfigService);
   const port = configService.get('PORT', 8080);
