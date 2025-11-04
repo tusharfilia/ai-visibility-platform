@@ -56,14 +56,22 @@ COPY --from=build /app/packages ./packages
 # pnpm uses symlinks in node_modules pointing to .pnpm store
 # Using -L flag to dereference symlinks and copy actual files instead
 RUN mkdir -p /app/apps/api && \
+    echo "DEBUG: Checking source /app/node_modules structure..." && \
+    ls -la /app/node_modules/ | grep -E "^[dl]" | head -20 || echo "No entries found" && \
+    echo "DEBUG: Checking if @nestjs exists in source..." && \
+    (test -d /app/node_modules/@nestjs && echo "Found @nestjs in source" && ls -la /app/node_modules/@nestjs | head -5) || \
+    (echo "WARNING: @nestjs not in source, checking .pnpm..." && \
+     find /app/node_modules/.pnpm -name "@nestjs*" -type d 2>/dev/null | head -5 || echo "No @nestjs in .pnpm") && \
     echo "DEBUG: Copying node_modules with dereferenced symlinks..." && \
     cp -rL /app/node_modules /app/apps/api/node_modules && \
-    echo "DEBUG: Verifying structure..." && \
+    echo "DEBUG: Verifying copied structure..." && \
     test -d /app/apps/api/node_modules/@nestjs && echo "SUCCESS: @nestjs directory exists" || echo "WARNING: @nestjs directory missing" && \
     (test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo "SUCCESS: @nestjs/core package.json found") || \
     (echo "ERROR: @nestjs/core package.json not found" && \
      echo "Checking @nestjs structure:" && \
-     ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo "No @nestjs directory found")
+     ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo "No @nestjs directory found" && \
+     echo "Checking what scoped packages exist:" && \
+     ls -la /app/apps/api/node_modules/ | grep "^d.*@[^/]*$" | head -10 || echo "No scoped packages found")
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
