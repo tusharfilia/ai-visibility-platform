@@ -151,7 +151,7 @@ export class EnhancedCopilotService {
     if (cached) return cached;
 
     const rulesData = await this.redis.hgetall(`copilot:rules:${workspaceId}`);
-    const rules = Object.values(rulesData).map(data => JSON.parse(data));
+    const rules = Object.values(rulesData).map((data: string) => JSON.parse(data));
     
     this.rulesCache.set(workspaceId, rules);
     return rules;
@@ -304,7 +304,7 @@ export class EnhancedCopilotService {
       return {
         actionId: action.id,
         status: 'failed',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         executedAt: new Date(),
         duration,
       };
@@ -473,7 +473,7 @@ export class EnhancedCopilotService {
 
   private async updateRulesCache(workspaceId: string): Promise<void> {
     const rulesData = await this.redis.hgetall(`copilot:rules:${workspaceId}`);
-    const rules = Object.values(rulesData).map(data => JSON.parse(data));
+    const rules = Object.values(rulesData).map((data: string) => JSON.parse(data));
     this.rulesCache.set(workspaceId, rules);
   }
 
@@ -490,7 +490,7 @@ export class EnhancedCopilotService {
       'high': 10,
       'critical': 20,
     };
-    return priorities[priority] || 1;
+    return (priorities as Record<string, number>)[priority] || 1;
   }
 
   private generateRuleId(): string {

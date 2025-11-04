@@ -283,7 +283,7 @@ export class PreSignupService {
         stage: 'failed',
         message: 'Analysis failed. Please try again.',
         status: 'failed',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
 
       // Emit failure event
@@ -291,7 +291,7 @@ export class PreSignupService {
         requestId,
         brandName,
         email,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -301,12 +301,30 @@ export class PreSignupService {
    */
   private async updateProgress(
     requestId: string,
-    updates: Partial<PreSignupRequest>
+    updates: Partial<PreSignupRequest> & { 
+      current?: number;
+      total?: number;
+      stage?: string;
+      message?: string;
+      status?: 'pending' | 'scanning' | 'completed' | 'failed';
+      results?: PreSignupResults;
+      error?: string;
+    }
   ): Promise<void> {
     const request = await this.getAnalysisStatus(requestId);
     if (!request) return;
 
-    const updatedRequest = { ...request, ...updates };
+    const updatedRequest: PreSignupRequest = {
+      ...request,
+      ...updates,
+      progress: {
+        ...request.progress,
+        ...(updates.current !== undefined && { current: updates.current }),
+        ...(updates.total !== undefined && { total: updates.total }),
+        ...(updates.stage && { stage: updates.stage }),
+        ...(updates.message && { message: updates.message }),
+      }
+    };
     
     await this.redis.setex(
       `presignup:${requestId}`,
@@ -510,7 +528,7 @@ export class PreSignupService {
       'retail': 0.9,
       'education': 0.8,
     };
-    return multipliers[industry] || 1.0;
+    return (multipliers as Record<string, number>)[industry || ''] || 1.0;
   }
 
   private generateRandomStrengths(): string[] {

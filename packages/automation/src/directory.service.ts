@@ -121,7 +121,7 @@ export class DirectoryAutomationService {
       return submission;
     } catch (error) {
       submission.status = 'failed';
-      submission.errorMessage = error.message;
+      submission.errorMessage = error instanceof Error ? error.message : String(error);
       submission.updatedAt = new Date();
 
       // TODO: Store failed submission in database
@@ -159,7 +159,7 @@ export class DirectoryAutomationService {
           workspaceId,
           directory,
           status: 'failed',
-          errorMessage: error.message,
+          errorMessage: error instanceof Error ? error.message : String(error),
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -318,7 +318,7 @@ export class DirectoryAutomationService {
     const requiredFields = ['name', 'address', 'phone'];
     
     for (const field of requiredFields) {
-      if (!businessInfo[field]) {
+      if (!(businessInfo as Record<string, any>)[field]) {
         throw new Error(`Required field missing: ${field}`);
       }
     }
@@ -386,7 +386,7 @@ export class DirectoryAutomationService {
       },
     };
 
-    return oauthConfigs[directory] || { authUrl: '', redirectUrl: '' };
+    return (oauthConfigs as Record<string, { authUrl: string; redirectUrl: string }>)[directory] || { authUrl: '', redirectUrl: '' };
   }
 }
 

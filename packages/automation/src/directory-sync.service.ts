@@ -360,7 +360,7 @@ export class DirectorySyncService {
 
       await this.updateSyncJob(syncJobId, {
         status: 'failed',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         progress: {
           current: 0,
           total: platformIds.length,
@@ -372,7 +372,7 @@ export class DirectorySyncService {
       this.eventEmitter.emit('directory.sync.failed', {
         workspaceId,
         syncJobId,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -577,7 +577,7 @@ export class DirectorySyncService {
       'medium': 5,
       'high': 10,
     };
-    return priorities[priority] || 5;
+    return (priorities as Record<string, number>)[priority] || 5;
   }
 
   private getEstimatedVerificationTime(platform: DirectoryPlatform): string {
@@ -589,7 +589,7 @@ export class DirectorySyncService {
       'yellow-pages': '3-7 days',
       'better-business-bureau': '5-10 days',
     };
-    return times[platform.id] || '1-3 days';
+    return (times as Record<string, string>)[platform.id] || '1-3 days';
   }
 
   private generateSyncJobId(): string {
