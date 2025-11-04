@@ -155,14 +155,14 @@ export function getActionPriority(
   action: CopilotActionType,
   policy: EffectivePolicy
 ): number {
-  const basePriorities = {
+  const basePriorities: Partial<Record<CopilotActionType, number>> = {
     [CopilotActionType.ADD_FAQ]: 1,
     [CopilotActionType.ADD_TLDR]: 2,
     [CopilotActionType.ADD_CITATIONS]: 3,
     [CopilotActionType.FIX_SCHEMA]: 4,
     [CopilotActionType.REVIEW_CAMPAIGN]: 5,
     [CopilotActionType.CORRECT_HALLUCINATION]: 1, // High priority - critical for brand accuracy
-  } as Record<CopilotActionType, number>;
+  };
   
   let priority = basePriorities[action] ?? 10; // Default to low priority if not found
   
