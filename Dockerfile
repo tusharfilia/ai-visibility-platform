@@ -79,6 +79,9 @@ RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/iterare" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/fast-safe-stringify" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
     find /app/node_modules/.pnpm -type d -path "*/node_modules/path-to-regexp" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
+    find /app/node_modules/.pnpm -type d -path "*/node_modules/lodash" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
+    echo "DEBUG: Copying all transitive dependencies recursively..." && \
+    find /app/node_modules/.pnpm -type d \( -path "*/@nestjs/core" -o -path "*/@nestjs/common" -o -path "*/@nestjs/swagger" \) -exec sh -c 'pkg_dir="{}"; pkg_parent="$$(dirname "$$pkg_dir")"; pkg_grandparent="$$(dirname "$$pkg_parent")"; if [ -d "$$pkg_grandparent/node_modules" ]; then find "$$pkg_grandparent/node_modules" -mindepth 1 -maxdepth 1 -type d ! -name "@nestjs" -exec sh -c "dep_dir=\"{}\"; dep_name=\"$$(basename \"$$dep_dir\")\"; if [ ! -d \"/app/apps/api/node_modules/$$dep_name\" ]; then cp -rL \"$$dep_dir\" /app/apps/api/node_modules/ 2>/dev/null || true; fi" \; ; fi' \; && \
     echo "DEBUG: Verifying @nestjs/core and dependencies..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found"; \
