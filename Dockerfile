@@ -56,22 +56,23 @@ COPY --from=build /app/packages ./packages
 # pnpm uses symlinks in node_modules pointing to .pnpm store
 # Using -L flag to dereference symlinks and copy actual files instead
 RUN mkdir -p /app/apps/api && \
-    echo "DEBUG: Checking source /app/node_modules structure..." && \
-    ls -la /app/node_modules/ | grep -E "^[dl]" | head -20 || echo "No entries found" && \
-    echo "DEBUG: Checking if @nestjs exists in source..." && \
-    (test -d /app/node_modules/@nestjs && echo "Found @nestjs in source" && ls -la /app/node_modules/@nestjs | head -5) || \
-    (echo "WARNING: @nestjs not in source, checking .pnpm..." && \
-     find /app/node_modules/.pnpm -name "@nestjs*" -type d 2>/dev/null | head -5 || echo "No @nestjs in .pnpm") && \
-    echo "DEBUG: Copying node_modules with dereferenced symlinks..." && \
+    echo "DEBUG: Copying node_modules structure..." && \
     cp -rL /app/node_modules /app/apps/api/node_modules && \
-    echo "DEBUG: Verifying copied structure..." && \
-    test -d /app/apps/api/node_modules/@nestjs && echo "SUCCESS: @nestjs directory exists" || echo "WARNING: @nestjs directory missing" && \
+    echo "DEBUG: Creating @nestjs directory and copying packages from .pnpm..." && \
+    mkdir -p /app/apps/api/node_modules/@nestjs && \
+    for pkg in core common platform-express config jwt passport swagger throttler bullmq; do \
+      pkg_path=$$(find /app/node_modules/.pnpm -path "*/@nestjs+$$pkg*/node_modules/@nestjs/$$pkg" -type d 2>/dev/null | head -1); \
+      if [ -n "$$pkg_path" ] && [ -d "$$pkg_path" ]; then \
+        echo "Copying @nestjs/$$pkg from $$pkg_path"; \
+        cp -rL "$$pkg_path" /app/apps/api/node_modules/@nestjs/; \
+      else \
+        echo "WARNING: @nestjs/$$pkg not found in .pnpm"; \
+      fi; \
+    done && \
+    echo "DEBUG: Verifying @nestjs/core exists..." && \
     (test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo "SUCCESS: @nestjs/core package.json found") || \
     (echo "ERROR: @nestjs/core package.json not found" && \
-     echo "Checking @nestjs structure:" && \
-     ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo "No @nestjs directory found" && \
-     echo "Checking what scoped packages exist:" && \
-     ls -la /app/apps/api/node_modules/ | grep "^d.*@[^/]*$" | head -10 || echo "No scoped packages found")
+     ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -10 || echo "No @nestjs packages found")
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
