@@ -57,19 +57,17 @@ COPY --from=build /app/packages ./packages
 # We need to copy the actual package directories from .pnpm
 RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
     echo "DEBUG: Finding @nestjs packages in .pnpm store..." && \
-    ( \
-      nestjs_dir=$$(find /app/node_modules/.pnpm -type d -name "@nestjs" -path "*/node_modules/@nestjs" | head -1) && \
-      if [ -n "$$nestjs_dir" ]; then \
-        echo "Found @nestjs directory: $$nestjs_dir" && \
-        for pkg in $$nestjs_dir/*; do \
-          if [ -d "$$pkg" ]; then \
-            pkg_name=$$(basename "$$pkg") && \
-            echo "Copying @nestjs/$$pkg_name..." && \
-            cp -rL "$$pkg" /app/apps/api/node_modules/@nestjs/; \
-          fi; \
-        done; \
-      fi \
-    ) && \
+    nestjs_dir=$$(find /app/node_modules/.pnpm -type d -name "@nestjs" -path "*/node_modules/@nestjs" | head -1) && \
+    if [ -n "$$nestjs_dir" ]; then \
+      echo "Found @nestjs directory: $$nestjs_dir" && \
+      for pkg in $$nestjs_dir/*; do \
+        if [ -d "$$pkg" ]; then \
+          pkg_name=$$(basename "$$pkg") && \
+          echo "Copying @nestjs/$$pkg_name..." && \
+          cp -rL "$$pkg" /app/apps/api/node_modules/@nestjs/; \
+        fi; \
+      done; \
+    fi && \
     echo "DEBUG: Also searching for individual @nestjs packages..." && \
     for pkg in core common platform-express config jwt passport swagger throttler bullmq; do \
       find /app/node_modules/.pnpm -type d -path "*/@nestjs+$$pkg*/node_modules/@nestjs/$$pkg" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true; \
