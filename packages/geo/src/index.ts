@@ -52,9 +52,9 @@ export * from './dashboard/dashboard-aggregator.service';
 // Validation services (exported as primary names for alerts module)
 export {
   HallucinationDetectorService,
-  type HallucinationAlert,
-  type HallucinationDetectionResult
+  type HallucinationAlert
 } from './validation/hallucination-detector';
+export type { HallucinationDetectionResult } from './validation/fact-extractor';
 export {
   FactExtractorService,
   type ExtractedFact,
