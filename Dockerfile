@@ -52,23 +52,18 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages ./packages
 
-# Copy node_modules to apps/api for proper module resolution
-# Node.js resolves modules starting from the file's directory (/app/apps/api/dist/main.js)
-# It walks up: dist/node_modules -> api/node_modules -> /app/node_modules
-# We need an actual copy (not symlink) at /app/apps/api/node_modules for reliable resolution
+# Copy node_modules to apps/api, dereferencing symlinks to copy actual files
+# pnpm uses symlinks in node_modules pointing to .pnpm store
+# Using -L flag to dereference symlinks and copy actual files instead
 RUN mkdir -p /app/apps/api && \
-    echo "DEBUG: Checking source node_modules structure..." && \
-    ls -la /app/node_modules/ | head -20 && \
-    echo "DEBUG: Checking if @nestjs exists in source..." && \
-    test -d /app/node_modules/@nestjs && echo "Found @nestjs in source" || echo "WARNING: @nestjs not in source" && \
-    echo "DEBUG: Copying node_modules..." && \
-    cp -r /app/node_modules /app/apps/api/node_modules && \
-    echo "DEBUG: Copy completed, checking destination..." && \
-    ls -la /app/apps/api/node_modules/ | head -20 && \
-    echo "DEBUG: Verifying @nestjs in destination..." && \
-    test -d /app/apps/api/node_modules/@nestjs && echo "Found @nestjs in destination" || echo "ERROR: @nestjs not in destination" && \
-    echo "DEBUG: Verifying @nestjs/core package.json..." && \
-    test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo "SUCCESS: @nestjs/core package.json found" || echo "ERROR: @nestjs/core package.json not found"
+    echo "DEBUG: Copying node_modules with dereferenced symlinks..." && \
+    cp -rL /app/node_modules /app/apps/api/node_modules && \
+    echo "DEBUG: Verifying structure..." && \
+    test -d /app/apps/api/node_modules/@nestjs && echo "SUCCESS: @nestjs directory exists" || echo "WARNING: @nestjs directory missing" && \
+    (test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo "SUCCESS: @nestjs/core package.json found") || \
+    (echo "ERROR: @nestjs/core package.json not found" && \
+     echo "Checking @nestjs structure:" && \
+     ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo "No @nestjs directory found")
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
@@ -80,17 +75,15 @@ EXPOSE 8080
 # This is a fallback - Node.js should find modules via normal resolution
 ENV NODE_PATH=/app/node_modules
 
-# Start the API - ensure we're in /app and verify module resolution
+# Start the API - verify module resolution and start
 CMD ["sh", "-c", "cd /app && \
   echo 'Working directory:' && pwd && \
-  echo 'Checking source node_modules structure:' && \
-  ls -la /app/node_modules/@nestjs 2>/dev/null | head -5 || echo 'WARNING: /app/node_modules/@nestjs not found' && \
-  echo 'Checking destination node_modules structure:' && \
-  ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo 'WARNING: /app/apps/api/node_modules/@nestjs not found' && \
-  echo 'Checking if node_modules directory exists:' && \
-  test -d /app/apps/api/node_modules && echo 'SUCCESS: node_modules directory exists' || echo 'ERROR: node_modules directory missing' && \
   echo 'Verifying @nestjs/core module exists:' && \
-  test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo 'SUCCESS: @nestjs/core found' || (echo 'ERROR: @nestjs/core not found' && echo 'Full node_modules listing:' && ls -la /app/apps/api/node_modules/ 2>/dev/null | head -30) && \
+  (test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo 'SUCCESS: @nestjs/core found') || \
+  (echo 'ERROR: @nestjs/core not found' && \
+   echo 'Checking @nestjs directory:' && \
+   ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo 'No @nestjs directory' && \
+   exit 1) && \
   echo 'Starting application...' && \
   node apps/api/dist/main.js"]
 
