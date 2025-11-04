@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm --filter @ai-visibility/db build && pnpm --filter @ai-visibility/shared build && pnpm --filter @ai-visibility/parser build && pnpm --filter @ai-visibility/providers build && pnpm --filter @ai-visibility/optimizer build && pnpm --filter @ai-visibility/copilot build && pnpm --filter @ai-visibility/geo build && pnpm --filter @ai-visibility/api build",
+    "build": "pnpm --filter @ai-visibility/db build && pnpm --filter @ai-visibility/shared build && pnpm --filter @ai-visibility/parser build && pnpm --filter @ai-visibility/providers build && pnpm --filter @ai-visibility/optimizer build && pnpm --filter @ai-visibility/copilot build && pnpm --filter @ai-visibility/geo build && pnpm --filter @ai-visibility/prompts build && pnpm --filter @ai-visibility/automation build && pnpm --filter @ai-visibility/content build && pnpm --filter @ai-visibility/api build",
     "start": "pnpm --filter @ai-visibility/api start",
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint",
