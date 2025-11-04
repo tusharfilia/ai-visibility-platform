@@ -67,6 +67,9 @@ RUN mkdir -p /app/apps/api && \
     find /app/node_modules/.pnpm -type d -path "*/@nestjs+swagger*/node_modules/@nestjs/swagger" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
     find /app/node_modules/.pnpm -type d -path "*/@nestjs+throttler*/node_modules/@nestjs/throttler" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
     find /app/node_modules/.pnpm -type d -path "*/@nestjs+bullmq*/node_modules/@nestjs/bullmq" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; 2>/dev/null || true && \
+    find /app/node_modules/.pnpm -type d -path "*/tslib@*/node_modules/tslib" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true && \
+    find /app/node_modules/.pnpm -type d -path "*/reflect-metadata@*/node_modules/reflect-metadata" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true && \
+    find /app/node_modules/.pnpm -type d -path "*/rxjs@*/node_modules/rxjs" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true && \
     test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo "SUCCESS: @nestjs/core found" || echo "WARNING: @nestjs/core not found"
 
 # Keep WORKDIR at /app for proper module resolution
