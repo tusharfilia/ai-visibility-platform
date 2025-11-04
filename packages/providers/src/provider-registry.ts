@@ -7,6 +7,10 @@ import { Provider, ProviderFactory as IProviderFactory, ProviderRegistry as IPro
 import { PerplexityProvider } from './perplexity-provider';
 import { AioProvider } from './aio-provider';
 import { BraveProvider } from './brave-provider';
+import { OpenAIProvider } from './llm/openai-provider';
+import { AnthropicProvider } from './llm/anthropic-provider';
+import { GeminiProvider } from './llm/gemini-provider';
+import { CopilotProvider } from './llm/copilot-provider';
 
 export class ProviderRegistry implements IProviderRegistry {
   private providers = new Map<EngineKey, Provider>();
@@ -52,6 +56,18 @@ export class ProviderFactory implements IProviderFactory {
       case EngineKey.BRAVE:
         provider = new BraveProvider(config);
         break;
+      case EngineKey.OPENAI:
+        provider = new OpenAIProvider(config);
+        break;
+      case EngineKey.ANTHROPIC:
+        provider = new AnthropicProvider(config);
+        break;
+      case EngineKey.GEMINI:
+        provider = new GeminiProvider(config);
+        break;
+      case EngineKey.COPILOT:
+        provider = new CopilotProvider(config);
+        break;
       default:
         throw new Error(`Unsupported engine: ${key}`);
     }
@@ -61,7 +77,15 @@ export class ProviderFactory implements IProviderFactory {
   }
 
   getSupportedEngines(): EngineKey[] {
-    return [EngineKey.PERPLEXITY, EngineKey.AIO, EngineKey.BRAVE];
+    return [
+      EngineKey.PERPLEXITY, 
+      EngineKey.AIO, 
+      EngineKey.BRAVE,
+      EngineKey.OPENAI,
+      EngineKey.ANTHROPIC,
+      EngineKey.GEMINI,
+      EngineKey.COPILOT
+    ];
   }
 
   getRegistry(): ProviderRegistry {

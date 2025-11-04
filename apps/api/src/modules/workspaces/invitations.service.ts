@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { EmailService } from '@ai-visibility/shared/email.service';
+import { EmailService } from '@ai-visibility/shared';
 import { createHash, randomBytes } from 'crypto';
 
 export interface WorkspaceInvitation {

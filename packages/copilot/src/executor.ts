@@ -185,6 +185,9 @@ export class CopilotExecutor {
     
     // Notion plugin
     this.registerPlugin(new NotionPlugin());
+    
+    // Hallucination correction plugin
+    this.registerPlugin(new HallucinationCorrectionPlugin());
   }
 
   /**
@@ -329,6 +332,113 @@ class NotionPlugin implements CmsPlugin {
 
   getCapabilities(): string[] {
     return ['content-update', 'collaboration', 'document-management'];
+  }
+}
+
+/**
+ * Hallucination Correction plugin implementation
+ */
+class HallucinationCorrectionPlugin implements CmsPlugin {
+  name = 'hallucination-correction';
+  version = '1.0.0';
+  supportedActions = [
+    CopilotActionType.CORRECT_HALLUCINATION,
+  ];
+
+  async execute(context: ExecutionContext): Promise<ExecutionResult> {
+    try {
+      // Extract hallucination details from context
+      const { hallucinationId, platform, correctionText, evidence } = context.metadata;
+      
+      if (!hallucinationId || !platform || !correctionText) {
+        throw new Error('Missing required hallucination correction data');
+      }
+      
+      // Simulate correction submission to AI platform
+      await this.submitCorrection(hallucinationId, platform, correctionText, evidence);
+      
+      return {
+        success: true,
+        actionId: `hallucination_correction_${Date.now()}`,
+        status: CopilotActionStatus.EXECUTED,
+        executionTime: 2000,
+        auditLog: {
+          id: `audit_${Date.now()}`,
+          workspaceId: context.workspaceId,
+          actorUserId: context.userId,
+          action: 'HALLUCINATION_CORRECTION_EXECUTE',
+          payload: { 
+            actionType: context.actionType, 
+            hallucinationId,
+            platform,
+            correctionText: correctionText.substring(0, 100) + '...' // Truncate for audit
+          },
+          createdAt: new Date(),
+        },
+      };
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      return {
+        success: false,
+        actionId: `hallucination_correction_${Date.now()}`,
+        status: CopilotActionStatus.REJECTED,
+        error: errorMessage,
+        executionTime: 1000,
+        auditLog: {
+          id: `audit_${Date.now()}`,
+          workspaceId: context.workspaceId,
+          actorUserId: context.userId,
+          action: 'HALLUCINATION_CORRECTION_ERROR',
+          payload: { 
+            actionType: context.actionType, 
+            error: errorMessage 
+          },
+          createdAt: new Date(),
+        },
+      };
+    }
+  }
+
+  async testConnection(): Promise<boolean> {
+    // Test connection to hallucination correction service
+    try {
+      // Simulate API health check
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  getCapabilities(): string[] {
+    return ['hallucination-detection', 'fact-correction', 'ai-platform-integration'];
+  }
+
+  /**
+   * Submit correction to AI platform
+   */
+  private async submitCorrection(
+    hallucinationId: string,
+    platform: string,
+    correctionText: string,
+    evidence?: string
+  ): Promise<void> {
+    // Simulate API call to AI platform correction service
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    console.log(`Submitting correction for hallucination ${hallucinationId} to ${platform}:`);
+    console.log(`Correction: ${correctionText}`);
+    if (evidence) {
+      console.log(`Evidence: ${evidence}`);
+    }
+    
+    // In a real implementation, this would:
+    // 1. Call the AI platform's correction API (OpenAI, Anthropic, etc.)
+    // 2. Submit the correction with evidence
+    // 3. Track the submission status
+    // 4. Update the hallucination alert status
   }
 }
 

@@ -1,0 +1,107 @@
+import { OpenAIClient } from '@azure/openai';
+import { BaseLLMProvider, LLMResponse, EngineAnswer } from './base-llm-provider';
+import { ProviderConfig } from '../types';
+
+export class CopilotProvider extends BaseLLMProvider {
+  private client: OpenAIClient;
+
+  constructor(config: ProviderConfig) {
+    super(config);
+    this.client = new OpenAIClient(
+      config.endpoint || 'https://your-resource.openai.azure.com/',
+      {
+        apiKey: config.apiKey,
+        apiVersion: '2024-02-15-preview',
+      }
+    );
+  }
+
+  async query(prompt: string, options: any = {}): Promise<LLMResponse> {
+    try {
+      const deploymentName = options.deployment || 'gpt-4';
+      
+      const response = await this.client.getChatCompletions(deploymentName, [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ], {
+        maxTokens: options.maxTokens || 1000,
+        temperature: options.temperature || 0.7,
+      });
+
+      const content = response.choices[0]?.message?.content || '';
+      const usage = response.usage;
+
+      return {
+        content,
+        citations: this.extractCitations(content),
+        mentions: this.extractMentions(content, options.brandName),
+        sentiment: this.analyzeSentiment(content),
+        cost: this.calculateCost({
+          content,
+          tokens: {
+            prompt: usage?.promptTokens || 0,
+            completion: usage?.completionTokens || 0,
+            total: usage?.totalTokens || 0,
+          },
+        } as LLMResponse),
+        tokens: {
+          prompt: usage?.promptTokens || 0,
+          completion: usage?.completionTokens || 0,
+          total: usage?.totalTokens || 0,
+        },
+      };
+    } catch (error) {
+      throw new Error(`Azure Copilot API error: ${error.message}`);
+    }
+  }
+
+  normalizeResponse(response: LLMResponse, originalPrompt: string): EngineAnswer {
+    return {
+      engine: 'copilot',
+      answer: response.content,
+      citations: response.citations || [],
+      mentions: response.mentions || [],
+      sentiment: response.sentiment || 'neutral',
+      confidence: this.calculateConfidence(response),
+      timestamp: new Date(),
+      cost: response.cost,
+    };
+  }
+
+  calculateCost(response: LLMResponse): number {
+    if (response.tokens) {
+      // Azure OpenAI pricing (similar to OpenAI)
+      const promptCostPer1K = 0.03;
+      const completionCostPer1K = 0.06;
+      
+      const promptCost = (response.tokens.prompt / 1000) * promptCostPer1K;
+      const completionCost = (response.tokens.completion / 1000) * completionCostPer1K;
+      
+      return promptCost + completionCost;
+    }
+    
+    // Fallback: estimate based on content length
+    const estimatedTokens = response.content.length / 4; // Rough estimate
+    return (estimatedTokens / 1000) * 0.06; // Use completion rate as average
+  }
+
+  getProviderName(): string {
+    return 'copilot';
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      // Test with a simple request
+      await this.client.getChatCompletions('gpt-4', [
+        { role: 'user', content: 'test' }
+      ], {
+        maxTokens: 10,
+      });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+}

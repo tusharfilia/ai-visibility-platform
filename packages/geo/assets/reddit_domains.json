@@ -1,0 +1,6 @@
+{
+  "domains": ["reddit.com", "redd.it", "redditstatic.com"],
+  "patterns": ["/r/", "/u/", "/user/"]
+}
+
+

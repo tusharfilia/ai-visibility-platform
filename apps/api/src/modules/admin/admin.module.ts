@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { QueueManagementController } from './queue-management.controller';
 import { DatabaseModule } from '../database/database.module';
 
 @Module({
@@ -15,6 +16,6 @@ import { DatabaseModule } from '../database/database.module';
     ),
   ],
   providers: [AdminService],
-  controllers: [AdminController],
+  controllers: [AdminController, QueueManagementController],
 })
 export class AdminModule {}

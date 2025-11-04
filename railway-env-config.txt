@@ -1,0 +1,44 @@
+# Railway Environment Configuration
+# Copy these to Railway environment variables
+
+# ===== Core Server =====
+PORT=8080
+NODE_ENV=production
+CORS_ALLOWED_ORIGINS=https://ai-visibility-platform-production.up.railway.app
+
+# ===== Auth (Lovable Cloud) =====
+AUTH_JWT_ISSUER=https://auth.lovable.dev
+AUTH_JWT_AUDIENCE=ai-visibility-platform
+AUTH_JWT_JWKS_URL=https://auth.lovable.dev/.well-known/jwks.json
+DEBUG_JWT_MODE=false
+
+# ===== Database (Railway PostgreSQL) =====
+# DATABASE_URL will be automatically set by Railway PostgreSQL service
+
+# ===== Cache/Queues (Railway Redis) =====
+# REDIS_URL will be automatically set by Railway Redis service
+
+# ===== Providers =====
+MOCK_PROVIDERS=false
+PERPLEXITY_API_KEY=your_perplexity_api_key_here
+SERPAPI_KEY=your_serpapi_key_here
+BRAVE_API_KEY=your_brave_api_key_here
+
+# ===== Feature Flags =====
+PERPLEXITY_ENABLED=true
+AIO_ENABLED=true
+BRAVE_ENABLED=true
+FULL_AUTO_DEFAULT=false
+BRAND_DEFENSE_ENABLED=true
+
+# ===== Observability =====
+SENTRY_DSN=your_sentry_dsn_here
+OTEL_EXPORTER_OTLP_ENDPOINT=your_otel_endpoint_here
+PROMETHEUS_ENABLED=true
+PROMETHEUS_METRICS_PORT=9464
+
+# ===== Cost Management =====
+BUDGET_DAILY_DEFAULT=500
+AUTO_THROTTLE_ENABLED=true
+
+

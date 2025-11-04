@@ -1,0 +1,59 @@
+# Railway Ingress Configuration for SSE
+# This configuration disables connection timeout for SSE streams
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-visibility-platform-ingress
+  annotations:
+    # Disable connection timeout for SSE
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "0"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "0"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "0"
+    
+    # Disable buffering for SSE
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    
+    # Enable CORS for SSE
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Last-Event-ID"
+    
+    # Keep connections alive
+    nginx.ingress.kubernetes.io/keepalive-timeout: "300"
+    nginx.ingress.kubernetes.io/keepalive-requests: "1000"
+    
+    # SSE specific headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /v1/events/stream {
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 0;
+        proxy_send_timeout 0;
+        proxy_connect_timeout 0;
+        chunked_transfer_encoding off;
+      }
+
+spec:
+  rules:
+  - host: ai-visibility-platform.railway.app
+    http:
+      paths:
+      - path: /v1/events/stream
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-visibility-api
+            port:
+              number: 3000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-visibility-api
+            port:
+              number: 3000

@@ -188,11 +188,11 @@ function analyzeAlerts(alerts: Alert[], policy: EffectivePolicy): ProposedAction
         
       case 'HALLUCINATION':
         actions.push({
-          actionType: CopilotActionType.ADD_CITATIONS,
+          actionType: CopilotActionType.CORRECT_HALLUCINATION,
           targetUrl: 'https://example.com/fact-check',
           priority: 9,
           confidence: 0.95,
-          reasoning: 'Hallucination detected - adding fact-checking citations',
+          reasoning: 'Hallucination detected - submitting correction to AI platform',
           estimatedImpact: 30,
           requiredApproval: true,
         });

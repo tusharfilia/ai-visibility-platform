@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../modules/database/prisma.service';
-import { FileStorageService } from '@ai-visibility/shared/file-storage.service';
+import { FileStorageService } from '@ai-visibility/shared';
 
 export interface WorkspaceExportData {
   workspace: any;

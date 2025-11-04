@@ -1,0 +1,26 @@
+{
+  "domains": [
+    "wsj.com",
+    "dowjones.com",
+    "ft.com",
+    "financialtimes.com",
+    "welt.de",
+    "bild.de",
+    "axel-springer.de",
+    "apnews.com",
+    "ap.org"
+  ],
+  "publishers": {
+    "wsj.com": "News Corp",
+    "dowjones.com": "News Corp",
+    "ft.com": "Financial Times",
+    "financialtimes.com": "Financial Times",
+    "welt.de": "Axel Springer",
+    "bild.de": "Axel Springer",
+    "axel-springer.de": "Axel Springer",
+    "apnews.com": "Associated Press",
+    "ap.org": "Associated Press"
+  }
+}
+
+

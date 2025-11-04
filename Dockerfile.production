@@ -1,0 +1,70 @@
+# Production Dockerfile for AI Visibility Platform
+FROM node:22-alpine AS base
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/jobs/package.json ./apps/jobs/
+COPY packages/*/package.json ./packages/*/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client
+RUN pnpm --filter @ai-visibility/db prisma generate
+
+# Build the application
+RUN pnpm build
+
+# Production stage
+FROM node:22-alpine AS production
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/jobs/package.json ./apps/jobs/
+COPY packages/*/package.json ./packages/*/
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy built application
+COPY --from=base --chown=nextjs:nodejs /app/dist ./dist
+COPY --from=base --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+
+# Copy necessary files
+COPY --chown=nextjs:nodejs apps/api/src/main.ts ./apps/api/src/
+COPY --chown=nextjs:nodejs apps/jobs/src/index.ts ./apps/jobs/src/
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/healthz || exit 1
+
+# Start the application
+CMD ["pnpm", "start"]
+

@@ -5,8 +5,7 @@ import { WorkspaceInvitationsService } from './invitations.service';
 import { WorkspaceExportController } from './export.controller';
 import { WorkspaceExportService, GDPRDeletionService } from './gdpr.service';
 import { PrismaService } from '../database/prisma.service';
-import { EmailService } from '@ai-visibility/shared/email.service';
-import { FileStorageService } from '@ai-visibility/shared/file-storage.service';
+import { EmailService, FileStorageService } from '@ai-visibility/shared';
 
 @Module({
   controllers: [

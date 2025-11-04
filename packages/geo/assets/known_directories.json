@@ -1,0 +1,41 @@
+{
+  "directories": [
+    {
+      "domain": "google.com/maps",
+      "type": "gbp",
+      "name": "Google Business Profile"
+    },
+    {
+      "domain": "bing.com/maps",
+      "type": "bing_places",
+      "name": "Bing Places"
+    },
+    {
+      "domain": "apple.com/maps",
+      "type": "apple_business",
+      "name": "Apple Business Connect"
+    },
+    {
+      "domain": "g2.com",
+      "type": "g2",
+      "name": "G2"
+    },
+    {
+      "domain": "capterra.com",
+      "type": "capterra",
+      "name": "Capterra"
+    },
+    {
+      "domain": "trustpilot.com",
+      "type": "trustpilot",
+      "name": "Trustpilot"
+    },
+    {
+      "domain": "yelp.com",
+      "type": "yelp",
+      "name": "Yelp"
+    }
+  ]
+}
+
+
