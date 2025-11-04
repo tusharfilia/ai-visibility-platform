@@ -46,7 +46,20 @@ export * from './directory/directory-constants';
 // Dashboard services
 export * from './dashboard/dashboard-aggregator.service';
 
-// Validation services
-export * from './validation/hallucination-detector';
-export * from './validation/fact-extractor';
-export * from './validation/fact-validator';
+// Validation services (export with aliases to avoid conflicts)
+export {
+  HallucinationDetectorService,
+  type HallucinationAlert,
+  type HallucinationDetectionResult
+} from './validation/hallucination-detector';
+export {
+  FactExtractorService as ValidationFactExtractorService,
+  type ExtractedFact as ValidationExtractedFact,
+  type FactValidationResult
+} from './validation/fact-extractor';
+export {
+  FactValidatorService,
+  type WorkspaceProfile,
+  type ValidationRule,
+  type ValidationResult
+} from './validation/fact-validator';

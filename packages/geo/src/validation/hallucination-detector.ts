@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { FactExtractorService, ExtractedFact } from './fact-extractor';
-import { FactValidatorService, FactValidationResult, WorkspaceProfile } from './fact-validator';
+import { FactExtractorService, ExtractedFact, FactValidationResult } from './fact-extractor';
+import { FactValidatorService, WorkspaceProfile } from './fact-validator';
 
 export interface HallucinationAlert {
   id: string;
