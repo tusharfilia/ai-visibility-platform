@@ -431,6 +431,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
           params.push(where.startedAt.gte);
         }
         
+        if (args.take) {
+          query += ` LIMIT $${paramIndex++}`;
+          params.push(args.take);
+        }
+        
         const result = await this.$queryRaw(query, params);
         return result;
       },
@@ -451,6 +456,149 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         
         const result = await this.$queryRaw(query, params);
         return parseInt(result[0]?.count || '0', 10);
+      }
+    };
+  }
+
+  get prompt() {
+    return {
+      findMany: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT * FROM "Prompt" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.workspaceId) {
+          query += ` AND "workspaceId" = $${paramIndex++}`;
+          params.push(where.workspaceId);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return result;
+      }
+    };
+  }
+
+  get answer() {
+    return {
+      findMany: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT * FROM "Answer" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.promptRun?.workspaceId) {
+          query += ` AND "promptRunId" IN (SELECT id FROM "PromptRun" WHERE "workspaceId" = $${paramIndex++})`;
+          params.push(where.promptRun.workspaceId);
+        }
+        
+        if (args.take) {
+          query += ` LIMIT $${paramIndex++}`;
+          params.push(args.take);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return result;
+      }
+    };
+  }
+
+  get mention() {
+    return {
+      findMany: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT * FROM "Mention" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.answer?.promptRun?.workspaceId) {
+          query += ` AND "answerId" IN (SELECT id FROM "Answer" WHERE "promptRunId" IN (SELECT id FROM "PromptRun" WHERE "workspaceId" = $${paramIndex++}))`;
+          params.push(where.answer.promptRun.workspaceId);
+        }
+        
+        if (args.take) {
+          query += ` LIMIT $${paramIndex++}`;
+          params.push(args.take);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return result;
+      }
+    };
+  }
+
+  get engine() {
+    return {
+      findMany: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT * FROM "Engine" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.workspaceId) {
+          query += ` AND "workspaceId" = $${paramIndex++}`;
+          params.push(where.workspaceId);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return result;
+      }
+    };
+  }
+
+  get connection() {
+    return {
+      findMany: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT * FROM "Connection" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.workspaceId) {
+          query += ` AND "workspaceId" = $${paramIndex++}`;
+          params.push(where.workspaceId);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return result;
+      }
+    };
+  }
+
+  get alert() {
+    return {
+      findMany: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT * FROM "Alert" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.workspaceId) {
+          query += ` AND "workspaceId" = $${paramIndex++}`;
+          params.push(where.workspaceId);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return result;
+      }
+    };
+  }
+
+  get report() {
+    return {
+      findMany: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT * FROM "Report" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.workspaceId) {
+          query += ` AND "workspaceId" = $${paramIndex++}`;
+          params.push(where.workspaceId);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return result;
       }
     };
   }
