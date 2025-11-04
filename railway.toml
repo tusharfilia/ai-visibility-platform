@@ -8,7 +8,7 @@ buildCommand = "pnpm install && pnpm build"
 
 # Deploy configuration
 [deploy]
-startCommand = "pnpm --filter @ai-visibility/api start"
+startCommand = "NODE_PATH=/app/node_modules node /app/apps/api/dist/main.js"
 healthcheckPath = "/healthz"
 healthcheckTimeout = 300
 restartPolicyType = "always"

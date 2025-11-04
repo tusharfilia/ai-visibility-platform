@@ -57,6 +57,8 @@ WORKDIR /app/apps/api
 # Expose port
 EXPOSE 8080
 
-# Start the API - verify file exists first, then run
-CMD ["sh", "-c", "ls -la dist/ && node dist/main.js"]
+# Set NODE_PATH to help resolve modules from root node_modules
+# Start the API - use absolute path with NODE_PATH
+ENV NODE_PATH=/app/node_modules
+CMD ["sh", "-c", "NODE_PATH=/app/node_modules node dist/main.js"]
 
