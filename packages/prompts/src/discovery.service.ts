@@ -313,7 +313,7 @@ export class PromptDiscoveryService {
   /**
    * Get existing clusters for workspace
    */
-  private async getExistingClusters(workspaceId: string): Promise<PromptCluster[]> {
+  async getExistingClusters(workspaceId: string): Promise<PromptCluster[]> {
     // Mock implementation - in real implementation, query database
     return [];
   }
