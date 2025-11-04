@@ -79,6 +79,20 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         const result = await this.$queryRaw(query, params);
         return result;
       },
+      count: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT COUNT(*) as count FROM "WorkspaceMember" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.workspaceId) {
+          query += ` AND "workspaceId" = $${paramIndex++}`;
+          params.push(where.workspaceId);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return parseInt(result[0]?.count || '0', 10);
+      },
       findFirst: async (args: any) => {
         const where = args.where || {};
         let query = 'SELECT * FROM "WorkspaceMember" WHERE 1=1';
@@ -396,6 +410,47 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       findMany: async (args: any) => {
         const result = await this.$queryRaw('SELECT * FROM "Citation" WHERE "answerId" IN (SELECT id FROM "Answer" WHERE "promptRunId" IN (SELECT id FROM "PromptRun" WHERE "workspaceId" = $1))', [args.where.answer.promptRun.workspaceId]);
         return result;
+      }
+    };
+  }
+
+  get promptRun() {
+    return {
+      findMany: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT * FROM "PromptRun" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.workspaceId) {
+          query += ` AND "workspaceId" = $${paramIndex++}`;
+          params.push(where.workspaceId);
+        }
+        if (where.startedAt?.gte) {
+          query += ` AND "startedAt" >= $${paramIndex++}`;
+          params.push(where.startedAt.gte);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return result;
+      },
+      count: async (args: any) => {
+        const where = args.where || {};
+        let query = 'SELECT COUNT(*) as count FROM "PromptRun" WHERE 1=1';
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        if (where.workspaceId) {
+          query += ` AND "workspaceId" = $${paramIndex++}`;
+          params.push(where.workspaceId);
+        }
+        if (where.startedAt?.gte) {
+          query += ` AND "startedAt" >= $${paramIndex++}`;
+          params.push(where.startedAt.gte);
+        }
+        
+        const result = await this.$queryRaw(query, params);
+        return parseInt(result[0]?.count || '0', 10);
       }
     };
   }

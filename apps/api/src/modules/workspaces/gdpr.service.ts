@@ -59,11 +59,12 @@ export class WorkspaceExportService {
 
       // Upload to file storage
       const fileKey = `exports/${fileName}`;
-      const downloadUrl = await this.fileStorage.uploadFile(
+      const uploadResult = await this.fileStorage.uploadFile(
         fileKey,
         Buffer.from(fileContent),
-        format === 'json' ? 'application/json' : 'text/csv'
+        { contentType: format === 'json' ? 'application/json' : 'text/csv' }
       );
+      const downloadUrl = typeof uploadResult === 'string' ? uploadResult : uploadResult.url || uploadResult.key || fileKey;
 
       // Generate signed URL (7 days expiry)
       const expiresAt = new Date();

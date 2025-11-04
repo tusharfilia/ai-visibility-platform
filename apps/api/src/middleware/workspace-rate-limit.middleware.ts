@@ -108,8 +108,8 @@ export class WorkspaceRateLimitMiddleware implements NestMiddleware {
       res.setHeader('X-RateLimit-Reset', Math.floor(Date.now() / 1000) + 3600);
 
       // Add workspace context to request
-      req['workspaceTier'] = tier;
-      req['workspaceLimits'] = limits;
+      (req as any).workspaceTier = tier;
+      (req as any).workspaceLimits = limits;
 
       next();
     } catch (error) {

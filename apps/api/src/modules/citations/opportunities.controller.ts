@@ -56,8 +56,8 @@ export class OpportunitiesController {
       );
 
       // Filter by minimum impact score if specified
-      const filteredOpportunities = request.minImpactScore 
-        ? opportunities.filter(opp => opp.impactScore >= request.minImpactScore)
+      const filteredOpportunities = request.minImpactScore !== undefined
+        ? opportunities.filter(opp => opp.impactScore >= (request.minImpactScore || 0))
         : opportunities;
 
       return {

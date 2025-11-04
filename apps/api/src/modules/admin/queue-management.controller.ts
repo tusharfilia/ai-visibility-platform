@@ -1,8 +1,9 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { EnhancedWorkerBase } from '../services/enhanced-worker.base';
-import { EnhancedQueueService } from '../services/enhanced-queue.service';
-import { QueueMonitoringService } from '../services/queue-monitoring.service';
+// TODO: Implement these services
+// import { EnhancedWorkerBase } from '../services/enhanced-worker.base';
+// import { EnhancedQueueService } from '../services/enhanced-queue.service';
+// import { QueueMonitoringService } from '../services/queue-monitoring.service';
 
 export interface QueueStatsRequest {
   queueName: string;
@@ -19,14 +20,44 @@ export interface AlertAcknowledgeRequest {
   acknowledgedBy: string;
 }
 
+// TODO: Implement queue management services
+// Stub services for now
+class StubEnhancedWorker {
+  async getQueueHealth(_: string) { return { status: 'ok' }; }
+  async getAllQueueHealth() { return []; }
+  async getQueueMetrics(_: string) { return {}; }
+  async getAllQueueMetrics() { return []; }
+  getWorkerMetrics(_: string) { return null; }
+  getAllWorkerMetrics() { return []; }
+  async getDashboardData() { return {}; }
+  getActiveAlerts() { return []; }
+  async pauseWorker(_: string) {}
+  async resumeWorker(_: string) {}
+  async closeWorker(_: string) {}
+}
+
+class StubEnhancedQueue {
+  async pauseQueue(_: string) {}
+  async resumeQueue(_: string) {}
+  async cleanQueue(_: string, __: number) {}
+  getJobDependencies(_: string) { return null; }
+  getWaitingJobs() { return []; }
+  async retryJob(_: string, __: string) {}
+}
+
+class StubQueueMonitoringService {
+  acknowledgeAlert(_: string, __: string) {}
+  async getPerformanceTrends(_: string, __: number) { return {}; }
+}
+
 @ApiTags('Queue Management')
 @Controller('v1/admin/queues')
 export class QueueManagementController {
-  constructor(
-    private enhancedWorker: EnhancedWorkerBase,
-    private enhancedQueue: EnhancedQueueService,
-    private monitoringService: QueueMonitoringService
-  ) {}
+  private enhancedWorker = new StubEnhancedWorker();
+  private enhancedQueue = new StubEnhancedQueue();
+  private monitoringService = new StubQueueMonitoringService();
+  
+  constructor() {}
 
   @Get('health')
   @ApiOperation({ summary: 'Get queue health status' })

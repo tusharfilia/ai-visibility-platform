@@ -414,7 +414,7 @@ export class DiscoveryController {
   ) {
     try {
       const refreshedClusters = await this.discoveryService.refreshClusters(workspaceId);
-      const cluster = refreshedClusters.find(c => c.id === clusterId);
+      const cluster = refreshedClusters.find((c: any) => c.id === clusterId);
       
       if (!cluster) {
         return {

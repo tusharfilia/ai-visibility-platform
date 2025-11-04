@@ -466,8 +466,17 @@ export class HallucinationsController {
         updatedAt: new Date()
       };
 
+      // Type cast and validate facts
+      const facts = request.facts.map((f: any) => ({
+        type: f.type as 'address' | 'hours' | 'phone' | 'services' | 'description' | 'website' | 'email',
+        value: f.value,
+        confidence: f.confidence || 0.7,
+        context: f.context || '',
+        source: f.source || 'unknown'
+      }));
+
       const validationResults = await this.factValidator.validateFacts(
-        request.facts,
+        facts,
         mockProfile
       );
 
