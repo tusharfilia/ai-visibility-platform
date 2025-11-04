@@ -16,6 +16,8 @@ import { CorrelationIdInterceptor } from './middleware/correlation-id.intercepto
 
 async function bootstrap() {
   console.log('🚀 Starting AI Visibility API...');
+  console.log(`📦 Node version: ${process.version}`);
+  console.log(`📁 Working directory: ${process.cwd()}`);
   
   try {
     const app = await NestFactory.create(AppModule, { 
@@ -23,8 +25,11 @@ async function bootstrap() {
       logger: ['error', 'warn', 'log'] // Enable logging for debugging
     });
 
+    console.log('✅ NestJS application created successfully');
+
     const configService = app.get(ConfigService);
     const port = configService.get('PORT', 8080);
+    console.log(`🔌 Attempting to start on port ${port}`);
 
     // Security middleware
     app.use(helmet());
@@ -47,18 +52,26 @@ async function bootstrap() {
     });
 
     // Health check endpoints (must be registered before global prefix)
+    // Access the underlying Express instance directly
     const httpAdapter = app.getHttpAdapter();
-    httpAdapter.get('/healthz', (req: any, res: any) => {
+    const expressApp = httpAdapter.getInstance();
+    
+    console.log('🏥 Registering health check endpoints...');
+    
+    // Register health endpoints at root level before global prefix
+    expressApp.get('/healthz', (req: any, res: any) => {
       res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
-    httpAdapter.get('/readyz', async (req: any, res: any) => {
+    expressApp.get('/readyz', async (req: any, res: any) => {
       try {
         res.status(200).json({ status: 'ready', timestamp: new Date().toISOString() });
       } catch (error) {
         res.status(503).json({ status: 'not ready', error: (error as Error).message });
       }
     });
+    
+    console.log('✅ Health check endpoints registered');
 
     // Global prefix
     app.setGlobalPrefix('v1');
