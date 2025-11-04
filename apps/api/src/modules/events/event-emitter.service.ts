@@ -30,7 +30,13 @@ export class EventEmitterService extends EventEmitter implements OnModuleInit, O
 
   async onModuleInit() {
     // Set up Redis pub/sub for multi-instance support
-    await this.setupRedisPubSub();
+    // Gracefully handle Redis connection failures
+    try {
+      await this.setupRedisPubSub();
+    } catch (error) {
+      console.warn('⚠️  Redis connection failed, continuing without pub/sub:', error instanceof Error ? error.message : String(error));
+      // Continue without Redis - app should still work with local event emission
+    }
   }
 
   async onModuleDestroy() {

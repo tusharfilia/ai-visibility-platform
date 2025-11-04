@@ -15,9 +15,12 @@ import { GlobalExceptionFilter } from './middleware/exception.filter';
 import { CorrelationIdInterceptor } from './middleware/correlation-id.interceptor';
 
 async function bootstrap() {
-  console.log('🚀 Starting AI Visibility API...');
-  console.log(`📦 Node version: ${process.version}`);
-  console.log(`📁 Working directory: ${process.cwd()}`);
+  // Log to stderr so Railway captures it
+  console.error('🚀 Starting AI Visibility API...');
+  console.error(`📦 Node version: ${process.version}`);
+  console.error(`📁 Working directory: ${process.cwd()}`);
+  console.error(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.error(`🔌 PORT: ${process.env.PORT || '8080'}`);
   
   try {
     const app = await NestFactory.create(AppModule, { 
@@ -25,11 +28,11 @@ async function bootstrap() {
       logger: ['error', 'warn', 'log'] // Enable logging for debugging
     });
 
-    console.log('✅ NestJS application created successfully');
+    console.error('✅ NestJS application created successfully');
 
     const configService = app.get(ConfigService);
     const port = configService.get('PORT', 8080);
-    console.log(`🔌 Attempting to start on port ${port}`);
+    console.error(`🔌 Attempting to start on port ${port}`);
 
     // Security middleware
     app.use(helmet());
@@ -56,22 +59,24 @@ async function bootstrap() {
     const httpAdapter = app.getHttpAdapter();
     const expressApp = httpAdapter.getInstance();
     
-    console.log('🏥 Registering health check endpoints...');
+    console.error('🏥 Registering health check endpoints...');
     
     // Register health endpoints at root level before global prefix
     expressApp.get('/healthz', (req: any, res: any) => {
+      console.error('📊 Health check hit');
       res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
     expressApp.get('/readyz', async (req: any, res: any) => {
       try {
+        console.error('📊 Readiness check hit');
         res.status(200).json({ status: 'ready', timestamp: new Date().toISOString() });
       } catch (error) {
         res.status(503).json({ status: 'not ready', error: (error as Error).message });
       }
     });
     
-    console.log('✅ Health check endpoints registered');
+    console.error('✅ Health check endpoints registered at /healthz and /readyz');
 
     // Global prefix
     app.setGlobalPrefix('v1');
@@ -120,12 +125,14 @@ async function bootstrap() {
 
     try {
       await app.listen(port, '0.0.0.0'); // Listen on all interfaces for Railway
-      console.log(`🚀 AI Visibility API running on port ${port}`);
-      console.log(`📚 Swagger docs available at http://localhost:${port}/v1/docs`);
-      console.log(`🏥 Health check available at http://localhost:${port}/healthz`);
-      console.log(`✅ Readiness check available at http://localhost:${port}/readyz`);
+      console.error(`🚀 AI Visibility API running on port ${port}`);
+      console.error(`📚 Swagger docs available at http://localhost:${port}/v1/docs`);
+      console.error(`🏥 Health check available at http://localhost:${port}/healthz`);
+      console.error(`✅ Readiness check available at http://localhost:${port}/readyz`);
+      console.error('✅ Application fully started and ready to accept requests');
     } catch (error) {
       console.error('❌ Failed to start API:', error);
+      console.error('Error details:', error instanceof Error ? error.stack : String(error));
       process.exit(1);
     }
   } catch (error) {
