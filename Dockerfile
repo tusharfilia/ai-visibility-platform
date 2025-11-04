@@ -52,13 +52,15 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages ./packages
 
-WORKDIR /app/apps/api
+# Keep WORKDIR at /app for proper module resolution
+WORKDIR /app
 
 # Expose port
 EXPOSE 8080
 
 # Set NODE_PATH to help resolve modules from root node_modules
-# Start the API - use absolute path with NODE_PATH
 ENV NODE_PATH=/app/node_modules
-CMD ["sh", "-c", "NODE_PATH=/app/node_modules node dist/main.js"]
+
+# Start the API - run from /app with absolute path to dist/main.js
+CMD ["sh", "-c", "cd /app && NODE_PATH=/app/node_modules node apps/api/dist/main.js"]
 
