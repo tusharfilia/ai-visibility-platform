@@ -53,7 +53,7 @@ export class CopilotProvider extends BaseLLMProvider {
         },
       };
     } catch (error) {
-      throw new Error(`Azure Copilot API error: ${error.message}`);
+      throw new Error(`Azure Copilot API error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

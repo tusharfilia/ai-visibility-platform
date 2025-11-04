@@ -57,16 +57,16 @@ export class ProviderFactory implements IProviderFactory {
         provider = new BraveProvider(config);
         break;
       case EngineKey.OPENAI:
-        provider = new OpenAIProvider(config);
+        provider = new OpenAIProvider(config) as any;
         break;
       case EngineKey.ANTHROPIC:
-        provider = new AnthropicProvider(config);
+        provider = new AnthropicProvider(config) as any;
         break;
       case EngineKey.GEMINI:
-        provider = new GeminiProvider(config);
+        provider = new GeminiProvider(config) as any;
         break;
       case EngineKey.COPILOT:
-        provider = new CopilotProvider(config);
+        provider = new CopilotProvider(config) as any;
         break;
       default:
         throw new Error(`Unsupported engine: ${key}`);

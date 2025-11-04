@@ -47,7 +47,7 @@ export class GeminiProvider extends BaseLLMProvider {
         },
       };
     } catch (error) {
-      throw new Error(`Gemini API error: ${error.message}`);
+      throw new Error(`Gemini API error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

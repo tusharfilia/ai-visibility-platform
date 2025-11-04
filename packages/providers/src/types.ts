@@ -8,6 +8,7 @@ import { EngineKey, Sentiment, EngineAnswer } from '@ai-visibility/shared';
 export interface ProviderConfig {
   apiKey?: string;
   baseUrl?: string;
+  endpoint?: string; // For Azure OpenAI (Copilot)
   timeout?: number;
   retries?: number;
   rateLimit?: {

@@ -135,7 +135,7 @@ export class AIProviderOrchestrator extends EventEmitter {
       this.emit('orchestration:failed', {
         workspaceId,
         query,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
       throw error;
     }
@@ -163,14 +163,14 @@ export class AIProviderOrchestrator extends EventEmitter {
     }
 
     try {
-      const provider = this.providerRegistry.get(providerName);
+      const provider = this.providerRegistry.get(providerName as EngineKey);
       if (!provider) {
         throw new Error(`Provider not found: ${providerName}`);
       }
 
       // Execute with timeout
       const result = await this.executeWithTimeout(
-        provider.query(query, { workspaceId, ...options }),
+        (provider as any).query(query, { workspaceId, ...options }),
         options.timeout || this.config.timeoutMs
       );
 
@@ -192,15 +192,16 @@ export class AIProviderOrchestrator extends EventEmitter {
       };
     } catch (error) {
       const latency = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
       
       // Record failure
       circuitBreaker.recordFailure();
-      this.healthMonitor.recordFailure(providerName, error.message);
+      this.healthMonitor.recordFailure(providerName, errorMessage);
 
       return {
         provider: providerName,
         success: false,
-        error: error.message,
+        error: errorMessage,
         latency,
         cost: 0,
         engineType: this.getEngineType(providerName)
@@ -291,7 +292,7 @@ export class AIProviderOrchestrator extends EventEmitter {
       'copilot': 0.05
     };
     
-    const baseCost = baseCosts[provider] || 0.01;
+    const baseCost = (baseCosts as Record<string, number>)[provider] || 0.01;
     const queryLength = query.length;
     
     return baseCost * (queryLength / 100); // Scale by query length

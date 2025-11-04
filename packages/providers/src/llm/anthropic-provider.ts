@@ -49,7 +49,7 @@ export class AnthropicProvider extends BaseLLMProvider {
         },
       };
     } catch (error) {
-      throw new Error(`Anthropic API error: ${error.message}`);
+      throw new Error(`Anthropic API error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

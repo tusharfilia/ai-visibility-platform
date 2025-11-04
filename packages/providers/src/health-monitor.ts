@@ -55,9 +55,9 @@ export class HealthMonitor extends EventEmitter {
    * Initialize health data for all providers
    */
   private initializeHealthData(): void {
-    const providers = this.providerRegistry.getAllProviders();
+    const providers = this.providerRegistry.getAll();
     
-    providers.forEach(provider => {
+    providers.forEach((provider: any, key: any) => {
       this.healthData.set(provider, {
         healthy: true,
         successRate: 1.0,
@@ -225,13 +225,13 @@ export class HealthMonitor extends EventEmitter {
    * Perform health checks
    */
   private async performHealthChecks(): Promise<void> {
-    const providers = this.providerRegistry.getAllProviders();
+    const providers = this.providerRegistry.getAll();
     
-    for (const provider of providers) {
+    for (const [key, provider] of providers) {
       try {
-        await this.checkProviderHealth(provider);
+        await this.checkProviderHealth(key);
       } catch (error) {
-        console.error(`Health check failed for provider ${provider}:`, error);
+        console.error(`Health check failed for provider ${key}:`, error);
       }
     }
   }

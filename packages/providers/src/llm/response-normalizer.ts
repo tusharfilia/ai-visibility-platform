@@ -118,8 +118,7 @@ export class ResponseNormalizer {
       cost: Math.round(totalCost * 10000) / 10000,
       metadata: {
         provider: firstResponse.engine,
-        mergedFrom: responses.length,
-      },
+      } as any,
     };
   }
 
