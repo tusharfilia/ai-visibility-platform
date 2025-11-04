@@ -24,7 +24,10 @@ export { CitationClassifierService, CitationSourceType, type ClassificationResul
 
 // Evidence services
 export * from './evidence/evidence-graph.builder';
-export * from './evidence/fact-extractor.service';
+export {
+  FactExtractorService as EvidenceFactExtractorService,
+  type ExtractedFact as EvidenceExtractedFact
+} from './evidence/fact-extractor.service';
 export type { EntityEvidenceGraph, FactConsensusScore } from './evidence/evidence-graph.builder';
 
 // Structural services
@@ -46,15 +49,15 @@ export * from './directory/directory-constants';
 // Dashboard services
 export * from './dashboard/dashboard-aggregator.service';
 
-// Validation services (export with aliases to avoid conflicts)
+// Validation services (exported as primary names for alerts module)
 export {
   HallucinationDetectorService,
   type HallucinationAlert,
   type HallucinationDetectionResult
 } from './validation/hallucination-detector';
 export {
-  FactExtractorService as ValidationFactExtractorService,
-  type ExtractedFact as ValidationExtractedFact,
+  FactExtractorService,
+  type ExtractedFact,
   type FactValidationResult
 } from './validation/fact-extractor';
 export {
