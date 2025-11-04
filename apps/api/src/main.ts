@@ -42,6 +42,21 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
   });
 
+  // Health check endpoints (must be before global prefix to be accessible at root)
+  app.use('/healthz', (req: any, res: any) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Readiness check endpoint
+  app.use('/readyz', async (req: any, res: any) => {
+    try {
+      // For now, just return ready - we'll add database checks later
+      res.status(200).json({ status: 'ready', timestamp: new Date().toISOString() });
+    } catch (error) {
+      res.status(503).json({ status: 'not ready', error: (error as Error).message });
+    }
+  });
+
   // Global prefix
   app.setGlobalPrefix('v1');
 
@@ -85,21 +100,6 @@ async function bootstrap() {
     swaggerOptions: {
       persistAuthorization: true,
     },
-  });
-
-  // Health check endpoint
-  app.use('/healthz', (req: any, res: any) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
-
-  // Readiness check endpoint
-  app.use('/readyz', async (req: any, res: any) => {
-    try {
-      // For now, just return ready - we'll add database checks later
-      res.status(200).json({ status: 'ready', timestamp: new Date().toISOString() });
-    } catch (error) {
-      res.status(503).json({ status: 'not ready', error: (error as Error).message });
-    }
   });
 
   try {
