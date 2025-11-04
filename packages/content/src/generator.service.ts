@@ -59,7 +59,8 @@ export class ContentGeneratorService {
       }
     );
 
-    const content = this.parseGeneratedContent(response.content, request);
+    const contentText = response.content || response.text || '';
+    const content = this.parseGeneratedContent(contentText, request);
     
     // Track usage
     await this.llmRouter.trackUsage(
@@ -68,8 +69,17 @@ export class ContentGeneratorService {
       config.model,
       response.tokens?.prompt || 0,
       response.tokens?.completion || 0,
-      response.cost
+      response.cost || 0
     );
+
+    // Ensure tokens has total property
+    const tokens = response.tokens 
+      ? {
+          prompt: response.tokens.prompt || 0,
+          completion: response.tokens.completion || 0,
+          total: (response.tokens as any).total || (response.tokens.prompt || 0) + (response.tokens.completion || 0),
+        }
+      : { prompt: 0, completion: 0, total: 0 };
 
     return {
       id: this.generateId(),
@@ -80,8 +90,8 @@ export class ContentGeneratorService {
       keywords: content.keywords,
       citations: content.citations,
       schema: request.includeSchema ? this.generateSchema(content, request) : undefined,
-      cost: response.cost,
-      tokens: response.tokens || { prompt: 0, completion: 0, total: 0 },
+      cost: response.cost || 0,
+      tokens,
       createdAt: new Date(),
     };
   }
@@ -202,7 +212,7 @@ export class ContentGeneratorService {
         return {
           ...baseSchema,
           '@type': 'FAQPage',
-          mainEntity: content.keywords.map(keyword => ({
+          mainEntity: content.keywords.map((keyword: string) => ({
             '@type': 'Question',
             name: `What is ${keyword}?`,
             acceptedAnswer: {
