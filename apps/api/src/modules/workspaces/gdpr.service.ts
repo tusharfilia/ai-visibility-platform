@@ -252,7 +252,7 @@ export class WorkspaceExportService {
       take: 10
     });
 
-    return exports.map(exp => ({
+    return exports.map((exp: any) => ({
       id: exp.id,
       exportedBy: exp.actorUserId,
       exportedAt: exp.createdAt,
@@ -351,7 +351,7 @@ export class GDPRDeletionService {
 
       for (const table of deletionOrder) {
         const deleteQuery = `DELETE FROM "${table}" WHERE "workspaceId" = $1`;
-        await this.prisma.$executeRaw(deleteQuery, workspaceId);
+        await this.prisma.$executeRaw(deleteQuery, [workspaceId]);
         console.log(`Deleted from ${table}`);
       }
 
@@ -457,7 +457,7 @@ export class GDPRDeletionService {
       case 'GDPR_DELETION_COMPLETED':
         return {
           status: 'completed',
-          requestedAt: deletionLogs.find(log => log.action === 'GDPR_DELETION_REQUESTED')?.createdAt
+          requestedAt: deletionLogs.find((log: any) => log.action === 'GDPR_DELETION_REQUESTED')?.createdAt
         };
 
       case 'GDPR_DELETION_CANCELLED':

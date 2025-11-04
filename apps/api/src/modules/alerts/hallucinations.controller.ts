@@ -128,7 +128,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'HALLUCINATION_DETECTION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -182,7 +182,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'MULTIPLE_HALLUCINATION_DETECTION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -232,7 +232,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'HALLUCINATIONS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -268,7 +268,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'HALLUCINATION_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -301,7 +301,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'STATUS_UPDATE_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -334,7 +334,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'CORRECTION_SUBMISSION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -365,7 +365,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'PATTERN_ANALYSIS_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -396,7 +396,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'STATS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -431,7 +431,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'FACT_EXTRACTION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -485,7 +485,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'FACT_VALIDATION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -520,7 +520,7 @@ export class HallucinationsController {
         ok: false,
         error: {
           code: 'COMPETITOR_EXTRACTION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }

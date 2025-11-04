@@ -54,7 +54,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'QUEUE_HEALTH_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -86,7 +86,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'QUEUE_METRICS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -127,7 +127,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'WORKER_METRICS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -148,7 +148,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'DASHBOARD_DATA_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -172,7 +172,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'ALERTS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -195,7 +195,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'ALERT_ACKNOWLEDGE_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -237,7 +237,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'WORKER_CONTROL_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -264,7 +264,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'PERFORMANCE_TRENDS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -287,7 +287,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'QUEUE_PAUSE_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -310,7 +310,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'QUEUE_RESUME_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -336,7 +336,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'QUEUE_CLEAN_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -377,7 +377,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'DEPENDENCIES_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -403,7 +403,7 @@ export class QueueManagementController {
         ok: false,
         error: {
           code: 'JOB_RETRY_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }

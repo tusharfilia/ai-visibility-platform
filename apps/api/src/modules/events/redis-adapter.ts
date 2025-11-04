@@ -27,19 +27,19 @@ export class RedisSSEAdapter {
   private workspaceConnections: Map<string, Set<string>> = new Map();
 
   constructor(private configService: ConfigService) {
-    const redisUrl = this.configService.get<string>('REDIS_URL');
+    const redisUrl = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
     
     this.publisher = new Redis(redisUrl, {
       retryDelayOnFailover: 100,
       enableReadyCheck: false,
       maxRetriesPerRequest: null,
-    });
+    } as any);
 
     this.subscriber = new Redis(redisUrl, {
       retryDelayOnFailover: 100,
       enableReadyCheck: false,
       maxRetriesPerRequest: null,
-    });
+    } as any);
 
     this.setupSubscriptions();
   }

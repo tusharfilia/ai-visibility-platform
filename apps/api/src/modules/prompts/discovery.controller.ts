@@ -51,7 +51,7 @@ export class DiscoveryController {
       // 2. Generate embeddings
       const embeddings = await this.embeddingsService.generateEmbeddings(
         workspaceId,
-        discoveredPrompts.map(p => p.text)
+        discoveredPrompts.map((p: any) => p.text)
       );
 
       // 3. Cluster prompts
@@ -62,7 +62,7 @@ export class DiscoveryController {
       };
 
       const clusteringResult = await this.clusteringService.clusterPrompts(
-        embeddings.map(e => ({ text: e.text, embedding: e.embedding })),
+        embeddings.map((e: any) => ({ text: e.text, embedding: e.embedding })),
         clusteringOptions
       );
 
@@ -89,7 +89,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'DISCOVERY_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -112,7 +112,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'CLUSTERS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -128,7 +128,7 @@ export class DiscoveryController {
     try {
       // TODO: Implement database lookup
       const clusters = await this.discoveryService.getExistingClusters(workspaceId);
-      const cluster = clusters.find(c => c.id === clusterId);
+      const cluster = clusters.find((c: any) => c.id === clusterId);
       
       if (!cluster) {
         return {
@@ -149,7 +149,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'CLUSTER_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -182,7 +182,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'CLUSTER_SCAN_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -223,7 +223,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'PROMPT_GENERATION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -255,7 +255,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'PROMPT_OPTIMIZATION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -290,7 +290,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'VARIATION_GENERATION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -326,7 +326,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'COMPETITOR_PROMPTS_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -362,7 +362,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'BRAND_MONITORING_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -402,7 +402,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'SIMILARITY_SEARCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -441,7 +441,7 @@ export class DiscoveryController {
         ok: false,
         error: {
           code: 'CLUSTER_REFRESH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }

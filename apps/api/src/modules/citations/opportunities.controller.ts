@@ -77,7 +77,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'OPPORTUNITY_ANALYSIS_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -146,7 +146,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'OPPORTUNITIES_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -182,7 +182,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'OPPORTUNITY_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -215,7 +215,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'STATUS_UPDATE_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -250,7 +250,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'OUTREACH_TRACKING_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -286,7 +286,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'COMPETITOR_ANALYSIS_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -315,7 +315,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'DOMAIN_ANALYSIS_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -345,7 +345,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'DOMAIN_METRICS_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -376,7 +376,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'DOMAIN_COMPARISON_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -415,7 +415,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'IMPACT_CALCULATION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -449,7 +449,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'ROI_CALCULATION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -495,7 +495,7 @@ export class OpportunitiesController {
         ok: false,
         error: {
           code: 'OPPORTUNITY_COMPARISON_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }

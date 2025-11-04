@@ -3,7 +3,10 @@ import { LLMConfigService, LLMConfig } from './llm-config.service';
 
 export interface LLMResponse {
   text: string;
+  content?: string; // Alias for text for compatibility
   usage?: { promptTokens: number; completionTokens: number };
+  tokens?: { prompt: number; completion: number }; // Alias for usage
+  cost?: number;
   metadata?: Record<string, any>;
 }
 

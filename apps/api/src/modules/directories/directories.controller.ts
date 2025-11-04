@@ -71,8 +71,8 @@ export class DirectoryController {
         submissions,
         summary: {
           total: submissions.length,
-          successful: submissions.filter(s => s.status === 'submitted').length,
-          failed: submissions.filter(s => s.status === 'failed').length,
+          successful: submissions.filter((s: any) => s.status === 'submitted').length,
+          failed: submissions.filter((s: any) => s.status === 'failed').length,
         },
       },
     };
@@ -255,7 +255,7 @@ export class DirectoryController {
         ok: false,
         error: {
           code: 'VALIDATION_ERROR',
-          message: error.message,
+          message: error instanceof Error ? error.message : String(error),
         },
       };
     }

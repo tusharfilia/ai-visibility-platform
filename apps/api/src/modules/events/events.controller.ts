@@ -148,7 +148,7 @@ export class EventsController {
         ok: false,
         error: {
           code: 'STATS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -175,7 +175,7 @@ export class EventsController {
         ok: false,
         error: {
           code: 'CLIENT_CODE_GENERATION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }

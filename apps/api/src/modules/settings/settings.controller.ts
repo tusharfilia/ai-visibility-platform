@@ -86,9 +86,9 @@ export class SettingsController {
           ok: true,
           data: {
             available: isAvailable,
-            testResponse: response.content.substring(0, 200) + '...',
-            cost: response.cost,
-            tokens: response.tokens,
+            testResponse: (response.content || response.text || '').substring(0, 200) + '...',
+            cost: response.cost || 0,
+            tokens: response.tokens || response.usage,
           },
         };
       } catch (error) {
@@ -96,7 +96,7 @@ export class SettingsController {
           ok: false,
           error: {
             code: 'LLM_TEST_FAILED',
-            message: error.message,
+            message: error instanceof Error ? error.message : String(error),
           },
         };
       }
@@ -200,7 +200,7 @@ export class SettingsController {
       },
     };
     
-    return rates[provider]?.[model] || 0.01;
+    return (rates as any)[provider]?.[model] || 0.01;
   }
 
   private getCompletionRate(provider: string, model: string): number {
@@ -221,7 +221,7 @@ export class SettingsController {
       },
     };
     
-    return rates[provider]?.[model] || 0.02;
+    return (rates as any)[provider]?.[model] || 0.02;
   }
 }
 

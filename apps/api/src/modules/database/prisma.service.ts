@@ -38,6 +38,17 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // Raw execute method (for DELETE, UPDATE, INSERT without RETURNING)
+  async $executeRaw(query: string, params: any[] = []): Promise<number> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(query, params);
+      return result.rowCount || 0;
+    } finally {
+      client.release();
+    }
+  }
+
   // Mock Prisma methods for compatibility
   get user() {
     return {
