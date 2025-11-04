@@ -57,6 +57,6 @@ WORKDIR /app/apps/api
 # Expose port
 EXPOSE 8080
 
-# Start the API
-CMD ["node", "dist/main.js"]
+# Start the API - verify file exists first, then run
+CMD ["sh", "-c", "ls -la dist/ && node dist/main.js"]
 
