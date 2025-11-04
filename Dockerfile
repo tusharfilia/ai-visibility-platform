@@ -65,16 +65,23 @@ COPY --from=build /app/packages/prompts/package.json ./packages/prompts/package.
 COPY --from=build /app/packages/providers/package.json ./packages/providers/package.json
 COPY --from=build /app/packages/shared/package.json ./packages/shared/package.json
 
-# Copy node_modules from build stage (needed for pnpm deploy)
+# Copy node_modules from build stage (includes .pnpm virtual store)
 COPY --from=build /app/node_modules ./node_modules
 
-# Use pnpm deploy to create a standalone installation with all dependencies
-# This creates a node_modules structure without symlinks
-RUN echo "DEBUG: Running pnpm deploy for API..." && \
-    pnpm deploy --filter @ai-visibility/api --prod ./apps/api/deploy && \
-    echo "DEBUG: Moving deployed node_modules..." && \
-    mv ./apps/api/deploy/node_modules ./apps/api/node_modules && \
-    rm -rf ./apps/api/deploy && \
+# Copy all dependencies from .pnpm virtual store to apps/api/node_modules
+# Find all node_modules directories in .pnpm and copy their contents
+RUN echo "DEBUG: Copying all dependencies from .pnpm virtual store..." && \
+    mkdir -p /app/apps/api/node_modules && \
+    find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
+      for dir in "{}"/*; do \
+        if [ -d "$dir" ]; then \
+          name=$(basename "$dir"); \
+          if [ ! -d "/app/apps/api/node_modules/$name" ]; then \
+            cp -rL "$dir" "/app/apps/api/node_modules/" 2>/dev/null || true; \
+          fi; \
+        fi; \
+      done \
+    ' \; && \
     echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found"; \
