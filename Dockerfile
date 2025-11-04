@@ -46,56 +46,49 @@ RUN pnpm build
 # Production image
 FROM base AS production
 
-# Copy built artifacts and node_modules
-COPY --from=build /app/node_modules ./node_modules
+# Copy built artifacts and necessary files for pnpm deploy
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages ./packages
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
-# Copy node_modules to apps/api and set up @nestjs packages
-# pnpm uses symlinks in node_modules pointing to .pnpm store
-# We need to copy the actual package directories from .pnpm
-RUN mkdir -p /app/apps/api/node_modules/@nestjs && \
-    echo "DEBUG: Copying @nestjs packages..." && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/core" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/common" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/platform-express" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/config" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/jwt" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/passport" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/swagger" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/throttler" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/@nestjs/bullmq" -exec cp -rL {} /app/apps/api/node_modules/@nestjs/ \; && \
-    echo "DEBUG: Copying all dependencies from @nestjs packages..." && \
-    find /app/node_modules/.pnpm -type d \( -path "*/@nestjs/core" -o -path "*/@nestjs/common" -o -path "*/@nestjs/platform-express" -o -path "*/@nestjs/config" -o -path "*/@nestjs/jwt" -o -path "*/@nestjs/passport" -o -path "*/@nestjs/swagger" -o -path "*/@nestjs/throttler" -o -path "*/@nestjs/bullmq" \) -exec sh -c 'pkg_dir="{}"; node_modules_dir="$$(dirname "$$pkg_dir")"; find "$$node_modules_dir" -mindepth 1 -maxdepth 1 -type d ! -name "@nestjs" -exec cp -rL {} /app/apps/api/node_modules/ \; 2>/dev/null || true' \; && \
-    echo "DEBUG: Copying essential runtime dependencies..." && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/tslib" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/reflect-metadata" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/rxjs" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    echo "DEBUG: Copying NestJS common dependencies..." && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/uid" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/class-validator" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/class-transformer" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/iterare" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/fast-safe-stringify" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/path-to-regexp" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    find /app/node_modules/.pnpm -type d -path "*/node_modules/lodash" -exec cp -rL {} /app/apps/api/node_modules/ \; && \
-    echo "DEBUG: Copying all transitive dependencies recursively..." && \
-    find /app/node_modules/.pnpm -type d \( -path "*/@nestjs/core" -o -path "*/@nestjs/common" -o -path "*/@nestjs/swagger" \) -exec sh -c 'pkg_dir="{}"; pkg_parent="$$(dirname "$$pkg_dir")"; pkg_grandparent="$$(dirname "$$pkg_parent")"; if [ -d "$$pkg_grandparent/node_modules" ]; then find "$$pkg_grandparent/node_modules" -mindepth 1 -maxdepth 1 -type d ! -name "@nestjs" -exec sh -c "dep_dir=\"{}\"; dep_name=\"$$(basename \"$$dep_dir\")\"; if [ ! -d \"/app/apps/api/node_modules/$$dep_name\" ]; then cp -rL \"$$dep_dir\" /app/apps/api/node_modules/ 2>/dev/null || true; fi" \; ; fi' \; && \
-    echo "DEBUG: Verifying @nestjs/core and dependencies..." && \
+# Copy all package.json files from packages
+COPY --from=build /app/packages/automation/package.json ./packages/automation/package.json
+COPY --from=build /app/packages/content/package.json ./packages/content/package.json
+COPY --from=build /app/packages/copilot/package.json ./packages/copilot/package.json
+COPY --from=build /app/packages/db/package.json ./packages/db/package.json
+COPY --from=build /app/packages/geo/package.json ./packages/geo/package.json
+COPY --from=build /app/packages/optimizer/package.json ./packages/optimizer/package.json
+COPY --from=build /app/packages/parser/package.json ./packages/parser/package.json
+COPY --from=build /app/packages/prompts/package.json ./packages/prompts/package.json
+COPY --from=build /app/packages/providers/package.json ./packages/providers/package.json
+COPY --from=build /app/packages/shared/package.json ./packages/shared/package.json
+
+# Copy node_modules from build stage (needed for pnpm deploy)
+COPY --from=build /app/node_modules ./node_modules
+
+# Use pnpm deploy to create a standalone installation with all dependencies
+# This creates a node_modules structure without symlinks
+RUN echo "DEBUG: Running pnpm deploy for API..." && \
+    pnpm deploy --filter @ai-visibility/api --prod ./apps/api/deploy && \
+    echo "DEBUG: Moving deployed node_modules..." && \
+    mv ./apps/api/deploy/node_modules ./apps/api/node_modules && \
+    rm -rf ./apps/api/deploy && \
+    echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found"; \
     else \
       echo "ERROR: @nestjs/core not found" && \
       exit 1; \
     fi && \
-    if [ -d /app/apps/api/node_modules/uid ]; then \
-      echo "SUCCESS: uid dependency found"; \
+    echo "DEBUG: Verifying js-yaml..." && \
+    if [ -d /app/apps/api/node_modules/js-yaml ]; then \
+      echo "SUCCESS: js-yaml found"; \
     else \
-      echo "WARNING: uid dependency not found, listing node_modules:" && \
-      ls -la /app/apps/api/node_modules/ | head -20; \
-    fi && \
-    ls -la /app/apps/api/node_modules/@nestjs/ | head -10
+      echo "WARNING: js-yaml not found, listing node_modules:" && \
+      ls -la /app/apps/api/node_modules/ | head -30; \
+    fi
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
