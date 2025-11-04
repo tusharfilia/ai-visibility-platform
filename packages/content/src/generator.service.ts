@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { LLMRouterService } from '@ai-visibility/shared/llm-router';
-import { LLMConfigService } from '@ai-visibility/shared/llm-config.service';
+import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
 
 export interface ContentGenerationRequest {
   type: 'blog' | 'faq' | 'landing' | 'social';

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DirectoryController } from './directories.controller';
-import { DirectoryAutomationService } from '@ai-visibility/automation/directory.service';
+import { DirectoryAutomationService } from '@ai-visibility/automation';
 
 @Module({
   controllers: [DirectoryController],

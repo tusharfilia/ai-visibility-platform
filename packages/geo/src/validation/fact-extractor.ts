@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { LLMRouterService } from '@ai-visibility/shared/llm-router';
+import { LLMRouterService } from '@ai-visibility/shared';
 
 export interface ExtractedFact {
   type: 'address' | 'hours' | 'phone' | 'services' | 'description' | 'website' | 'email';

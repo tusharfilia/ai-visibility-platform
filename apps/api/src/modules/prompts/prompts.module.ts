@@ -3,10 +3,7 @@ import { PromptsController } from './prompts.controller';
 import { PromptsService } from './prompts.service';
 import { DiscoveryController } from './discovery.controller';
 import { DiscoveryApiService } from './discovery.service';
-import { PromptDiscoveryService } from '@ai-visibility/prompts/discovery.service';
-import { PromptGeneratorService } from '@ai-visibility/prompts/prompt-generator';
-import { EmbeddingsService } from '@ai-visibility/prompts/embeddings.service';
-import { ClusteringService } from '@ai-visibility/prompts/clustering.service';
+import { PromptDiscoveryService, PromptGeneratorService, EmbeddingsService, ClusteringService } from '@ai-visibility/prompts';
 import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
 
 @Module({

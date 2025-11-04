@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PromptDiscoveryService } from '@ai-visibility/prompts/discovery.service';
-import { PromptGeneratorService } from '@ai-visibility/prompts/prompt-generator';
-import { EmbeddingsService } from '@ai-visibility/prompts/embeddings.service';
-import { ClusteringService } from '@ai-visibility/prompts/clustering.service';
+import { PromptDiscoveryService, PromptGeneratorService, EmbeddingsService, ClusteringService } from '@ai-visibility/prompts';
 
 @Injectable()
 export class DiscoveryApiService {

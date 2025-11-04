@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { DirectoryAutomationService, BusinessInfo, DirectorySubmission } from '@ai-visibility/automation/directory.service';
+import { DirectoryAutomationService, BusinessInfo, DirectorySubmission } from '@ai-visibility/automation';
 import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
 import { WorkspaceAccessGuard } from '../../guards/workspace-access.guard';
 

@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { ContentGeneratorService, ContentGenerationRequest, GeneratedContent } from '@ai-visibility/content/generator.service';
+import { ContentGeneratorService, ContentGenerationRequest, GeneratedContent } from '@ai-visibility/content';
 import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
 import { WorkspaceAccessGuard } from '../../guards/workspace-access.guard';
 
