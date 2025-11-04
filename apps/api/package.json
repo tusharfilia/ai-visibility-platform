@@ -6,8 +6,8 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "start": "NODE_PATH=/app/node_modules node dist/main",
-    "start:prod": "NODE_PATH=/app/node_modules node dist/main",
+    "start": "cd /app && NODE_PATH=/app/node_modules node apps/api/dist/main.js",
+    "start:prod": "cd /app && NODE_PATH=/app/node_modules node apps/api/dist/main.js",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",

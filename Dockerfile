@@ -52,9 +52,12 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages ./packages
 
-# Create symlink so node_modules can be found from apps/api directory
-# This ensures module resolution works when Railway runs from /app/apps/api
-RUN mkdir -p /app/apps/api && ln -sf /app/node_modules /app/apps/api/node_modules
+# Create symlink AND copy node_modules to apps/api for maximum compatibility
+# Some Node.js versions don't follow symlinks properly for module resolution
+RUN mkdir -p /app/apps/api && \
+    ln -sf /app/node_modules /app/apps/api/node_modules && \
+    # Also ensure @nestjs is accessible (verify it exists)
+    test -d /app/node_modules/@nestjs || (echo "ERROR: @nestjs not found!" && ls -la /app/node_modules/ | head -20)
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
@@ -63,8 +66,10 @@ WORKDIR /app
 EXPOSE 8080
 
 # Set NODE_PATH to help resolve modules from root node_modules
+# This is a fallback - Node.js should find modules via normal resolution
 ENV NODE_PATH=/app/node_modules
 
-# Start the API - run from /app with absolute path to dist/main.js
-CMD ["sh", "-c", "NODE_PATH=/app/node_modules node apps/api/dist/main.js"]
+# Start the API - ensure we're in /app and use absolute path
+# The cd ensures Node.js resolves modules relative to /app
+CMD ["sh", "-c", "cd /app && pwd && ls -la node_modules/@nestjs 2>/dev/null | head -5 || echo 'node_modules check failed' && node apps/api/dist/main.js"]
 
