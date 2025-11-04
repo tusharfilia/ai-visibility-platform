@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { EngineKey } from '@ai-visibility/shared';
 import { ProviderRegistry } from './provider-registry';
 import { CircuitBreaker } from './circuit-breaker';
 import { HealthMonitor } from './health-monitor';

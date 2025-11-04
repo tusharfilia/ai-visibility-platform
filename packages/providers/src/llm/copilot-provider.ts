@@ -1,32 +1,35 @@
-import { OpenAIClient } from '@azure/openai';
+import { AzureOpenAI } from '@azure/openai';
 import { BaseLLMProvider, LLMResponse, EngineAnswer } from './base-llm-provider';
 import { ProviderConfig } from '../types';
 
 export class CopilotProvider extends BaseLLMProvider {
-  private client: OpenAIClient;
+  private client: AzureOpenAI;
 
   constructor(config: ProviderConfig) {
     super(config);
-    this.client = new OpenAIClient(
-      config.endpoint || 'https://your-resource.openai.azure.com/',
-      {
-        apiKey: config.apiKey,
-        apiVersion: '2024-02-15-preview',
-      }
-    );
+    if (!config.apiKey || !config.endpoint) {
+      throw new Error('Azure OpenAI API key and endpoint are required');
+    }
+    this.client = new AzureOpenAI({
+      endpoint: config.endpoint,
+      apiKey: config.apiKey,
+      apiVersion: '2024-02-15-preview',
+    });
   }
 
   async query(prompt: string, options: any = {}): Promise<LLMResponse> {
     try {
       const deploymentName = options.deployment || 'gpt-4';
       
-      const response = await this.client.getChatCompletions(deploymentName, [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ], {
-        maxTokens: options.maxTokens || 1000,
+      const response = await this.client.chat.completions.create({
+        model: deploymentName,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        max_tokens: options.maxTokens || 1000,
         temperature: options.temperature || 0.7,
       });
 

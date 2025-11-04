@@ -8,6 +8,9 @@ export class GeminiProvider extends BaseLLMProvider {
 
   constructor(config: ProviderConfig) {
     super(config);
+    if (!config.apiKey) {
+      throw new Error('Google AI API key is required');
+    }
     this.client = new GoogleGenerativeAI(config.apiKey);
     this.model = this.client.getGenerativeModel({ model: 'gemini-pro' });
   }
