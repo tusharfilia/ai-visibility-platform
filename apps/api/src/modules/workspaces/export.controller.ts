@@ -64,7 +64,7 @@ export class WorkspaceExportController {
         ok: false,
         error: {
           code: 'EXPORT_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -92,7 +92,7 @@ export class WorkspaceExportController {
         ok: false,
         error: {
           code: 'EXPORT_HISTORY_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -126,7 +126,7 @@ export class WorkspaceExportController {
         ok: false,
         error: {
           code: 'DELETION_REQUEST_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -153,7 +153,7 @@ export class WorkspaceExportController {
         ok: false,
         error: {
           code: 'DELETION_CANCELLATION_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -178,7 +178,7 @@ export class WorkspaceExportController {
         ok: false,
         error: {
           code: 'DELETION_STATUS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }

@@ -254,7 +254,8 @@ export class WorkspaceMembersService {
       'VIEWER': ['READ']
     };
 
-    return permissions[role]?.includes(permission) || false;
+    const rolePermissions = permissions[role as keyof typeof permissions];
+    return rolePermissions?.includes(permission) || false;
   }
 }
 

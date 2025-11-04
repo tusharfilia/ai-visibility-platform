@@ -332,11 +332,11 @@ export class WorkspaceInvitationsService {
       </div>
     `;
 
-    await this.emailService.sendEmail(
-      invitation.email,
+    await this.emailService.sendEmail({
+      to: invitation.email,
       subject,
-      htmlContent
-    );
+      html: htmlContent
+    });
   }
 }
 

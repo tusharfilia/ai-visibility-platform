@@ -90,7 +90,7 @@ export class WorkspaceExportService {
       };
     } catch (error) {
       console.error('Workspace export failed:', error);
-      throw new Error(`Failed to export workspace data: ${error.message}`);
+      throw new Error(`Failed to export workspace data: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -321,7 +321,7 @@ export class GDPRDeletionService {
       return deletionRequest;
     } catch (error) {
       console.error('GDPR deletion request failed:', error);
-      throw new Error(`Failed to initiate deletion request: ${error.message}`);
+      throw new Error(`Failed to initiate deletion request: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -372,7 +372,7 @@ export class GDPRDeletionService {
       console.log(`GDPR deletion completed for workspace ${workspaceId}`);
     } catch (error) {
       console.error('GDPR deletion execution failed:', error);
-      throw new Error(`Failed to execute deletion: ${error.message}`);
+      throw new Error(`Failed to execute deletion: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -413,7 +413,7 @@ export class GDPRDeletionService {
       console.log(`GDPR deletion cancelled for workspace ${workspaceId}`);
     } catch (error) {
       console.error('GDPR deletion cancellation failed:', error);
-      throw new Error(`Failed to cancel deletion request: ${error.message}`);
+      throw new Error(`Failed to cancel deletion request: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

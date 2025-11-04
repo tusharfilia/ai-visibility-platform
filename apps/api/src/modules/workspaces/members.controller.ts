@@ -49,7 +49,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'MEMBERS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -97,7 +97,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'MEMBER_ADD_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -142,7 +142,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'MEMBER_REMOVE_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -191,7 +191,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'MEMBER_ROLE_UPDATE_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -216,7 +216,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'INVITATIONS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -264,7 +264,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'INVITATION_CREATE_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -309,7 +309,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'INVITATION_REVOKE_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -337,7 +337,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'INVITATION_ACCEPT_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
@@ -374,7 +374,7 @@ export class WorkspaceMembersController {
         ok: true,
         data: {
           role,
-          permissions: permissions[role] || []
+          permissions: permissions[role as keyof typeof permissions] || []
         }
       };
     } catch (error) {
@@ -382,7 +382,7 @@ export class WorkspaceMembersController {
         ok: false,
         error: {
           code: 'PERMISSIONS_FETCH_FAILED',
-          message: error.message
+          message: error instanceof Error ? error.message : String(error)
         }
       };
     }
