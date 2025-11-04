@@ -52,6 +52,10 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/packages ./packages
 
+# Create symlink so node_modules can be found from apps/api directory
+# This ensures module resolution works when Railway runs from /app/apps/api
+RUN mkdir -p /app/apps/api && ln -sf /app/node_modules /app/apps/api/node_modules
+
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
 
@@ -62,5 +66,5 @@ EXPOSE 8080
 ENV NODE_PATH=/app/node_modules
 
 # Start the API - run from /app with absolute path to dist/main.js
-CMD ["sh", "-c", "cd /app && NODE_PATH=/app/node_modules node apps/api/dist/main.js"]
+CMD ["sh", "-c", "NODE_PATH=/app/node_modules node apps/api/dist/main.js"]
 
