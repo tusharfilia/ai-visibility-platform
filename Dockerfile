@@ -70,9 +70,12 @@ RUN mkdir -p /app/apps/api && \
       fi; \
     done && \
     echo "DEBUG: Verifying @nestjs/core exists..." && \
-    (test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo "SUCCESS: @nestjs/core package.json found") || \
-    (echo "ERROR: @nestjs/core package.json not found" && \
-     ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -10 || echo "No @nestjs packages found")
+    if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
+      echo "SUCCESS: @nestjs/core package.json found"; \
+    else \
+      echo "ERROR: @nestjs/core package.json not found"; \
+      ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -10 || echo "No @nestjs packages found"; \
+    fi
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
@@ -88,11 +91,14 @@ ENV NODE_PATH=/app/node_modules
 CMD ["sh", "-c", "cd /app && \
   echo 'Working directory:' && pwd && \
   echo 'Verifying @nestjs/core module exists:' && \
-  (test -f /app/apps/api/node_modules/@nestjs/core/package.json && echo 'SUCCESS: @nestjs/core found') || \
-  (echo 'ERROR: @nestjs/core not found' && \
-   echo 'Checking @nestjs directory:' && \
-   ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo 'No @nestjs directory' && \
-   exit 1) && \
+  if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
+    echo 'SUCCESS: @nestjs/core found'; \
+  else \
+    echo 'ERROR: @nestjs/core not found'; \
+    echo 'Checking @nestjs directory:'; \
+    ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo 'No @nestjs directory'; \
+    exit 1; \
+  fi && \
   echo 'Starting application...' && \
   node apps/api/dist/main.js"]
 
