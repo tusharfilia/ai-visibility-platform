@@ -92,14 +92,17 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
         if [ -d "$pkg_dir" ] || [ -L "$pkg_dir" ]; then \
           # Get relative path from node_modules directory (e.g., @nestjs/core or package-name) \
           rel_path=$(echo "$pkg_dir" | sed "s|^$nm_dir/||"); \
-          # Debug @nestjs/core specifically \
-          if echo "$rel_path" | grep -q "^@nestjs/core"; then \
-            echo "DEBUG: Found $rel_path in $nm_dir, pkg_dir=$pkg_dir"; \
+          # Debug ALL @nestjs entries to see what we're getting \
+          if echo "$rel_path" | grep -q "^@nestjs"; then \
+            echo "DEBUG: Processing @nestjs entry: rel_path=$rel_path, pkg_dir=$pkg_dir, nm_dir=$nm_dir"; \
           fi; \
           # Skip bare scoped directories (e.g., just @nestjs) - only copy actual packages \
           if echo "$rel_path" | grep -q "^@"; then \
             if ! echo "$rel_path" | grep -q "/"; then \
               # This is a bare scoped directory like @nestjs, skip it \
+              if echo "$rel_path" | grep -q "^@nestjs"; then \
+                echo "DEBUG: Skipping bare @nestjs directory"; \
+              fi; \
               continue; \
             fi; \
           fi; \
@@ -119,6 +122,10 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
             if echo "$rel_path" | grep -q "^@nestjs/core"; then \
               echo "DEBUG: After copy, checking $dest_path"; \
               ls -la "$dest_path" 2>/dev/null | head -3 || echo "ERROR: Destination not created"; \
+            fi; \
+          else \
+            if echo "$rel_path" | grep -q "^@nestjs/core"; then \
+              echo "DEBUG: @nestjs/core already exists at $dest_path, skipping"; \
             fi; \
           fi; \
         fi; \
