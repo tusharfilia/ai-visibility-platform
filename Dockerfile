@@ -88,9 +88,14 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
     find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
       nm_dir="{}"; \
       for pkg_dir in "$nm_dir"/*; do \
-        if [ -d "$pkg_dir" ]; then \
+        # Check if it's a directory or symlink to directory \
+        if [ -d "$pkg_dir" ] || [ -L "$pkg_dir" ]; then \
           # Get relative path from node_modules directory (e.g., @nestjs/core or package-name) \
           rel_path=$(echo "$pkg_dir" | sed "s|^$nm_dir/||"); \
+          # Debug @nestjs/core specifically \
+          if echo "$rel_path" | grep -q "^@nestjs/core"; then \
+            echo "DEBUG: Found $rel_path in $nm_dir, pkg_dir=$pkg_dir"; \
+          fi; \
           # Skip bare scoped directories (e.g., just @nestjs) - only copy actual packages \
           if echo "$rel_path" | grep -q "^@"; then \
             if ! echo "$rel_path" | grep -q "/"; then \
@@ -108,8 +113,13 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
           if [ ! -d "$dest_path" ] || [ ! -f "$dest_path/package.json" ]; then \
             if echo "$rel_path" | grep -q "^@nestjs/core"; then \
               echo "DEBUG: Copying @nestjs/core from $pkg_dir to $dest_path"; \
+              ls -la "$pkg_dir" | head -3; \
             fi; \
             cp -rL "$pkg_dir" "$dest_path" 2>&1 || echo "ERROR: Failed to copy $rel_path"; \
+            if echo "$rel_path" | grep -q "^@nestjs/core"; then \
+              echo "DEBUG: After copy, checking $dest_path"; \
+              ls -la "$dest_path" 2>/dev/null | head -3 || echo "ERROR: Destination not created"; \
+            fi; \
           fi; \
         fi; \
       done \
