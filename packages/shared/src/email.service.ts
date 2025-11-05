@@ -27,12 +27,14 @@ export interface EmailTemplate {
 export class EmailService {
   private resend: Resend;
   private defaultFrom: string;
+  private configService?: ConfigService;
 
-  constructor(@Optional() private configService?: ConfigService) {
+  constructor(@Optional() configService?: ConfigService) {
+    this.configService = configService;
     // Fallback to environment variables if ConfigService is not available
     const getConfig = (key: string, defaultValue?: string): string | undefined => {
       if (this.configService) {
-        return this.configService.get<string>(key, defaultValue);
+        return this.configService.get<string>(key, defaultValue) || defaultValue;
       }
       return process.env[key] || defaultValue;
     };
