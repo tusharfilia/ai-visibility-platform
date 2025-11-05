@@ -70,15 +70,24 @@ COPY --from=build /app/node_modules ./node_modules
 
 # Copy all dependencies from .pnpm virtual store to apps/api/node_modules
 # pnpm stores packages in .pnpm/<package>@<version>/node_modules/<package>
-# We need to copy all packages from these node_modules directories
+# We need to preserve the relative path from node_modules for scoped packages
 RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
     mkdir -p /app/apps/api/node_modules && \
     find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
-      for pkg_dir in "{}"/*; do \
+      nm_dir="{}"; \
+      for pkg_dir in "$nm_dir"/*; do \
         if [ -d "$pkg_dir" ]; then \
-          pkg_name=$(basename "$pkg_dir"); \
-          if [ ! -d "/app/apps/api/node_modules/$pkg_name" ]; then \
-            cp -rL "$pkg_dir" "/app/apps/api/node_modules/" 2>/dev/null || true; \
+          # Get relative path from node_modules directory (e.g., @nestjs/core or package-name) \
+          rel_path=$(echo "$pkg_dir" | sed "s|^$nm_dir/||"); \
+          dest_path="/app/apps/api/node_modules/$rel_path"; \
+          # Create parent directory if it's a scoped package \
+          if echo "$rel_path" | grep -q "/"; then \
+            parent_dir=$(dirname "$dest_path"); \
+            mkdir -p "$parent_dir"; \
+          fi; \
+          # Copy if destination doesn't exist \
+          if [ ! -d "$dest_path" ]; then \
+            cp -rL "$pkg_dir" "$dest_path" 2>/dev/null || true; \
           fi; \
         fi; \
       done \
