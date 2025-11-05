@@ -29,12 +29,16 @@ export class EmailService {
   private defaultFrom: string;
   private configService?: ConfigService;
 
-  constructor(@Optional() configService?: ConfigService) {
+  constructor(@Optional() configService: ConfigService | undefined) {
     this.configService = configService;
     // Fallback to environment variables if ConfigService is not available
     const getConfig = (key: string, defaultValue?: string): string | undefined => {
       if (this.configService) {
-        return this.configService.get<string>(key, defaultValue) || defaultValue;
+        // ConfigService.get() can return complex types, so we handle it explicitly
+        if (defaultValue !== undefined) {
+          return (this.configService.get<string>(key, defaultValue) as string) || defaultValue;
+        }
+        return this.configService.get<string>(key) as string | undefined;
       }
       return process.env[key] || defaultValue;
     };
