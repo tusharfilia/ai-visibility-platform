@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 
@@ -28,7 +28,7 @@ export class EmailService {
   private resend: Resend;
   private defaultFrom: string;
 
-  constructor(private configService?: ConfigService) {
+  constructor(@Optional() private configService?: ConfigService) {
     // Fallback to environment variables if ConfigService is not available
     const getConfig = (key: string, defaultValue?: string): string | undefined => {
       if (this.configService) {
