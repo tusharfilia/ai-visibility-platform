@@ -28,14 +28,27 @@ export class EmailService {
   private resend: Resend;
   private defaultFrom: string;
 
-  constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+  constructor(private configService?: ConfigService) {
+    // Fallback to environment variables if ConfigService is not available
+    const getConfig = (key: string, defaultValue?: string): string | undefined => {
+      if (this.configService) {
+        return this.configService.get<string>(key, defaultValue);
+      }
+      return process.env[key] || defaultValue;
+    };
+
+    const apiKey = getConfig('RESEND_API_KEY');
     if (!apiKey) {
-      throw new Error('RESEND_API_KEY is required');
+      // Don't throw error - allow app to start without email service
+      console.warn('RESEND_API_KEY is not configured. Email functionality will be disabled.');
+      // Create a dummy Resend instance to prevent errors
+      this.resend = new Resend('dummy-key-for-startup');
+      this.defaultFrom = 'AI Visibility Platform <noreply@ai-visibility.com>';
+      return;
     }
     
     this.resend = new Resend(apiKey);
-    this.defaultFrom = this.configService.get<string>('EMAIL_FROM', 'AI Visibility Platform <noreply@ai-visibility.com>');
+    this.defaultFrom = getConfig('EMAIL_FROM', 'AI Visibility Platform <noreply@ai-visibility.com>') || 'AI Visibility Platform <noreply@ai-visibility.com>';
   }
 
   /**
