@@ -75,12 +75,18 @@ COPY --from=build /app/node_modules ./node_modules
 # Skip bare scoped directories (like @nestjs without a subpackage) - only copy actual packages
 RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
     mkdir -p /app/apps/api/node_modules && \
-    echo "DEBUG: Finding node_modules directories in .pnpm..." && \
-    find /app/node_modules/.pnpm -type d -name "node_modules" | head -5 && \
+    echo "DEBUG: Finding @nestjs/core in .pnpm..." && \
+    find /app/node_modules/.pnpm -path "*/@nestjs/core" -type d | head -3 && \
+    echo "DEBUG: Finding node_modules containing @nestjs/core..." && \
+    find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
+      if [ -d "{}/@nestjs/core" ]; then \
+        echo "Found @nestjs/core in {}"; \
+        ls -la "{}/@nestjs/core" | head -3; \
+      fi \
+    ' \; | head -5 && \
     echo "DEBUG: Starting copy process..." && \
     find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
       nm_dir="{}"; \
-      count=0; \
       for pkg_dir in "$nm_dir"/*; do \
         if [ -d "$pkg_dir" ]; then \
           # Get relative path from node_modules directory (e.g., @nestjs/core or package-name) \
@@ -101,20 +107,16 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
           # Copy if destination doesn't exist (force copy to handle updates) \
           if [ ! -d "$dest_path" ] || [ ! -f "$dest_path/package.json" ]; then \
             if echo "$rel_path" | grep -q "^@nestjs/core"; then \
-              echo "DEBUG: Copying $rel_path to $dest_path"; \
+              echo "DEBUG: Copying @nestjs/core from $pkg_dir to $dest_path"; \
             fi; \
             cp -rL "$pkg_dir" "$dest_path" 2>&1 || echo "ERROR: Failed to copy $rel_path"; \
-            count=$((count + 1)); \
           fi; \
         fi; \
-      done; \
-      if [ $count -gt 0 ] && echo "$nm_dir" | grep -q "@nestjs"; then \
-        echo "DEBUG: Copied $count packages from $nm_dir"; \
-      fi \
+      done \
     ' \; && \
-    echo "DEBUG: Copy completed. Checking node_modules structure..." && \
-    ls -la /app/apps/api/node_modules/ | head -20 && \
-    echo "DEBUG: Listing @nestjs packages found:" && \
+    echo "DEBUG: Copy completed. Checking for @nestjs..." && \
+    find /app/apps/api/node_modules -name "@nestjs" -type d && \
+    echo "DEBUG: Listing @nestjs directory contents:" && \
     ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -20 || echo "No @nestjs directory found" && \
     echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
