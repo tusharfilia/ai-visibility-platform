@@ -96,6 +96,7 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
           if echo "$rel_path" | grep -q "^@"; then \
             if ! echo "$rel_path" | grep -q "/"; then \
               # This is a bare scoped directory like @nestjs, iterate into it \
+              # Force rebuild: v2 - iterate into @nestjs to copy sub-packages \
               if echo "$rel_path" | grep -q "^@nestjs"; then \
                 echo "DEBUG: Found bare @nestjs directory, iterating into it..."; \
                 for sub_pkg in "$pkg_dir"/*; do \
