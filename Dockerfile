@@ -72,6 +72,7 @@ COPY --from=build /app/node_modules ./node_modules
 # pnpm stores packages in .pnpm/<package>@<version>/node_modules/<package>
 # For scoped packages like @nestjs/swagger, pnpm uses @nestjs+swagger@version in the directory name
 # We need to preserve the relative path from node_modules for scoped packages
+# Skip bare scoped directories (like @nestjs without a subpackage) - only copy actual packages
 RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
     mkdir -p /app/apps/api/node_modules && \
     find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
@@ -80,6 +81,13 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
         if [ -d "$pkg_dir" ]; then \
           # Get relative path from node_modules directory (e.g., @nestjs/core or package-name) \
           rel_path=$(echo "$pkg_dir" | sed "s|^$nm_dir/||"); \
+          # Skip bare scoped directories (e.g., just @nestjs) - only copy actual packages \
+          if echo "$rel_path" | grep -q "^@"; then \
+            if ! echo "$rel_path" | grep -q "/"; then \
+              # This is a bare scoped directory like @nestjs, skip it \
+              continue; \
+            fi; \
+          fi; \
           dest_path="/app/apps/api/node_modules/$rel_path"; \
           # Create parent directory if it's a scoped package \
           if echo "$rel_path" | grep -q "/"; then \
