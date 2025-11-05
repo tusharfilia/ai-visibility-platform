@@ -68,11 +68,21 @@ COPY --from=build /app/packages/shared/package.json ./packages/shared/package.js
 # Copy node_modules from build stage (includes .pnpm virtual store)
 COPY --from=build /app/node_modules ./node_modules
 
-# Copy all dependencies to apps/api/node_modules with dereferenced symlinks
-# This creates a flat structure with all actual files (no symlinks)
-RUN echo "DEBUG: Copying node_modules with dereferenced symlinks..." && \
+# Copy all dependencies from .pnpm virtual store to apps/api/node_modules
+# pnpm stores packages in .pnpm/<package>@<version>/node_modules/<package>
+# We need to copy all packages from these node_modules directories
+RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
     mkdir -p /app/apps/api/node_modules && \
-    cp -rL /app/node_modules/* /app/apps/api/node_modules/ 2>/dev/null || true && \
+    find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
+      for pkg_dir in "{}"/*; do \
+        if [ -d "$pkg_dir" ]; then \
+          pkg_name=$(basename "$pkg_dir"); \
+          if [ ! -d "/app/apps/api/node_modules/$pkg_name" ]; then \
+            cp -rL "$pkg_dir" "/app/apps/api/node_modules/" 2>/dev/null || true; \
+          fi; \
+        fi; \
+      done \
+    ' \; && \
     echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found"; \
