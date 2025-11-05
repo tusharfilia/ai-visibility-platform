@@ -70,6 +70,7 @@ COPY --from=build /app/node_modules ./node_modules
 
 # Copy all dependencies from .pnpm virtual store to apps/api/node_modules
 # pnpm stores packages in .pnpm/<package>@<version>/node_modules/<package>
+# For scoped packages like @nestjs/swagger, pnpm uses @nestjs+swagger@version in the directory name
 # We need to preserve the relative path from node_modules for scoped packages
 RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
     mkdir -p /app/apps/api/node_modules && \
@@ -85,19 +86,32 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
             parent_dir=$(dirname "$dest_path"); \
             mkdir -p "$parent_dir"; \
           fi; \
-          # Copy if destination doesn't exist \
-          if [ ! -d "$dest_path" ]; then \
+          # Copy if destination doesn't exist (force copy to handle updates) \
+          if [ ! -d "$dest_path" ] || [ ! -f "$dest_path/package.json" ]; then \
             cp -rL "$pkg_dir" "$dest_path" 2>/dev/null || true; \
           fi; \
         fi; \
       done \
     ' \; && \
+    echo "DEBUG: Copy completed. Listing @nestjs packages found:" && \
+    ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -20 || echo "No @nestjs directory found" && \
     echo "DEBUG: Verifying @nestjs/core..." && \
     if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found"; \
     else \
       echo "ERROR: @nestjs/core not found" && \
       ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -10 || echo "No @nestjs directory"; \
+      exit 1; \
+    fi && \
+    echo "DEBUG: Verifying @nestjs/swagger..." && \
+    if [ -f /app/apps/api/node_modules/@nestjs/swagger/package.json ]; then \
+      echo "SUCCESS: @nestjs/swagger found"; \
+    else \
+      echo "ERROR: @nestjs/swagger not found" && \
+      echo "Listing @nestjs directory:" && \
+      ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -20 || echo "No @nestjs directory"; \
+      echo "Searching for swagger in .pnpm:" && \
+      find /app/node_modules/.pnpm -name "*swagger*" -type d 2>/dev/null | head -5 || echo "No swagger found"; \
       exit 1; \
     fi && \
     echo "DEBUG: Verifying js-yaml..." && \
