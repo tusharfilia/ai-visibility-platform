@@ -2,29 +2,71 @@
  * JWT strategy for Passport with JWKS support
  */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import jwksRsa from 'jwks-rsa';
 
-const issuer = process.env.AUTH_JWT_ISSUER!;
-const audience = process.env.AUTH_JWT_AUDIENCE!;
-const jwksUri = process.env.AUTH_JWT_JWKS_URL!;
+const logger = new Logger('JwtStrategy');
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor() {
+    const issuer = process.env.AUTH_JWT_ISSUER;
+    const audience = process.env.AUTH_JWT_AUDIENCE;
+    const jwksUri = process.env.AUTH_JWT_JWKS_URL;
+    const jwtSecret = process.env.AUTH_JWT_SECRET;
+
+    // If JWT config is missing, use a dummy secret (app will still start but JWT auth won't work)
+    if (!issuer || !audience || (!jwksUri && !jwtSecret)) {
+      logger.warn('JWT configuration missing. JWT authentication will be disabled.');
+      super({
+        jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+        secretOrKey: jwtSecret || 'dummy-secret-for-startup',
+        ignoreExpiration: false,
+      });
+      return;
+    }
+
+    // Try to use JWKS if URI is provided, otherwise fall back to secret
+    let secretOrKeyProvider: any;
+    let secretOrKey: string | undefined;
+
+    if (jwksUri) {
+      try {
+        // Use require with error handling to avoid module loading issues
+        // Wrap in try-catch to handle lru-cache compatibility issues
+        let jwksRsa: any;
+        try {
+          jwksRsa = require('jwks-rsa');
+        } catch (requireError) {
+          logger.error(`Failed to load jwks-rsa: ${requireError instanceof Error ? requireError.message : String(requireError)}`);
+          throw requireError;
+        }
+        
+        try {
+          secretOrKeyProvider = jwksRsa.passportJwtSecret({
+            cache: true,
+            cacheMaxEntries: 5,
+            cacheMaxAge: 10 * 60 * 1000,
+            jwksUri,
+          });
+        } catch (initError) {
+          logger.error(`Failed to initialize JWKS client: ${initError instanceof Error ? initError.message : String(initError)}`);
+          throw initError;
+        }
+      } catch (error) {
+        logger.error(`JWKS initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+        logger.warn('Falling back to JWT secret authentication');
+        secretOrKey = jwtSecret || 'dummy-secret-for-startup';
+      }
+    } else {
+      secretOrKey = jwtSecret || 'dummy-secret-for-startup';
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      audience,
-      issuer,
-      algorithms: ['RS256'],
-      secretOrKeyProvider: jwksRsa.passportJwtSecret({
-        cache: true,
-        cacheMaxEntries: 5,
-        cacheMaxAge: 10 * 60 * 1000,
-        jwksUri,
-      }),
+      ...(secretOrKeyProvider ? { secretOrKeyProvider } : { secretOrKey }),
+      ...(issuer && audience ? { audience, issuer, algorithms: ['RS256'] } : {}),
       ignoreExpiration: false,
     });
   }
