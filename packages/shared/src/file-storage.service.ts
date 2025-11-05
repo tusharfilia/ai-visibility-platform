@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -24,17 +24,34 @@ export interface PresignedUrlOptions {
 
 @Injectable()
 export class FileStorageService {
-  private s3Client: S3Client;
+  private s3Client?: S3Client;
   private bucketName: string;
+  private configService?: ConfigService;
 
-  constructor(private configService: ConfigService) {
-    const accessKeyId = this.configService.get<string>('CLOUDFLARE_R2_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('CLOUDFLARE_R2_SECRET_ACCESS_KEY');
-    const endpoint = this.configService.get<string>('CLOUDFLARE_R2_ENDPOINT');
-    this.bucketName = this.configService.get<string>('CLOUDFLARE_R2_BUCKET', 'ai-visibility-assets');
+  constructor(@Optional() configService: ConfigService | undefined) {
+    this.configService = configService;
+    
+    // Fallback to environment variables if ConfigService is not available
+    const getConfig = (key: string, defaultValue?: string): string | undefined => {
+      if (this.configService) {
+        if (defaultValue !== undefined) {
+          return (this.configService.get<string>(key, defaultValue) as string) || defaultValue;
+        }
+        return this.configService.get<string>(key) as string | undefined;
+      }
+      return process.env[key] || defaultValue;
+    };
+
+    const accessKeyId = getConfig('CLOUDFLARE_R2_ACCESS_KEY_ID');
+    const secretAccessKey = getConfig('CLOUDFLARE_R2_SECRET_ACCESS_KEY');
+    const endpoint = getConfig('CLOUDFLARE_R2_ENDPOINT');
+    this.bucketName = getConfig('CLOUDFLARE_R2_BUCKET', 'ai-visibility-assets') || 'ai-visibility-assets';
 
     if (!accessKeyId || !secretAccessKey || !endpoint) {
-      throw new Error('Cloudflare R2 credentials are required');
+      // Don't throw error - allow app to start without R2 storage
+      console.warn('Cloudflare R2 credentials are not configured. File storage functionality will be disabled.');
+      this.s3Client = undefined;
+      return;
     }
 
     this.s3Client = new S3Client({
@@ -55,6 +72,10 @@ export class FileStorageService {
     buffer: Buffer,
     options: UploadOptions = {}
   ): Promise<UploadResult> {
+    if (!this.s3Client) {
+      throw new Error('File storage is not configured. Please configure Cloudflare R2 credentials.');
+    }
+    
     try {
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
@@ -183,6 +204,10 @@ export class FileStorageService {
     key: string,
     options: PresignedUrlOptions = {}
   ): Promise<string> {
+    if (!this.s3Client) {
+      throw new Error('File storage is not configured. Please configure Cloudflare R2 credentials.');
+    }
+    
     try {
       const command = new GetObjectCommand({
         Bucket: this.bucketName,
@@ -215,6 +240,10 @@ export class FileStorageService {
    * Delete file from storage
    */
   async deleteFile(key: string): Promise<void> {
+    if (!this.s3Client) {
+      throw new Error('File storage is not configured. Please configure Cloudflare R2 credentials.');
+    }
+    
     try {
       const command = new DeleteObjectCommand({
         Bucket: this.bucketName,
