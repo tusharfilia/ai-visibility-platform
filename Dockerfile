@@ -92,28 +92,28 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
         if [ -d "$pkg_dir" ] || [ -L "$pkg_dir" ]; then \
           # Get relative path from node_modules directory (e.g., @nestjs/core or package-name) \
           rel_path=$(echo "$pkg_dir" | sed "s|^$nm_dir/||"); \
-          # Handle bare scoped directories (e.g., @nestjs) - iterate into them \
+          # Handle bare scoped directories (e.g., @nestjs, @ioredis, @types) - iterate into them \
           if echo "$rel_path" | grep -q "^@"; then \
             if ! echo "$rel_path" | grep -q "/"; then \
-              # This is a bare scoped directory like @nestjs, iterate into it \
-              # Force rebuild: v2 - iterate into @nestjs to copy sub-packages \
-              if echo "$rel_path" | grep -q "^@nestjs"; then \
-                echo "DEBUG: Found bare @nestjs directory, iterating into it..."; \
-                for sub_pkg in "$pkg_dir"/*; do \
-                  if [ -d "$sub_pkg" ] || [ -L "$sub_pkg" ]; then \
-                    sub_rel_path=$(echo "$sub_pkg" | sed "s|^$nm_dir/||"); \
-                    sub_dest_path="/app/apps/api/node_modules/$sub_rel_path"; \
-                    parent_dir=$(dirname "$sub_dest_path"); \
-                    mkdir -p "$parent_dir"; \
-                    if [ ! -d "$sub_dest_path" ] || [ ! -f "$sub_dest_path/package.json" ]; then \
-                      if echo "$sub_rel_path" | grep -q "^@nestjs/core"; then \
-                        echo "DEBUG: Copying @nestjs/core from $sub_pkg to $sub_dest_path"; \
-                      fi; \
-                      cp -rL "$sub_pkg" "$sub_dest_path" 2>&1 || echo "ERROR: Failed to copy $sub_rel_path"; \
-                    fi; \
-                  fi; \
-                done; \
+              # This is a bare scoped directory like @nestjs or @ioredis, iterate into it \
+              # Debug message for important scoped packages \
+              if echo "$rel_path" | grep -qE "^@(nestjs|ioredis|types)"; then \
+                echo "DEBUG: Found bare $rel_path directory, iterating into it..."; \
               fi; \
+              for sub_pkg in "$pkg_dir"/*; do \
+                if [ -d "$sub_pkg" ] || [ -L "$sub_pkg" ]; then \
+                  sub_rel_path=$(echo "$sub_pkg" | sed "s|^$nm_dir/||"); \
+                  sub_dest_path="/app/apps/api/node_modules/$sub_rel_path"; \
+                  parent_dir=$(dirname "$sub_dest_path"); \
+                  mkdir -p "$parent_dir"; \
+                  if [ ! -d "$sub_dest_path" ] || [ ! -f "$sub_dest_path/package.json" ]; then \
+                    if echo "$sub_rel_path" | grep -qE "^@(nestjs/core|ioredis/commands)"; then \
+                      echo "DEBUG: Copying $sub_rel_path from $sub_pkg to $sub_dest_path"; \
+                    fi; \
+                    cp -rL "$sub_pkg" "$sub_dest_path" 2>&1 || echo "ERROR: Failed to copy $sub_rel_path"; \
+                  fi; \
+                fi; \
+              done; \
               continue; \
             fi; \
           fi; \
