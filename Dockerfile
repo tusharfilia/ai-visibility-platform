@@ -133,6 +133,22 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
         fi; \
       done \
     ' \; && \
+    echo "DEBUG: Copying workspace packages..." && \
+    mkdir -p /app/apps/api/node_modules/@ai-visibility && \
+    for pkg in geo automation content copilot db optimizer parser prompts providers shared; do \
+      if [ -d "/app/packages/$pkg" ]; then \
+        echo "DEBUG: Copying @ai-visibility/$pkg..." && \
+        cp -rL "/app/packages/$pkg" "/app/apps/api/node_modules/@ai-visibility/$pkg" 2>&1 || echo "ERROR: Failed to copy $pkg"; \
+      fi; \
+    done && \
+    echo "DEBUG: Verifying workspace packages..." && \
+    if [ -d /app/apps/api/node_modules/@ai-visibility/geo ]; then \
+      echo "SUCCESS: @ai-visibility/geo found"; \
+    else \
+      echo "ERROR: @ai-visibility/geo not found"; \
+      ls -la /app/apps/api/node_modules/@ai-visibility 2>/dev/null || echo "No @ai-visibility directory"; \
+      exit 1; \
+    fi && \
     echo "DEBUG: Copy completed. Checking for @nestjs..." && \
     find /app/apps/api/node_modules -name "@nestjs" -type d && \
     echo "DEBUG: Listing @nestjs directory contents:" && \
