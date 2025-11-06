@@ -178,6 +178,40 @@ RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
     else \
       echo "WARNING: js-yaml not found, listing node_modules:" && \
       ls -la /app/apps/api/node_modules/ | head -30; \
+    fi && \
+    echo "DEBUG: Verifying express..." && \
+    if [ -d /app/apps/api/node_modules/express ]; then \
+      echo "SUCCESS: express found"; \
+      if [ -f /app/apps/api/node_modules/express/index.js ]; then \
+        echo "SUCCESS: express/index.js exists"; \
+      else \
+        echo "ERROR: express/index.js not found"; \
+        ls -la /app/apps/api/node_modules/express/ 2>/dev/null | head -10 || echo "No express directory"; \
+        exit 1; \
+      fi; \
+    else \
+      echo "ERROR: express not found" && \
+      echo "Searching for express in .pnpm:" && \
+      find /app/node_modules/.pnpm -name "*express*" -type d 2>/dev/null | head -5 || echo "No express found in .pnpm"; \
+      exit 1; \
+    fi && \
+    echo "DEBUG: Verifying path-to-regexp..." && \
+    if [ -d /app/apps/api/node_modules/path-to-regexp ]; then \
+      echo "SUCCESS: path-to-regexp found"; \
+      if [ -f /app/apps/api/node_modules/path-to-regexp/index.js ] || [ -f /app/apps/api/node_modules/path-to-regexp/dist/index.js ]; then \
+        echo "SUCCESS: path-to-regexp index file exists"; \
+      else \
+        echo "ERROR: path-to-regexp index file not found"; \
+        ls -la /app/apps/api/node_modules/path-to-regexp/ 2>/dev/null | head -10 || echo "No path-to-regexp directory"; \
+        exit 1; \
+      fi; \
+    else \
+      echo "ERROR: path-to-regexp not found" && \
+      echo "Searching for path-to-regexp in .pnpm:" && \
+      find /app/node_modules/.pnpm -name "*path-to-regexp*" -type d 2>/dev/null | head -5 || echo "No path-to-regexp found in .pnpm"; \
+      echo "Listing node_modules:" && \
+      ls -la /app/apps/api/node_modules/ | head -30; \
+      exit 1; \
     fi
 
 # Keep WORKDIR at /app for proper module resolution
