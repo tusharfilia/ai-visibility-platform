@@ -71,11 +71,13 @@ COPY --from=build /app/packages/shared/package.json ./packages/shared/package.js
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 RUN pnpm install --prod --no-frozen-lockfile && \
-    echo "DEBUG: Verifying packages can be resolved by Node.js..." && \
+    echo "DEBUG: Verifying packages can be resolved from apps/api directory..." && \
+    cd /app/apps/api && \
     node -e "try { require.resolve('@nestjs/core'); console.log('SUCCESS: @nestjs/core can be resolved'); } catch(e) { console.error('ERROR: @nestjs/core cannot be resolved:', e.message); process.exit(1); }" && \
     node -e "try { require.resolve('@nestjs/swagger'); console.log('SUCCESS: @nestjs/swagger can be resolved'); } catch(e) { console.error('ERROR: @nestjs/swagger cannot be resolved:', e.message); process.exit(1); }" && \
     node -e "try { require.resolve('express'); console.log('SUCCESS: express can be resolved'); } catch(e) { console.error('ERROR: express cannot be resolved:', e.message); process.exit(1); }" && \
     node -e "try { require.resolve('path-to-regexp'); console.log('SUCCESS: path-to-regexp can be resolved'); } catch(e) { console.error('ERROR: path-to-regexp cannot be resolved:', e.message); process.exit(1); }" && \
+    cd /app && \
     echo "DEBUG: Verifying workspace packages..." && \
     if [ -d /app/packages/geo ]; then \
       echo "SUCCESS: @ai-visibility/geo source found"; \
@@ -83,6 +85,7 @@ RUN pnpm install --prod --no-frozen-lockfile && \
       echo "ERROR: @ai-visibility/geo source not found"; \
       exit 1; \
     fi && \
+    cd /app/apps/api && \
     node -e "try { require.resolve('@ai-visibility/geo'); console.log('SUCCESS: @ai-visibility/geo can be resolved'); } catch(e) { console.warn('WARNING: @ai-visibility/geo cannot be resolved (may work at runtime):', e.message); }"
 
 # Keep WORKDIR at /app for proper module resolution
@@ -98,8 +101,10 @@ ENV NODE_PATH=/app/node_modules
 # Start the API - verify module resolution and start
 CMD ["sh", "-c", "cd /app && \
   echo 'Working directory:' && pwd && \
-  echo 'Verifying @nestjs/core can be resolved...' && \
+  echo 'Verifying @nestjs/core can be resolved from apps/api...' && \
+  cd apps/api && \
   node -e \"try { require.resolve('@nestjs/core'); console.log('SUCCESS: @nestjs/core can be resolved'); } catch(e) { console.error('ERROR:', e.message); process.exit(1); }\" && \
+  cd /app && \
   echo 'Starting application...' && \
   node apps/api/dist/main.js"]
 
