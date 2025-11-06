@@ -273,7 +273,22 @@ export class FileStorageService {
    * Get public URL for file
    */
   getPublicUrl(key: string): string {
-    const endpoint = this.configService.get<string>('CLOUDFLARE_R2_ENDPOINT');
+    if (!this.s3Client) {
+      throw new Error('File storage is not configured. Please configure Cloudflare R2 credentials.');
+    }
+    
+    // Get endpoint from configService or process.env
+    let endpoint: string | undefined;
+    if (this.configService) {
+      endpoint = this.configService.get<string>('CLOUDFLARE_R2_ENDPOINT') as string | undefined;
+    } else {
+      endpoint = process.env.CLOUDFLARE_R2_ENDPOINT;
+    }
+    
+    if (!endpoint) {
+      throw new Error('CLOUDFLARE_R2_ENDPOINT is not configured');
+    }
+    
     return `${endpoint}/${this.bucketName}/${key}`;
   }
 
