@@ -65,153 +65,48 @@ COPY --from=build /app/packages/prompts/package.json ./packages/prompts/package.
 COPY --from=build /app/packages/providers/package.json ./packages/providers/package.json
 COPY --from=build /app/packages/shared/package.json ./packages/shared/package.json
 
-# Copy node_modules from build stage (includes .pnpm virtual store)
-COPY --from=build /app/node_modules ./node_modules
-
-# Copy all dependencies from .pnpm virtual store to apps/api/node_modules
-# pnpm stores packages in .pnpm/<package>@<version>/node_modules/<package>
-# For scoped packages like @nestjs/swagger, pnpm uses @nestjs+swagger@version in the directory name
-# We need to preserve the relative path from node_modules for scoped packages
-# Skip bare scoped directories (like @nestjs without a subpackage) - only copy actual packages
-RUN echo "DEBUG: Copying all packages from .pnpm virtual store..." && \
-    mkdir -p /app/apps/api/node_modules && \
-    echo "DEBUG: Finding @nestjs/core in .pnpm..." && \
-    find /app/node_modules/.pnpm -path "*/@nestjs/core" -type d | head -3 && \
-    echo "DEBUG: Finding node_modules containing @nestjs/core..." && \
-    find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
-      if [ -d "{}/@nestjs/core" ]; then \
-        echo "Found @nestjs/core in {}"; \
-        ls -la "{}/@nestjs/core" | head -3; \
-      fi \
-    ' \; | head -5 && \
-    echo "DEBUG: Starting copy process..." && \
-    find /app/node_modules/.pnpm -type d -name "node_modules" -exec sh -c ' \
-      nm_dir="{}"; \
-      for pkg_dir in "$nm_dir"/*; do \
-        # Check if it's a directory or symlink to directory \
-        if [ -d "$pkg_dir" ] || [ -L "$pkg_dir" ]; then \
-          # Get relative path from node_modules directory (e.g., @nestjs/core or package-name) \
-          rel_path=$(echo "$pkg_dir" | sed "s|^$nm_dir/||"); \
-          # Handle bare scoped directories (e.g., @nestjs, @ioredis, @types) - iterate into them \
-          if echo "$rel_path" | grep -q "^@"; then \
-            if ! echo "$rel_path" | grep -q "/"; then \
-              # This is a bare scoped directory like @nestjs or @ioredis, iterate into it \
-              # Debug message for important scoped packages \
-              if echo "$rel_path" | grep -qE "^@(nestjs|ioredis|types)"; then \
-                echo "DEBUG: Found bare $rel_path directory, iterating into it..."; \
-              fi; \
-              for sub_pkg in "$pkg_dir"/*; do \
-                if [ -d "$sub_pkg" ] || [ -L "$sub_pkg" ]; then \
-                  sub_rel_path=$(echo "$sub_pkg" | sed "s|^$nm_dir/||"); \
-                  sub_dest_path="/app/apps/api/node_modules/$sub_rel_path"; \
-                  parent_dir=$(dirname "$sub_dest_path"); \
-                  mkdir -p "$parent_dir"; \
-                  if [ ! -d "$sub_dest_path" ] || [ ! -f "$sub_dest_path/package.json" ]; then \
-                    if echo "$sub_rel_path" | grep -qE "^@(nestjs/core|ioredis/commands)"; then \
-                      echo "DEBUG: Copying $sub_rel_path from $sub_pkg to $sub_dest_path"; \
-                    fi; \
-                    cp -rL "$sub_pkg" "$sub_dest_path" 2>&1 || echo "ERROR: Failed to copy $sub_rel_path"; \
-                  fi; \
-                fi; \
-              done; \
-              continue; \
-            fi; \
-          fi; \
-          dest_path="/app/apps/api/node_modules/$rel_path"; \
-          # Create parent directory if it's a scoped package \
-          if echo "$rel_path" | grep -q "/"; then \
-            parent_dir=$(dirname "$dest_path"); \
-            mkdir -p "$parent_dir"; \
-          fi; \
-          # Copy if destination doesn't exist (force copy to handle updates) \
-          if [ ! -d "$dest_path" ] || [ ! -f "$dest_path/package.json" ]; then \
-            if echo "$rel_path" | grep -q "^@nestjs/core"; then \
-              echo "DEBUG: Copying @nestjs/core from $pkg_dir to $dest_path"; \
-            fi; \
-            cp -rL "$pkg_dir" "$dest_path" 2>&1 || echo "ERROR: Failed to copy $rel_path"; \
-          fi; \
-        fi; \
-      done \
-    ' \; && \
-    echo "DEBUG: Copying workspace packages..." && \
-    mkdir -p /app/apps/api/node_modules/@ai-visibility && \
-    for pkg in geo automation content copilot db optimizer parser prompts providers shared; do \
-      if [ -d "/app/packages/$pkg" ]; then \
-        echo "DEBUG: Copying @ai-visibility/$pkg..." && \
-        cp -rL "/app/packages/$pkg" "/app/apps/api/node_modules/@ai-visibility/$pkg" 2>&1 || echo "ERROR: Failed to copy $pkg"; \
-      fi; \
-    done && \
-    echo "DEBUG: Verifying workspace packages..." && \
-    if [ -d /app/apps/api/node_modules/@ai-visibility/geo ]; then \
-      echo "SUCCESS: @ai-visibility/geo found"; \
-    else \
-      echo "ERROR: @ai-visibility/geo not found"; \
-      ls -la /app/apps/api/node_modules/@ai-visibility 2>/dev/null || echo "No @ai-visibility directory"; \
-      exit 1; \
-    fi && \
-    echo "DEBUG: Copy completed. Checking for @nestjs..." && \
-    find /app/apps/api/node_modules -name "@nestjs" -type d && \
-    echo "DEBUG: Listing @nestjs directory contents:" && \
-    ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -20 || echo "No @nestjs directory found" && \
-    echo "DEBUG: Verifying @nestjs/core..." && \
-    if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
+# Install production dependencies using pnpm
+# This creates a proper node_modules structure that Node.js can resolve
+# Skip Puppeteer Chrome download during install
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+RUN pnpm install --prod --no-frozen-lockfile && \
+    echo "DEBUG: Verifying critical packages..." && \
+    if [ -f /app/node_modules/@nestjs/core/package.json ]; then \
       echo "SUCCESS: @nestjs/core found"; \
     else \
-      echo "ERROR: @nestjs/core not found" && \
-      ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -10 || echo "No @nestjs directory"; \
+      echo "ERROR: @nestjs/core not found"; \
       exit 1; \
     fi && \
-    echo "DEBUG: Verifying @nestjs/swagger..." && \
-    if [ -f /app/apps/api/node_modules/@nestjs/swagger/package.json ]; then \
+    if [ -f /app/node_modules/@nestjs/swagger/package.json ]; then \
       echo "SUCCESS: @nestjs/swagger found"; \
     else \
-      echo "ERROR: @nestjs/swagger not found" && \
-      echo "Listing @nestjs directory:" && \
-      ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -20 || echo "No @nestjs directory"; \
-      echo "Searching for swagger in .pnpm:" && \
-      find /app/node_modules/.pnpm -name "*swagger*" -type d 2>/dev/null | head -5 || echo "No swagger found"; \
+      echo "ERROR: @nestjs/swagger not found"; \
       exit 1; \
     fi && \
-    echo "DEBUG: Verifying js-yaml..." && \
-    if [ -d /app/apps/api/node_modules/js-yaml ]; then \
-      echo "SUCCESS: js-yaml found"; \
-    else \
-      echo "WARNING: js-yaml not found, listing node_modules:" && \
-      ls -la /app/apps/api/node_modules/ | head -30; \
-    fi && \
-    echo "DEBUG: Verifying express..." && \
-    if [ -d /app/apps/api/node_modules/express ]; then \
+    if [ -d /app/node_modules/express ]; then \
       echo "SUCCESS: express found"; \
-      if [ -f /app/apps/api/node_modules/express/index.js ]; then \
-        echo "SUCCESS: express/index.js exists"; \
-      else \
-        echo "ERROR: express/index.js not found"; \
-        ls -la /app/apps/api/node_modules/express/ 2>/dev/null | head -10 || echo "No express directory"; \
-        exit 1; \
-      fi; \
     else \
-      echo "ERROR: express not found" && \
-      echo "Searching for express in .pnpm:" && \
-      find /app/node_modules/.pnpm -name "*express*" -type d 2>/dev/null | head -5 || echo "No express found in .pnpm"; \
+      echo "ERROR: express not found"; \
       exit 1; \
     fi && \
-    echo "DEBUG: Verifying path-to-regexp..." && \
-    if [ -d /app/apps/api/node_modules/path-to-regexp ]; then \
+    if [ -d /app/node_modules/path-to-regexp ]; then \
       echo "SUCCESS: path-to-regexp found"; \
-      if [ -f /app/apps/api/node_modules/path-to-regexp/index.js ] || [ -f /app/apps/api/node_modules/path-to-regexp/dist/index.js ]; then \
-        echo "SUCCESS: path-to-regexp index file exists"; \
-      else \
-        echo "ERROR: path-to-regexp index file not found"; \
-        ls -la /app/apps/api/node_modules/path-to-regexp/ 2>/dev/null | head -10 || echo "No path-to-regexp directory"; \
-        exit 1; \
-      fi; \
     else \
-      echo "ERROR: path-to-regexp not found" && \
-      echo "Searching for path-to-regexp in .pnpm:" && \
-      find /app/node_modules/.pnpm -name "*path-to-regexp*" -type d 2>/dev/null | head -5 || echo "No path-to-regexp found in .pnpm"; \
-      echo "Listing node_modules:" && \
-      ls -la /app/apps/api/node_modules/ | head -30; \
+      echo "ERROR: path-to-regexp not found"; \
       exit 1; \
+    fi && \
+    echo "DEBUG: Verifying workspace packages..." && \
+    if [ -d /app/packages/geo ]; then \
+      echo "SUCCESS: @ai-visibility/geo source found"; \
+    else \
+      echo "ERROR: @ai-visibility/geo source not found"; \
+      exit 1; \
+    fi && \
+    if [ -L /app/node_modules/@ai-visibility/geo ] || [ -d /app/node_modules/@ai-visibility/geo ]; then \
+      echo "SUCCESS: @ai-visibility/geo linked in node_modules"; \
+    else \
+      echo "WARNING: @ai-visibility/geo not linked in node_modules (may still work via workspace)"; \
     fi
 
 # Keep WORKDIR at /app for proper module resolution
@@ -228,12 +123,12 @@ ENV NODE_PATH=/app/node_modules
 CMD ["sh", "-c", "cd /app && \
   echo 'Working directory:' && pwd && \
   echo 'Verifying @nestjs/core module exists:' && \
-  if [ -f /app/apps/api/node_modules/@nestjs/core/package.json ]; then \
-    echo 'SUCCESS: @nestjs/core found'; \
+  if [ -f /app/node_modules/@nestjs/core/package.json ]; then \
+    echo 'SUCCESS: @nestjs/core found in /app/node_modules'; \
   else \
-    echo 'ERROR: @nestjs/core not found'; \
-    echo 'Checking @nestjs directory:'; \
-    ls -la /app/apps/api/node_modules/@nestjs 2>/dev/null | head -5 || echo 'No @nestjs directory'; \
+    echo 'ERROR: @nestjs/core not found in /app/node_modules'; \
+    echo 'Checking node_modules structure:'; \
+    ls -la /app/node_modules/@nestjs 2>/dev/null | head -10 || echo 'No @nestjs directory'; \
     exit 1; \
   fi && \
   echo 'Starting application...' && \
