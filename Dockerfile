@@ -71,31 +71,11 @@ COPY --from=build /app/packages/shared/package.json ./packages/shared/package.js
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 RUN pnpm install --prod --no-frozen-lockfile && \
-    echo "DEBUG: Verifying critical packages..." && \
-    if [ -f /app/node_modules/@nestjs/core/package.json ]; then \
-      echo "SUCCESS: @nestjs/core found"; \
-    else \
-      echo "ERROR: @nestjs/core not found"; \
-      exit 1; \
-    fi && \
-    if [ -f /app/node_modules/@nestjs/swagger/package.json ]; then \
-      echo "SUCCESS: @nestjs/swagger found"; \
-    else \
-      echo "ERROR: @nestjs/swagger not found"; \
-      exit 1; \
-    fi && \
-    if [ -d /app/node_modules/express ]; then \
-      echo "SUCCESS: express found"; \
-    else \
-      echo "ERROR: express not found"; \
-      exit 1; \
-    fi && \
-    if [ -d /app/node_modules/path-to-regexp ]; then \
-      echo "SUCCESS: path-to-regexp found"; \
-    else \
-      echo "ERROR: path-to-regexp not found"; \
-      exit 1; \
-    fi && \
+    echo "DEBUG: Verifying packages can be resolved by Node.js..." && \
+    node -e "try { require.resolve('@nestjs/core'); console.log('SUCCESS: @nestjs/core can be resolved'); } catch(e) { console.error('ERROR: @nestjs/core cannot be resolved:', e.message); process.exit(1); }" && \
+    node -e "try { require.resolve('@nestjs/swagger'); console.log('SUCCESS: @nestjs/swagger can be resolved'); } catch(e) { console.error('ERROR: @nestjs/swagger cannot be resolved:', e.message); process.exit(1); }" && \
+    node -e "try { require.resolve('express'); console.log('SUCCESS: express can be resolved'); } catch(e) { console.error('ERROR: express cannot be resolved:', e.message); process.exit(1); }" && \
+    node -e "try { require.resolve('path-to-regexp'); console.log('SUCCESS: path-to-regexp can be resolved'); } catch(e) { console.error('ERROR: path-to-regexp cannot be resolved:', e.message); process.exit(1); }" && \
     echo "DEBUG: Verifying workspace packages..." && \
     if [ -d /app/packages/geo ]; then \
       echo "SUCCESS: @ai-visibility/geo source found"; \
@@ -103,11 +83,7 @@ RUN pnpm install --prod --no-frozen-lockfile && \
       echo "ERROR: @ai-visibility/geo source not found"; \
       exit 1; \
     fi && \
-    if [ -L /app/node_modules/@ai-visibility/geo ] || [ -d /app/node_modules/@ai-visibility/geo ]; then \
-      echo "SUCCESS: @ai-visibility/geo linked in node_modules"; \
-    else \
-      echo "WARNING: @ai-visibility/geo not linked in node_modules (may still work via workspace)"; \
-    fi
+    node -e "try { require.resolve('@ai-visibility/geo'); console.log('SUCCESS: @ai-visibility/geo can be resolved'); } catch(e) { console.warn('WARNING: @ai-visibility/geo cannot be resolved (may work at runtime):', e.message); }"
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
@@ -122,15 +98,8 @@ ENV NODE_PATH=/app/node_modules
 # Start the API - verify module resolution and start
 CMD ["sh", "-c", "cd /app && \
   echo 'Working directory:' && pwd && \
-  echo 'Verifying @nestjs/core module exists:' && \
-  if [ -f /app/node_modules/@nestjs/core/package.json ]; then \
-    echo 'SUCCESS: @nestjs/core found in /app/node_modules'; \
-  else \
-    echo 'ERROR: @nestjs/core not found in /app/node_modules'; \
-    echo 'Checking node_modules structure:'; \
-    ls -la /app/node_modules/@nestjs 2>/dev/null | head -10 || echo 'No @nestjs directory'; \
-    exit 1; \
-  fi && \
+  echo 'Verifying @nestjs/core can be resolved...' && \
+  node -e \"try { require.resolve('@nestjs/core'); console.log('SUCCESS: @nestjs/core can be resolved'); } catch(e) { console.error('ERROR:', e.message); process.exit(1); }\" && \
   echo 'Starting application...' && \
   node apps/api/dist/main.js"]
 
