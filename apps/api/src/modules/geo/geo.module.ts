@@ -24,7 +24,7 @@ import {
   DashboardAggregatorService,
 } from '@ai-visibility/geo';
 import { PrismaService } from '../database/prisma.service';
-import { EventEmitterService } from '../events/event-emitter.service';
+import { EventsModule } from '../events/events.module';
 import { BullModule } from '@nestjs/bullmq';
 
 @Module({
@@ -33,6 +33,7 @@ import { BullModule } from '@nestjs/bullmq';
       { name: 'maturityRecompute' },
       { name: 'recommendationRefresh' }
     ),
+    EventsModule,
   ],
   providers: [
     GEODataService,
@@ -53,7 +54,6 @@ import { BullModule } from '@nestjs/bullmq';
     FactExtractorService,
     DashboardAggregatorService,
     PrismaService,
-    EventEmitterService,
   ],
   controllers: [
     GEOOptimizationController,

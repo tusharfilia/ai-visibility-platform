@@ -3,7 +3,7 @@
  * Manages real-time event broadcasting with workspace isolation
  */
 
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Optional } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { EventEmitter } from 'events';
 import { RedisSSEAdapter } from './redis-adapter';
@@ -22,9 +22,11 @@ export class EventEmitterService extends EventEmitter implements OnModuleInit, O
   private subscribers: Map<string, Set<Function>> = new Map();
   private eventHistory: Map<string, SSEEvent[]> = new Map();
   private readonly MAX_HISTORY = 100; // Keep last 100 events per workspace
+  private redisAdapter?: RedisSSEAdapter;
 
-  constructor(private redisAdapter: RedisSSEAdapter) {
+  constructor(@Optional() redisAdapter: RedisSSEAdapter | undefined) {
     super();
+    this.redisAdapter = redisAdapter;
     this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
   }
 
@@ -137,8 +139,14 @@ export class EventEmitterService extends EventEmitter implements OnModuleInit, O
     // Emit to Redis for multi-instance support
     await this.emitToRedis(event);
 
-    // Also emit via Redis adapter for SSE connections
-    await this.redisAdapter.sendToWorkspace(workspaceId, type, data);
+    // Also emit via Redis adapter for SSE connections (if available)
+    if (this.redisAdapter) {
+      try {
+        await this.redisAdapter.sendToWorkspace(workspaceId, type, data);
+      } catch (error) {
+        console.warn('Failed to send event via Redis SSE adapter:', error instanceof Error ? error.message : String(error));
+      }
+    }
   }
 
   /**
