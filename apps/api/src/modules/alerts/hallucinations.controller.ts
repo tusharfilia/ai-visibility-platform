@@ -140,25 +140,50 @@ export class HallucinationsController {
     @Body() request: MultipleResponsesDetectionRequest
   ) {
     try {
-      // TODO: Get workspace profile from database
-      const mockProfile = {
-        id: 'profile_1',
-        workspaceId,
-        businessName: 'AI Visibility Platform',
-        address: '123 Main St, New York, NY 10001',
-        phone: '(555) 123-4567',
-        hours: { monday: '9AM-5PM', tuesday: '9AM-5PM' },
-        services: ['AI visibility tracking', 'GEO optimization'],
-        description: 'AI visibility platform for businesses',
-        verified: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+      // Get real workspace profile from database
+      const Pool = require('pg').Pool;
+      const dbPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+
+      const profileResult = await dbPool.query(
+        'SELECT * FROM "WorkspaceProfile" WHERE "workspaceId" = $1',
+        [workspaceId]
+      );
+
+      if (profileResult.rows.length === 0) {
+        return {
+          ok: false,
+          error: {
+            code: 'WORKSPACE_PROFILE_NOT_FOUND',
+            message: 'Workspace profile not found. Please create a workspace profile first.'
+          }
+        };
+      }
+
+      const profileRow = profileResult.rows[0];
+      const profile = {
+        id: profileRow.id,
+        workspaceId: profileRow.workspaceId,
+        businessName: profileRow.businessName || profileRow.name,
+        address: profileRow.address || '',
+        phone: profileRow.phone || '',
+        email: profileRow.email || '',
+        website: profileRow.website || '',
+        hours: profileRow.hours || {},
+        services: profileRow.services || [],
+        description: profileRow.description || '',
+        verified: profileRow.verified || false,
+        createdAt: profileRow.createdAt,
+        updatedAt: profileRow.updatedAt,
+        facts: profileRow.facts || {},
       };
 
       const alerts = await this.hallucinationDetector.detectHallucinationsFromMultipleResponses(
         workspaceId,
         request.responses,
-        mockProfile,
+        profile,
         request.options
       );
 
@@ -451,19 +476,44 @@ export class HallucinationsController {
     }
   ) {
     try {
-      // TODO: Get workspace profile from database
-      const mockProfile = {
-        id: 'profile_1',
-        workspaceId,
-        businessName: 'AI Visibility Platform',
-        address: '123 Main St, New York, NY 10001',
-        phone: '(555) 123-4567',
-        hours: { monday: '9AM-5PM', tuesday: '9AM-5PM' },
-        services: ['AI visibility tracking', 'GEO optimization'],
-        description: 'AI visibility platform for businesses',
-        verified: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+      // Get real workspace profile from database
+      const Pool = require('pg').Pool;
+      const dbPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+
+      const profileResult = await dbPool.query(
+        'SELECT * FROM "WorkspaceProfile" WHERE "workspaceId" = $1',
+        [workspaceId]
+      );
+
+      if (profileResult.rows.length === 0) {
+        return {
+          ok: false,
+          error: {
+            code: 'WORKSPACE_PROFILE_NOT_FOUND',
+            message: 'Workspace profile not found. Please create a workspace profile first.'
+          }
+        };
+      }
+
+      const profileRow = profileResult.rows[0];
+      const profile = {
+        id: profileRow.id,
+        workspaceId: profileRow.workspaceId,
+        businessName: profileRow.businessName || profileRow.name,
+        address: profileRow.address || '',
+        phone: profileRow.phone || '',
+        email: profileRow.email || '',
+        website: profileRow.website || '',
+        hours: profileRow.hours || {},
+        services: profileRow.services || [],
+        description: profileRow.description || '',
+        verified: profileRow.verified || false,
+        createdAt: profileRow.createdAt,
+        updatedAt: profileRow.updatedAt,
+        facts: profileRow.facts || {},
       };
 
       // Type cast and validate facts
@@ -477,7 +527,7 @@ export class HallucinationsController {
 
       const validationResults = await this.factValidator.validateFacts(
         facts,
-        mockProfile
+        profile
       );
 
       return {

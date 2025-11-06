@@ -306,18 +306,59 @@ export class GEOOptimizationController {
     @Param('brandName') brandName: string,
   ): Promise<{ ok: boolean; data: any }> {
     try {
-      // Mock competitor analysis
-      const competitors = ['competitor1', 'competitor2', 'competitor3'];
+      // Get real competitors from database - find brands mentioned in same context
+      const Pool = require('pg').Pool;
+      const dbPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+
+      // Find competitors by looking at brands mentioned in the same prompts/answers
+      const competitorsQuery = `
+        SELECT DISTINCT m.brand
+        FROM "Mention" m
+        JOIN "Answer" a ON m."answerId" = a.id
+        JOIN "PromptRun" pr ON a."promptRunId" = pr.id
+        WHERE pr."workspaceId" = $1
+          AND m.brand != $2
+          AND m.brand IS NOT NULL
+          AND m.brand != ''
+        GROUP BY m.brand
+        HAVING COUNT(*) >= 2
+        ORDER BY COUNT(*) DESC
+        LIMIT 10
+      `;
+
+      const competitorsResult = await dbPool.query(competitorsQuery, [workspaceId, brandName]);
+      const competitorBrands = competitorsResult.rows.map((row: any) => row.brand);
+
+      // If no competitors found in database, use empty array (will analyze just the brand)
+      const competitors = competitorBrands.length > 0 ? competitorBrands : [];
       const analysis = [];
 
+      // Analyze the main brand
+      const brandScore = await this.getVisibilityScore(brandName, workspaceId);
+      analysis.push({
+        name: brandName,
+        score: brandScore.overall,
+        strengths: brandScore.recommendations.slice(0, 2),
+        weaknesses: this.identifyWeaknesses(brandScore.breakdown),
+      });
+
+      // Analyze competitors
       for (const competitor of competitors) {
-        const score = await this.getVisibilityScore(competitor, workspaceId);
-        analysis.push({
-          name: competitor,
-          score: score.overall,
-          strengths: score.recommendations.slice(0, 2),
-          weaknesses: this.identifyWeaknesses(score.breakdown),
-        });
+        try {
+          const score = await this.getVisibilityScore(competitor, workspaceId);
+          analysis.push({
+            name: competitor,
+            score: score.overall,
+            strengths: score.recommendations.slice(0, 2),
+            weaknesses: this.identifyWeaknesses(score.breakdown),
+          });
+        } catch (error) {
+          // Skip competitors that fail to analyze
+          console.warn(`Failed to analyze competitor ${competitor}:`, error instanceof Error ? error.message : String(error));
+        }
       }
 
       // Sort by score

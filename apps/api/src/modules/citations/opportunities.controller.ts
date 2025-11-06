@@ -160,10 +160,19 @@ export class OpportunitiesController {
     @Param('id') opportunityId: string
   ) {
     try {
-      // TODO: Implement database lookup
-      const opportunity = null; // Mock implementation
-      
-      if (!opportunity) {
+      // Get real opportunity from database
+      const Pool = require('pg').Pool;
+      const dbPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+
+      const result = await dbPool.query(
+        'SELECT * FROM "CitationOpportunity" WHERE "id" = $1 AND "workspaceId" = $2',
+        [opportunityId, workspaceId]
+      );
+
+      if (result.rows.length === 0) {
         return {
           ok: false,
           error: {
@@ -172,6 +181,19 @@ export class OpportunitiesController {
           }
         };
       }
+
+      const row = result.rows[0];
+      const opportunity = {
+        id: row.id,
+        workspaceId: row.workspaceId,
+        domain: row.domain,
+        domainAuthority: row.domainAuthority,
+        citationCount: row.citationCount,
+        impactScore: row.impactScore,
+        status: row.status,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      };
 
       return {
         ok: true,

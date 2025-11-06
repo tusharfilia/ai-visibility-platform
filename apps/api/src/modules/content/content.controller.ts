@@ -33,24 +33,60 @@ export class ContentController {
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string
   ): Promise<{ ok: boolean; data: GeneratedContent }> {
-    // TODO: Implement content retrieval from database
-    // For now, return a placeholder
-    const content: GeneratedContent = {
-      id,
-      type: 'blog',
-      title: 'Sample Content',
-      content: 'This is sample content...',
-      metaDescription: 'Sample meta description',
-      keywords: ['sample', 'content'],
-      cost: 0.05,
-      tokens: { prompt: 100, completion: 200, total: 300 },
-      createdAt: new Date(),
-    };
-    
-    return {
-      ok: true,
-      data: content,
-    };
+    try {
+      // Get real content from database
+      // Note: Content may be stored in CopilotAction or a dedicated content table
+      // For now, check if it's a CopilotAction with content_generation type
+      const Pool = require('pg').Pool;
+      const dbPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+
+      // Try to find content in CopilotAction table
+      const actionResult = await dbPool.query(
+        `SELECT * FROM "CopilotAction" 
+         WHERE "id" = $1 AND "workspaceId" = $2 AND "actionType" = 'content_generation'`,
+        [id, workspaceId]
+      );
+
+      if (actionResult.rows.length > 0) {
+        const action = actionResult.rows[0];
+        const content: GeneratedContent = {
+          id: action.id,
+          type: 'blog',
+          title: (action.metadata as any)?.title || 'Generated Content',
+          content: (action.metadata as any)?.content || action.result || '',
+          metaDescription: (action.metadata as any)?.metaDescription || '',
+          keywords: (action.metadata as any)?.keywords || [],
+          cost: (action.costCents || 0) / 100,
+          tokens: (action.metadata as any)?.tokens || { prompt: 0, completion: 0, total: 0 },
+          createdAt: action.createdAt,
+        };
+        
+        return {
+          ok: true,
+          data: content,
+        };
+      }
+
+      // If not found, return error
+      return {
+        ok: false,
+        error: {
+          code: 'CONTENT_NOT_FOUND',
+          message: 'Content not found. Content may not have been generated yet or the ID is invalid.'
+        }
+      } as any;
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'CONTENT_FETCH_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      } as any;
+    }
   }
 
   @Put(':id')

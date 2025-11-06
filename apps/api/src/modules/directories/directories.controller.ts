@@ -168,17 +168,45 @@ export class DirectoryController {
       state?: string;
     }
   ) {
-    // TODO: Implement OAuth callback handling
-    console.log(`OAuth callback for ${directory}:`, request);
-    
-    return {
-      ok: true,
-      data: {
-        message: 'OAuth callback processed successfully',
-        directory,
-        token: 'mock-access-token',
-      },
-    };
+    try {
+      // TODO: Implement full OAuth callback handling with actual token exchange
+      // For now, validate the callback and return proper response structure
+      console.log(`OAuth callback for ${directory}:`, request);
+      
+      if (!request.code) {
+        return {
+          ok: false,
+          error: {
+            code: 'OAUTH_CALLBACK_INVALID',
+            message: 'OAuth callback code is missing'
+          }
+        };
+      }
+
+      // In a full implementation, you would:
+      // 1. Exchange the code for an access token via the directory's OAuth endpoint
+      // 2. Store the token securely in the database
+      // 3. Associate it with the workspace
+      
+      // For now, return a structured response indicating the callback was received
+      return {
+        ok: true,
+        data: {
+          message: 'OAuth callback received. Token exchange will be implemented.',
+          directory,
+          status: 'pending',
+          // Note: Actual token exchange needs to be implemented based on directory provider
+        },
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'OAUTH_CALLBACK_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      };
+    }
   }
 
   @Get('config/:directory')
