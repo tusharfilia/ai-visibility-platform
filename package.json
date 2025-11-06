@@ -41,7 +41,8 @@
   "packageManager": "pnpm@8.15.0",
   "pnpm": {
     "overrides": {
-      "lru-cache": "^8.0.0"
+      "lru-cache": "^8.0.0",
+      "path-to-regexp": "^2.4.0"
     }
   }
 }
