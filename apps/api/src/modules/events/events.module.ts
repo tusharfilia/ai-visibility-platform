@@ -4,6 +4,7 @@ import { EventsController } from './events.controller';
 import { EventEmitterService } from './event-emitter.service';
 import { SSEConnectionPoolService } from './connection-pool.service';
 import { RedisSSEAdapter } from './redis-adapter';
+import { WorkspaceContextService } from '../../middleware/workspace-context';
 
 @Module({
   imports: [ConfigModule],
@@ -12,6 +13,7 @@ import { RedisSSEAdapter } from './redis-adapter';
     EventEmitterService,
     SSEConnectionPoolService,
     RedisSSEAdapter,
+    WorkspaceContextService,
   ],
   exports: [
     EventEmitterService,

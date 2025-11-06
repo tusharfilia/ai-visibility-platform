@@ -3,7 +3,7 @@
  * Provides real-time event streaming with heartbeat and Last-Event-ID support
  */
 
-import { Controller, Get, Req, Res, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, Res, Query, UseGuards, Optional } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { EventEmitterService } from './event-emitter.service';
 import { SSEConnectionPoolService } from './connection-pool.service';
@@ -16,12 +16,16 @@ import { v4 as uuidv4 } from 'uuid';
 @Controller('v1/events')
 @UseGuards(JwtAuthGuard, WorkspaceAccessGuard)
 export class EventsController {
+  private workspaceContext?: WorkspaceContextService;
+
   constructor(
     private eventEmitter: EventEmitterService,
     private connectionPool: SSEConnectionPoolService,
-    private workspaceContext: WorkspaceContextService,
+    @Optional() workspaceContext: WorkspaceContextService | undefined,
     private configService: ConfigService
-  ) {}
+  ) {
+    this.workspaceContext = workspaceContext;
+  }
 
   @Get('stream')
   async streamEvents(
@@ -32,8 +36,15 @@ export class EventsController {
     @Query('lastEventId') lastEventId?: string
   ) {
     // Get workspace and user context
-    const contextWorkspaceId = workspaceId || this.workspaceContext.getWorkspaceId();
-    const contextUserId = userId || this.workspaceContext.getUserId();
+    // Fallback to query params, then workspaceContext, then JWT user
+    const contextWorkspaceId = workspaceId || 
+      (this.workspaceContext ? this.workspaceContext.getWorkspaceId() : undefined) ||
+      ((req as any).user?.workspaceId) ||
+      'default-workspace';
+    const contextUserId = userId || 
+      (this.workspaceContext ? this.workspaceContext.getUserId() : undefined) ||
+      ((req as any).user?.sub) ||
+      'default-user';
     const instanceId = this.configService.get<string>('INSTANCE_ID', 'api-1');
     const connectionId = uuidv4();
 
