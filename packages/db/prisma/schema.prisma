@@ -452,6 +452,26 @@ model CorrectionSubmission {
   @@map("correction_submissions")
 }
 
+model DemoRun {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  domain      String?
+  brand       String?
+  summary     String?
+  competitors String[]
+  analysisJobsTotal     Int?
+  analysisJobsCompleted Int?
+  analysisJobsFailed    Int?
+  status      String   @default("pending")
+  progress    Int      @default(0)
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, status])
+  @@map("demo_runs")
+}
+
 model WhiteLabelConfig {
   id            String   @id @default(cuid())
   workspaceId   String   @unique

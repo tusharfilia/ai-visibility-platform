@@ -1,259 +1,48 @@
 <!-- fd308937-3c6d-4692-984c-ee5eae4d343a 821bbd02-3210-48b3-9db8-4b37821aaf95 -->
-# GEO Compliance Enhancements Implementation Plan
+# Demo Self-Serve Implementation Plan
 
-## Overview
+## Phase 1 – Scaffolding
 
-Implement 7 major GEO enhancements from the compliance audit, adding entity-level evidence tracking, engine-aware scoring, citation intelligence, structural analysis, maturity modeling, prescriptive recommendations, and directory presence analysis. All changes integrate with existing multi-tenant, SSE, queue, and scoring infrastructure.
+- a. Add `demo_runs` migration (id, workspaceId, status, timestamps, progress, error).
+- b. Create `apps/api/src/modules/demo/` with controller/service DTO scaffolding.
+- c. Register `DemoModule` in `AppModule`; stub controller methods returning 202.
+- d. Document flow in Swagger (summary of steps, link to status endpoint).
 
-## Prerequisites (Preserved)
+## Phase 2 – Domain Intake & AI Summary
 
-- Multi-tenancy with workspace isolation
-- SSE infrastructure with Redis Pub/Sub
-- Queue architecture with BullMQ
-- Idempotency framework
-- Existing GEO scoring algorithms
-- AI provider orchestration
+- a. Implement `POST /v1/demo/summary` to accept domain/brand and optional override text.
+- b. Call LLM via `LLMRouterService` to generate summary; persist to `WorkspaceProfile`.
+- c. Create workspace & demo run record if absent; update status `summary_ready`.
 
-## Implementation Phases
+## Phase 3 – Prompt Generation & Confirmation
 
-### Phase 1: Database Schema & Core Models
+- a. Implement `POST /v1/demo/prompts` taking `seedPrompts` and optional `useSuggested` flag.
+- b. Use summary to generate additional prompts (LLM) and dedupe.
+- c. Save final prompt list to `prompts` table; update status `prompts_ready`.
 
-**File**: `packages/db/prisma/schema.prisma`
+## Phase 4 – Competitor Discovery & Confirmation
 
-1. Add `EntityEvidence` model:
+- a. Implement `POST /v1/demo/competitors` to run lightweight searches for each prompt.
+- b. Parse competitor domains from responses (reuse parser utilities); return suggestions.
+- c. Persist confirmed competitor set; update status `competitors_ready`.
 
-   - Fields: id, workspaceId, entityType, sourceType, sourceDomain, citationUrl, evidenceText, authorityScore, freshness, verified, createdAt
-   - Index on [workspaceId, sourceType]
+## Phase 5 – Run Analysis Jobs
 
-2. Add `GEOMaturityScore` model:
+- a. Implement `POST /v1/demo/run` to seed default engines and enqueue `runPrompt` jobs for brand & competitors.
+- b. Extend job payloads to include `demoRunId` for progress tracking.
+- c. Update workers to record completion/progress in `demo_runs`; expose `/v1/demo/status/{jobId}`.
 
-   - Fields: id, workspaceId (unique), entityStrength, citationDepth, structuralClarity, updateCadence, overallScore, maturityLevel, recommendations (Json), timestamps
-   - Index on [workspaceId, overallScore]
+## Phase 6 – Insights & Recommendations
 
-3. Extend `Citation` model:
+- a. Aggregate prompt run outputs for visibility metrics (brand vs competitors) in `DemoService`.
+- b. Implement `/v1/demo/insights` and `/v1/demo/recommendations` endpoints.
+- c. Leverage existing GEO & recommendations services; map results to concise JSON for Swagger.
 
-   - Add nullable fields: sourceType, isLicensed (default false), publisherName, directoryType, redditThread, authorityScore (default 0), freshness
-   - Maintain backward compatibility (all new fields nullable)
+## Phase 7 – Polish & Docs
 
-4. Create migration:
-
-   - Generate Prisma migration: `pnpm --filter @ai-visibility/db prisma migrate dev --name add_geo_enhancements`
-   - Migration handles: new tables, new Citation fields (nullable), indexes
-
-**File**: `packages/db/prisma/seed.ts`
-
-- Seed initial engine bias configs (default values)
-- Seed directory constants
-
-### Phase 2: Classification & Evidence Infrastructure
-
-**File**: `packages/geo/assets/licensed_publishers.json` (new)
-
-```json
-{
-  "domains": [
-    "wsj.com", "dowjones.com",
-    "ft.com", "financialtimes.com",
-    "welt.de", "bild.de", "axel-springer.de",
-    "apnews.com", "ap.org"
-  ],
-  "publishers": {
-    "wsj.com": "News Corp",
-    "ft.com": "Financial Times",
-    "welt.de": "Axel Springer",
-    "apnews.com": "Associated Press"
-  }
-}
-```
-
-**File**: `packages/geo/assets/known_directories.json` (new)
-
-```json
-{
-  "directories": [
-    { "domain": "google.com/maps", "type": "gbp", "name": "Google Business Profile" },
-    { "domain": "bing.com/maps", "type": "bing_places", "name": "Bing Places" },
-    { "domain": "apple.com/maps", "type": "apple_business", "name": "Apple Business Connect" },
-    { "domain": "g2.com", "type": "g2", "name": "G2" },
-    { "domain": "capterra.com", "type": "capterra", "name": "Capterra" },
-    { "domain": "trustpilot.com", "type": "trustpilot", "name": "Trustpilot" },
-    { "domain": "yelp.com", "type": "yelp", "name": "Yelp" }
-  ]
-}
-```
-
-**File**: `packages/geo/assets/reddit_domains.json` (new)
-
-```json
-{
-  "domains": ["reddit.com", "redd.it", "redditstatic.com"],
-  "patterns": ["/r/", "/u/", "/user/"]
-}
-```
-
-**File**: `packages/geo/src/citations/citation-classifier.service.ts` (new)
-
-- `CitationClassifierService` class
-- Methods: `classifyCitation(citation)`, `detectLicensedPublisher(domain)`, `detectReddit(url)`, `detectDirectory(domain)`
-- Loads asset JSON files
-- Returns `CitationSourceType` enum: 'licensed_publisher' | 'curated' | 'directory' | 'reddit' | 'user_generated'
-- Accuracy target: >95% on fixtures
-
-**File**: `packages/geo/src/evidence/evidence-graph.builder.ts` (new)
-
-- `EvidenceGraphBuilderService` class
-- Methods: `buildEvidenceGraph(workspaceId)`, `aggregateEvidence(citations, mentions)`, `calculateConsensusScore(evidenceNodes)`, `linkEntityToEvidence(entity, evidence)`
-- Returns `EntityEvidenceGraph` interface with nodes, edges, consensusScore
-- Integrates with existing KnowledgeGraphBuilderService
-
-### Phase 3: Engine Bias & Scoring Updates
-
-**File**: `packages/geo/src/scoring/engine-bias.config.ts` (new)
-
-```typescript
-export const ENGINE_BIAS_CONFIG: Record<EngineKey, EngineBiasConfig> = {
-  PERPLEXITY: {
-    sourceWeights: { reddit: 0.066, wikipedia: 0.03, licensed_publisher: 0.20, curated: 0.15, directory: 0.10 },
-    redditMultiplier: 1.5,
-    citationPatterns: { reddit: 0.066 }
-  },
-  OPENAI: {
-    sourceWeights: { reddit: 0.018, wikipedia: 0.078, licensed_publisher: 0.30, curated: 0.20, directory: 0.10 },
-    licensedPublisherMultiplier: 3.0,
-    citationPatterns: { licensed_publisher: 0.30, wikipedia: 0.078 }
-  },
-  AIO: {
-    sourceWeights: { reddit: 0.022, wikipedia: 0.006, licensed_publisher: 0.15, curated: 0.40, directory: 0.12 },
-    curatedMultiplier: 2.5,
-    redditPenalty: 0.8,
-    citationPatterns: { curated: 0.40 }
-  },
-  // ... other engines with default weights
-};
-```
-
-**File**: `packages/geo/src/scoring/visibility-score.ts` (modify)
-
-1. Update `VisibilityScoreCalculator` class:
-
-   - Add `engineKey` parameter to `calculateScore()`
-   - Add `structuralScore` input to `VisibilityScoreInput` interface
-   - Modify weights: mentionScore 0.35 (was 0.4), rankingScore 0.25 (was 0.3), citationScore 0.20, competitorScore 0.10, structuralScore 0.10 (NEW)
-   - Add `calculateEngineAwareCitationScore(citations, engineKey)` method
-   - Apply engine-specific multipliers per `engine-bias.config.ts`
-   - Apply freshness decay: exponential half-life ~180 days
-
-2. Update `calculateCitationScore()`:
-
-   - Use `CitationClassifierService` to get sourceType
-   - Apply authority multipliers: licensed 3x, curated 2x, directory 1.5x, reddit engine-dependent
-   - Apply freshness decay algorithm
-
-**File**: `packages/geo/src/scoring/citation-authority.service.ts` (new)
-
-- `CitationAuthorityService` class
-- Methods: `calculateAuthority(citation, engineKey)`, `applyFreshnessDecay(authority, freshness)`, `applySourceMultipliers(baseAuthority, sourceType, engineKey)`
-- Implements audit algorithms exactly
-
-### Phase 4: Structural Scoring
-
-**File**: `packages/geo/src/structural/schema-auditor.ts` (new)
-
-- `SchemaAuditorService` class
-- Methods: `auditPage(url)`, `validateSchemaTypes(html)`, `detectSchemaTypes()`: Organization, LocalBusiness, Product, FAQ, HowTo
-- Parses JSON-LD and microdata
-- Returns schema coverage score (0-100)
-
-**File**: `packages/geo/src/structural/freshness-analyzer.ts` (new)
-
-- `FreshnessAnalyzerService` class
-- Methods: `analyzeFreshness(url)`, `extractLastUpdated(html)`, `calculateFreshnessScore(lastUpdated)`
-- Looks for: `<time>`, `last-modified` header, `"datePublished"`/`"dateModified"` in schema
-- Returns freshness score (0-100) with decay calculation
-
-**File**: `packages/geo/src/structural/page-structure-analyzer.ts` (new)
-
-- `PageStructureAnalyzerService` class
-- Methods: `analyzeStructure(url)`, `detectAtomicPage(html)`
-- Checks: has TL;DR/summary, clear headings (>=3), external citations (>=1), bullet points (>=3), focused length (<2000 words)
-- Returns structure score (0-100)
-
-**File**: `packages/geo/src/structural/structural-scoring.service.ts` (new)
-
-- `StructuralScoringService` class (orchestrates above services)
-- Methods: `calculateStructuralScore(workspaceId)`
-- Aggregates: schemaScore, freshnessScore, structureScore
-- Returns overall structural score (0-100)
-- Caches results in Redis (TTL 1 hour)
-
-### Phase 5: GEO Maturity Model
-
-**File**: `packages/geo/src/maturity/maturity-calculator.service.ts` (new)
-
-- `GEOMaturityCalculatorService` class
-- Methods:
-  - `calculateMaturityScore(workspaceId)`: Main orchestrator
-  - `calculateEntityStrength(workspaceId)`: KG completeness, verified presence (0-100)
-  - `calculateCitationDepth(workspaceId)`: Count + quality across source types (0-100)
-  - `calculateStructuralClarity(workspaceId)`: Uses StructuralScoringService (0-100)
-  - `calculateUpdateCadence(workspaceId)`: Freshness analysis across key pages (0-100)
-  - `determineMaturityLevel(overallScore)`: 'beginner' (<40), 'intermediate' (40-60), 'advanced' (60-80), 'expert' (80+)
-- Weights: entityStrength 0.30, citationDepth 0.35, structuralClarity 0.20, updateCadence 0.15
-- Stores results in `GEOMaturityScore` table
-- Emits SSE event: `maturity.updated`
-
-**File**: `packages/geo/src/maturity/prescriptive-recommendations.service.ts` (new)
-
-- `PrescriptiveRecommendationEngine` class
-- Methods:
-  - `generateRecommendations(workspaceId)`: Main generator
-  - `analyzeCitationGaps(maturityScore)`: Count needed citations by type
-  - `analyzeSchemaGaps(workspaceId)`: Missing schema types per page
-  - `analyzeRedditPresence(workspaceId)`: Reddit mention count, recommend threads
-  - `analyzeFreshnessGaps(workspaceId)`: Stale pages (>180 days)
-- Returns `Recommendation[]` interface:
-  ```typescript
-  interface Recommendation {
-    type: string;
-    priority: 'low' | 'medium' | 'high' | 'critical';
-    message: string;
-    action: CopilotActionType;
-    estimatedImpact: number;
-    effort: 'low' | 'medium' | 'high';
-    targetUrl?: string;
-    targetDomain?: string;
-  }
-  ```
-
-- Examples: "You need 2 more trusted citations from licensed publishers", "Schema missing in About page - add Organization markup"
-- Stores in `GEOMaturityScore.recommendations` JSON field
-- Emits SSE event: `geo.recommendations.updated`
-
-### Phase 6: Directory Presence Analysis
-
-**File**: `packages/geo/src/directory/directory-constants.ts` (new)
-
-- Defines directory domains, NAP field mappings
-- Directory type enum
-- Exports `DIRECTORY_CONFIGS`, `ALL_DIRECTORY_TYPES`, `DirectoryType`
-
-**File**: `packages/geo/src/directory/directory-presence.analyzer.ts` (new)
-
-- `DirectoryPresenceAnalyzerService` class
-- Methods: `analyzeDirectoryPresence(workspaceId)`, `checkDirectoryListing(type, workspaceId)`, `calculateNAPConsistency(listings)`, `calculateListingQuality(listing)`
-- Returns `DirectoryPresenceReport` interface with: coverage (0-100%), NAP consistency (0-100%), listing quality (0-100 average), missing directories, listings array, recommendations
-- Analyzes all 7 directory types: GBP, Bing Places, Apple Business, G2, Capterra, Trustpilot, Yelp
-
-**File**: `apps/api/src/modules/directory/presence.controller.ts` (new)
-
-- `DirectoryPresenceController` class
-- Endpoint: `GET /v1/directory/presence?workspaceId=xxx`
-- Returns directory presence report with coverage metrics and recommendations
-
-**File**: `apps/api/src/modules/directory/directory.module.ts` (new)
-
-- `DirectoryModule` that imports `DirectoryPresenceController` and `DirectoryPresenceAnalyzerService`
-- Registered in `app.module.ts`
+- a. Add validation & error handling (missing keys, invalid step order).
+- b. Update README/Swagger descriptions with end-to-end usage instructions.
+- c. Add optional cleanup script or endpoint to delete demo workspaces. 
 
 ### To-dos
 

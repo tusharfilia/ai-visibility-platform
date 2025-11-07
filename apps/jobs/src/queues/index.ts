@@ -30,6 +30,7 @@ export interface RunPromptPayload {
   promptId: string;
   engineKey: string;
   idempotencyKey: string;
+  demoRunId?: string;
   userId?: string;
 }
 

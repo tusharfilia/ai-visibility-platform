@@ -127,7 +127,7 @@ export class RunPromptWorker {
    * Process individual prompt
    */
   private async processIndividualPrompt(job: Job<RunPromptPayload>): Promise<void> {
-    const { workspaceId, promptId, engineKey, idempotencyKey, userId } = job.data;
+    const { workspaceId, promptId, engineKey, idempotencyKey, userId, demoRunId } = job.data;
     
     console.log(`Processing prompt run: ${promptId} with ${engineKey}`);
     
@@ -273,21 +273,99 @@ export class RunPromptWorker {
       });
 
       console.log(`Prompt run completed: ${promptRun.id}`);
+
+      if (demoRunId) {
+        await this.markDemoRunJobSuccess(demoRunId);
+      }
       
     } catch (error) {
       console.error(`Prompt run failed: ${error.message}`);
       
       // Update prompt run with error
-      await prisma.promptRun.update({
-        where: { idempotencyKey },
-        data: {
-          status: 'FAILED',
-          finishedAt: new Date(),
-          errorMsg: error.message,
-        },
-      });
-      
+      try {
+        await prisma.promptRun.update({
+          where: { idempotencyKey },
+          data: {
+            status: 'FAILED',
+            finishedAt: new Date(),
+            errorMsg: error.message,
+          },
+        });
+      } catch (updateError) {
+        const message = updateError instanceof Error ? updateError.message : String(updateError);
+        console.warn(`Unable to persist prompt run failure for ${idempotencyKey}: ${message}`);
+      }
+
+      if (demoRunId) {
+        await this.markDemoRunJobFailure(demoRunId);
+      }
+
       throw error;
+    }
+  }
+
+  private async markDemoRunJobSuccess(demoRunId: string): Promise<void> {
+    try {
+      await this.dbPool.query(
+        `UPDATE "demo_runs"
+         SET "analysisJobsCompleted" = COALESCE("analysisJobsCompleted", 0) + 1,
+             "progress" = LEAST(
+               100,
+               CASE
+                 WHEN COALESCE("analysisJobsTotal", 0) = 0 THEN GREATEST("progress", 95)
+                 ELSE GREATEST(
+                   "progress",
+                   80 + COALESCE(ROUND(((COALESCE("analysisJobsCompleted", 0) + 1)::numeric / NULLIF("analysisJobsTotal", 0)) * 20)::int, 0)
+                 )
+               END
+             ),
+             "status" = CASE
+               WHEN COALESCE("analysisJobsTotal", 0) > 0
+                    AND (COALESCE("analysisJobsCompleted", 0) + 1 + COALESCE("analysisJobsFailed", 0)) >= "analysisJobsTotal"
+                 THEN 'analysis_complete'
+               ELSE "status"
+             END,
+             "updatedAt" = NOW()
+         WHERE "id" = $1`,
+        [demoRunId]
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`Failed to update demo run success metrics for ${demoRunId}: ${message}`);
+    }
+  }
+
+  private async markDemoRunJobFailure(demoRunId: string): Promise<void> {
+    try {
+      await this.dbPool.query(
+        `UPDATE "demo_runs"
+         SET "analysisJobsFailed" = COALESCE("analysisJobsFailed", 0) + 1,
+             "progress" = LEAST(
+               100,
+               CASE
+                 WHEN COALESCE("analysisJobsTotal", 0) = 0 THEN GREATEST("progress", 95)
+                 ELSE GREATEST(
+                   "progress",
+                   80 + COALESCE(ROUND(((COALESCE("analysisJobsCompleted", 0) + COALESCE("analysisJobsFailed", 0) + 1)::numeric / NULLIF("analysisJobsTotal", 0)) * 20)::int, 0)
+                 )
+               END
+             ),
+             "status" = CASE
+               WHEN COALESCE("analysisJobsTotal", 0) > 0
+                    AND (COALESCE("analysisJobsCompleted", 0) + COALESCE("analysisJobsFailed", 0) + 1) >= "analysisJobsTotal"
+                 THEN CASE
+                   WHEN COALESCE("analysisJobsCompleted", 0) = 0 THEN 'analysis_failed'
+                   ELSE 'analysis_complete'
+                 END
+               ELSE "status"
+             END,
+             "updatedAt" = NOW()
+         WHERE "id" = $1`,
+        [demoRunId]
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`Failed to update demo run failure metrics for ${demoRunId}: ${message}`);
     }
   }
 

@@ -1,0 +1,1367 @@
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { randomUUID } from 'crypto';
+import { URL } from 'url';
+import { LLMRouterService } from '@ai-visibility/shared';
+import { PrismaService } from '../database/prisma.service';
+import { DemoCompetitorsRequestDto, DemoPromptsRequestDto, DemoRunRequestDto, DemoSummaryRequestDto } from './dto/demo.dto';
+
+type DemoRunRecord = {
+  id: string;
+  workspaceId: string | null;
+  domain: string | null;
+  brand: string | null;
+  summary: string | null;
+  competitors: string[] | null;
+  analysisJobsTotal: number | null;
+  analysisJobsCompleted: number | null;
+  analysisJobsFailed: number | null;
+  status: string;
+  progress: number;
+  updatedAt: Date;
+};
+
+type DemoEntityInfo = {
+  key: string;
+  label: string;
+  domain?: string | null;
+};
+
+type DemoRunMetrics = {
+  totalRuns: number;
+  completedRuns: number;
+  failedRuns: number;
+  successRate: number;
+  failRate: number;
+  totalCostCents: number;
+  avgCostCents: number;
+};
+
+type DemoShareOfVoiceRow = {
+  entityKey: string;
+  entity: string;
+  mentions: number;
+  positiveMentions: number;
+  neutralMentions: number;
+  negativeMentions: number;
+  sharePercentage: number;
+};
+
+type DemoEnginePerformanceRow = {
+  engine: string;
+  totalRuns: number;
+  successfulRuns: number;
+  failedRuns: number;
+  successRate: number;
+  totalCostCents: number;
+};
+
+type DemoCitationStat = {
+  domain: string;
+  references: number;
+  sharePercentage: number;
+};
+
+type DemoRecommendationItem = {
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  category: 'visibility' | 'sentiment' | 'citations' | 'execution' | 'coverage';
+  relatedMetric?: string;
+  actionItems: string[];
+};
+
+type DemoAnalysisData = {
+  demoRun: DemoRunRecord;
+  brand: DemoEntityInfo;
+  brandDomain?: string | null;
+  competitors: DemoEntityInfo[];
+  metrics: DemoRunMetrics;
+  shareOfVoice: DemoShareOfVoiceRow[];
+  enginePerformance: DemoEnginePerformanceRow[];
+  citations: DemoCitationStat[];
+  generatedAt: Date;
+};
+
+@Injectable()
+export class DemoService {
+  private readonly logger = new Logger(DemoService.name);
+  private readonly statusOrder: Record<string, number> = {
+    pending: 0,
+    summary_ready: 1,
+    prompts_ready: 2,
+    competitors_ready: 3,
+    analysis_running: 4,
+    analysis_complete: 5,
+    analysis_failed: 5,
+  };
+
+  private readonly engineEnvRequirements: Record<string, string[]> = {
+    PERPLEXITY: ['PERPLEXITY_API_KEY'],
+    BRAVE: ['BRAVE_API_KEY'],
+    AIO: ['AIO_ENABLED'],
+    OPENAI: ['OPENAI_API_KEY'],
+    ANTHROPIC: ['ANTHROPIC_API_KEY'],
+    GEMINI: ['GOOGLE_AI_API_KEY'],
+  };
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly llmRouter: LLMRouterService,
+    @InjectQueue('runPrompt') private readonly runPromptQueue: Queue,
+  ) {}
+
+  private readonly defaultEngines = ['PERPLEXITY', 'BRAVE', 'AIO'];
+
+  async prepareSummary(payload: DemoSummaryRequestDto): Promise<{ ok: boolean; data: any }> {
+    const normalized = this.normalizeDomain(payload.domain);
+    const brand = (payload.brand ?? this.deriveBrandFromHost(normalized.host)).trim();
+    const workspaceId = this.generateWorkspaceId(normalized.host);
+
+    await this.ensureWorkspace(workspaceId, brand);
+
+    const summaryResult = await this.generateSummary(workspaceId, normalized.href, brand, payload.summaryOverride);
+    await this.upsertWorkspaceProfile(workspaceId, brand, summaryResult.summary);
+
+    const demoRun = await this.createDemoRun({
+      workspaceId,
+      domain: normalized.href,
+      brand,
+      summary: summaryResult.summary,
+      status: 'summary_ready',
+      progress: 10,
+    });
+
+    return {
+      ok: true,
+      data: {
+        demoRunId: demoRun.id,
+        workspaceId,
+        domain: normalized.href,
+        brand,
+        summary: summaryResult.summary,
+        summarySource: summaryResult.source,
+      },
+    };
+  }
+
+  async preparePrompts(payload: DemoPromptsRequestDto): Promise<{ ok: boolean; data: any }> {
+    const demoRun = await this.loadDemoRun(payload.demoRunId);
+
+    if (!demoRun.workspaceId) {
+      throw new BadRequestException('Demo run is missing workspace context. Re-run the summary step.');
+    }
+
+    this.ensureStatusAtLeast(demoRun, 'summary_ready', 'Complete the summary step before generating prompts.');
+
+    const seedPrompts = this.normalizePromptList(payload.seedPrompts, 'seed');
+    if (seedPrompts.length === 0) {
+      throw new BadRequestException('Provide at least one seed prompt.');
+    }
+
+    let finalPrompts: Array<{ text: string; source: 'seed' | 'llm' | 'user' }> = [];
+
+    const confirmed = this.normalizePromptList(payload.confirmedPrompts ?? [], 'user');
+    if (confirmed.length > 0) {
+      finalPrompts = this.mergePromptSources(confirmed);
+    } else {
+      const generated = await this.generatePromptSuggestions(
+        demoRun.workspaceId,
+        demoRun.brand ?? 'Brand',
+        demoRun.summary ?? '',
+        seedPrompts.map(p => p.text)
+      );
+      finalPrompts = this.mergePromptSources([...seedPrompts, ...generated]);
+    }
+
+    if (finalPrompts.length === 0) {
+      throw new BadRequestException('Unable to determine prompts. Try providing confirmedPrompts.');
+    }
+
+    await this.replaceWorkspacePrompts(demoRun.workspaceId, finalPrompts);
+    await this.updateDemoRun(demoRun.id, {
+      status: 'prompts_ready',
+      progress: Math.max(40, demoRun.progress ?? 0),
+    });
+
+    return {
+      ok: true,
+      data: {
+        demoRunId: demoRun.id,
+        workspaceId: demoRun.workspaceId,
+        prompts: finalPrompts,
+        total: finalPrompts.length,
+      },
+    };
+  }
+
+  async prepareCompetitors(payload: DemoCompetitorsRequestDto): Promise<{ ok: boolean; data: any }> {
+    const demoRun = await this.loadDemoRun(payload.demoRunId);
+
+    if (!demoRun.workspaceId) {
+      throw new BadRequestException('Demo run is missing workspace context. Re-run the summary step.');
+    }
+
+    this.ensureStatusAtLeast(demoRun, 'prompts_ready', 'Complete the prompt step before selecting competitors.');
+
+    const promptRecords = await this.getDemoPrompts(demoRun.workspaceId);
+    if (promptRecords.length === 0) {
+      throw new BadRequestException('Prompts are not ready. Complete the prompt step first.');
+    }
+
+    const promptTexts = promptRecords.map((record) => record.text);
+
+    const confirmed = this.normalizeDomainList(payload.competitorDomains ?? []);
+    let finalCompetitors: string[] = confirmed;
+    let suggestedCompetitors: string[] = [];
+
+    if (finalCompetitors.length === 0) {
+      suggestedCompetitors = await this.generateCompetitorSuggestions(
+        demoRun.workspaceId,
+        demoRun.brand ?? 'Brand',
+        demoRun.summary ?? '',
+        promptTexts,
+        demoRun.domain,
+      );
+      finalCompetitors = suggestedCompetitors;
+    } else {
+      suggestedCompetitors = finalCompetitors;
+    }
+
+    if (finalCompetitors.length === 0) {
+      throw new BadRequestException('Unable to determine competitor list. Provide competitorDomains.');
+    }
+
+    await this.updateDemoRun(demoRun.id, {
+      status: 'competitors_ready',
+      progress: Math.max(60, demoRun.progress ?? 0),
+      competitors: finalCompetitors,
+    });
+
+    return {
+      ok: true,
+      data: {
+        demoRunId: demoRun.id,
+        workspaceId: demoRun.workspaceId,
+        finalCompetitors,
+        suggestedCompetitors,
+      },
+    };
+  }
+
+  async runDemo(payload: DemoRunRequestDto): Promise<{ ok: boolean; data: any }> {
+    const demoRun = await this.loadDemoRun(payload.demoRunId);
+
+    if (!demoRun.workspaceId) {
+      throw new BadRequestException('Demo run is missing workspace context. Re-run the summary step.');
+    }
+
+    this.ensureStatusAtLeast(demoRun, 'competitors_ready', 'Complete the competitor step before running the analysis.');
+
+    const promptRecords = await this.getDemoPrompts(demoRun.workspaceId);
+    if (promptRecords.length === 0) {
+      throw new BadRequestException('Prompts are not ready. Complete the prompt step first.');
+    }
+
+    const engines = this.normalizeEngines(payload.engines);
+    this.validateDemoConfiguration(engines);
+    await this.ensureEngines(demoRun.workspaceId, engines);
+
+    const jobs = promptRecords.flatMap((prompt) =>
+      engines.map((engine) => {
+        const idempotencyKey = `${demoRun.workspaceId}:${prompt.id}:${engine}`;
+        return {
+          name: 'runPrompt',
+          data: {
+            workspaceId: demoRun.workspaceId!,
+            promptId: prompt.id,
+            engineKey: engine,
+            idempotencyKey,
+            demoRunId: demoRun.id,
+            userId: 'demo-user',
+          },
+          opts: {
+            removeOnComplete: { count: 200 },
+            removeOnFail: { count: 50 },
+          },
+        };
+      })
+    );
+
+    if (jobs.length === 0) {
+      throw new BadRequestException('No analysis jobs were created. Check prompts and engines.');
+    }
+
+    await this.runPromptQueue.addBulk(jobs);
+
+    await this.updateDemoRun(demoRun.id, {
+      status: 'analysis_running',
+      progress: Math.max(80, demoRun.progress ?? 0),
+      analysisJobsTotal: jobs.length,
+      analysisJobsCompleted: 0,
+      analysisJobsFailed: 0,
+    });
+
+    return {
+      ok: true,
+      data: {
+        demoRunId: demoRun.id,
+        workspaceId: demoRun.workspaceId,
+        engines,
+        queuedJobs: jobs.length,
+      },
+    };
+  }
+
+  async getStatus(demoRunId: string): Promise<{ ok: boolean; data: any }> {
+    const demoRun = await this.loadDemoRun(demoRunId);
+
+    const total = demoRun.analysisJobsTotal ?? 0;
+    const completed = demoRun.analysisJobsCompleted ?? 0;
+    const failed = demoRun.analysisJobsFailed ?? 0;
+    const finished = completed + failed;
+    const remaining = total > finished ? total - finished : 0;
+
+    const progress = this.computeProgress(demoRun.progress, total, finished);
+
+    return {
+      ok: true,
+      data: {
+        demoRunId: demoRun.id,
+        workspaceId: demoRun.workspaceId,
+        status: demoRun.status,
+        progress,
+        totalJobs: total,
+        completedJobs: completed,
+        failedJobs: failed,
+        remainingJobs: remaining,
+        updatedAt: demoRun.updatedAt.toISOString(),
+      },
+    };
+  }
+
+  async getInsights(demoRunId: string): Promise<{ ok: boolean; data: any }> {
+    const demoRun = await this.loadDemoRun(demoRunId);
+
+    if (!demoRun.workspaceId) {
+      throw new BadRequestException('Demo run is missing workspace context. Re-run the summary step.');
+    }
+
+    this.ensureStatusAtLeast(
+      demoRun,
+      'analysis_complete',
+      `Insights are only available after analysis completes (current status: ${demoRun.status}).`,
+    );
+
+    const analysis = await this.collectAnalysisData(demoRun);
+    const insightHighlights = this.buildInsightHighlights(analysis);
+
+    return {
+      ok: true,
+      data: {
+        demoRunId: analysis.demoRun.id,
+        workspaceId: analysis.demoRun.workspaceId,
+        status: analysis.demoRun.status,
+        progress: analysis.demoRun.progress,
+        totals: analysis.metrics,
+        shareOfVoice: analysis.shareOfVoice.map(({ entity, mentions, positiveMentions, neutralMentions, negativeMentions, sharePercentage }) => ({
+          entity,
+          mentions,
+          positiveMentions,
+          neutralMentions,
+          negativeMentions,
+          sharePercentage,
+        })),
+        enginePerformance: analysis.enginePerformance.map(({ engine, totalRuns, successfulRuns, failedRuns, successRate, totalCostCents }) => ({
+          engine,
+          totalRuns,
+          successfulRuns,
+          failedRuns,
+          successRate,
+          totalCostCents,
+        })),
+        topCitations: analysis.citations,
+        insightHighlights,
+        generatedAt: analysis.generatedAt.toISOString(),
+      },
+    };
+  }
+
+  async getRecommendations(demoRunId: string): Promise<{ ok: boolean; data: any }> {
+    const demoRun = await this.loadDemoRun(demoRunId);
+
+    if (!demoRun.workspaceId) {
+      throw new BadRequestException('Demo run is missing workspace context. Re-run the summary step.');
+    }
+
+    this.ensureStatusAtLeast(
+      demoRun,
+      'analysis_complete',
+      `Recommendations are only available after analysis completes (current status: ${demoRun.status}).`,
+    );
+
+    const analysis = await this.collectAnalysisData(demoRun);
+    const recommendations = this.generateRecommendations(analysis);
+
+    return {
+      ok: true,
+      data: {
+        demoRunId: analysis.demoRun.id,
+        workspaceId: analysis.demoRun.workspaceId,
+        status: analysis.demoRun.status,
+        progress: analysis.demoRun.progress,
+        recommendations,
+        shareOfVoice: analysis.shareOfVoice.map(({ entity, mentions, positiveMentions, neutralMentions, negativeMentions, sharePercentage }) => ({
+          entity,
+          mentions,
+          positiveMentions,
+          neutralMentions,
+          negativeMentions,
+          sharePercentage,
+        })),
+        enginePerformance: analysis.enginePerformance.map(({ engine, totalRuns, successfulRuns, failedRuns, successRate, totalCostCents }) => ({
+          engine,
+          totalRuns,
+          successfulRuns,
+          failedRuns,
+          successRate,
+          totalCostCents,
+        })),
+        generatedAt: analysis.generatedAt.toISOString(),
+      },
+    };
+  }
+
+  private async collectAnalysisData(demoRun: DemoRunRecord): Promise<DemoAnalysisData> {
+    if (!demoRun.workspaceId) {
+      throw new BadRequestException('Demo run is missing workspace context. Re-run the summary step.');
+    }
+
+    const workspaceId = demoRun.workspaceId;
+    const normalizedDomain = demoRun.domain ? this.normalizeDomain(demoRun.domain) : { href: '', host: '' };
+    const brandDomain = normalizedDomain.host || null;
+    const brandLabelCandidate = (demoRun.brand ?? (brandDomain ? this.deriveBrandFromHost(brandDomain) : '')).trim();
+    const brandLabel = brandLabelCandidate || 'Demo Brand';
+    const brand: DemoEntityInfo = {
+      key: this.normalizeEntityKey(brandLabel),
+      label: brandLabel,
+      domain: brandDomain,
+    };
+
+    const competitors: DemoEntityInfo[] = (demoRun.competitors ?? []).map((competitor) => {
+      const normalized = this.normalizeDomain(competitor);
+      const derivedLabel = this.deriveBrandFromHost(normalized.host);
+      const label = this.formatEntityLabel(derivedLabel || normalized.host || competitor || 'Competitor');
+      return {
+        key: this.normalizeEntityKey(label),
+        label,
+        domain: normalized.host || competitor || null,
+      };
+    });
+
+    const [runMetricsRow] = await this.prisma.$queryRaw<Array<{
+      totalRuns: number;
+      completedRuns: number;
+      failedRuns: number;
+      totalCostCents: number;
+    }>>(
+      `SELECT
+         COUNT(*)::int AS "totalRuns",
+         SUM(CASE WHEN pr."status" = 'SUCCESS' THEN 1 ELSE 0 END)::int AS "completedRuns",
+         SUM(CASE WHEN pr."status" = 'FAILED' THEN 1 ELSE 0 END)::int AS "failedRuns",
+         COALESCE(SUM(pr."costCents"), 0)::int AS "totalCostCents"
+       FROM "PromptRun" pr
+       JOIN "Prompt" p ON p.id = pr."promptId"
+       WHERE pr."workspaceId" = $1
+         AND 'demo' = ANY(p."tags")`,
+      [workspaceId],
+    );
+
+    const totalRuns = Number(runMetricsRow?.totalRuns ?? 0);
+    const completedRuns = Number(runMetricsRow?.completedRuns ?? 0);
+    const failedRuns = Number(runMetricsRow?.failedRuns ?? 0);
+    const totalCostCents = Number(runMetricsRow?.totalCostCents ?? 0);
+    const successRate = totalRuns > 0 ? this.toPercentage(completedRuns / totalRuns) : 0;
+    const failRate = totalRuns > 0 ? this.toPercentage(failedRuns / totalRuns) : 0;
+    const avgCostCents = totalRuns > 0 ? Math.round(totalCostCents / totalRuns) : 0;
+
+    const metrics: DemoRunMetrics = {
+      totalRuns,
+      completedRuns,
+      failedRuns,
+      successRate,
+      failRate,
+      totalCostCents,
+      avgCostCents,
+    };
+
+    const mentionRows = await this.prisma.$queryRaw<Array<{
+      entityKey: string | null;
+      entityLabel: string | null;
+      mentions: number;
+      positiveMentions: number;
+      neutralMentions: number;
+      negativeMentions: number;
+    }>>(
+      `SELECT
+         LOWER(m."brand") AS "entityKey",
+         MIN(m."brand") AS "entityLabel",
+         COUNT(*)::int AS "mentions",
+         SUM(CASE WHEN m."sentiment" = 'POS' THEN 1 ELSE 0 END)::int AS "positiveMentions",
+         SUM(CASE WHEN m."sentiment" = 'NEU' THEN 1 ELSE 0 END)::int AS "neutralMentions",
+         SUM(CASE WHEN m."sentiment" = 'NEG' THEN 1 ELSE 0 END)::int AS "negativeMentions"
+       FROM "Mention" m
+       JOIN "Answer" a ON a.id = m."answerId"
+       JOIN "PromptRun" pr ON pr.id = a."promptRunId"
+       JOIN "Prompt" p ON p.id = pr."promptId"
+       WHERE pr."workspaceId" = $1
+         AND 'demo' = ANY(p."tags")
+       GROUP BY LOWER(m."brand")
+       ORDER BY COUNT(*) DESC`,
+      [workspaceId],
+    );
+
+    const mentionStatsMap = new Map<string, DemoShareOfVoiceRow>();
+
+    for (const row of mentionRows) {
+      const rawKey = row.entityKey || row.entityLabel || 'Other';
+      const key = this.normalizeEntityKey(rawKey);
+      const isOther = !row.entityKey && !row.entityLabel;
+      const label = isOther ? 'Other' : this.formatEntityLabel(row.entityLabel || rawKey);
+
+      const mentions = Number(row.mentions ?? 0);
+      const positiveMentions = Number(row.positiveMentions ?? 0);
+      const neutralMentions = Number(row.neutralMentions ?? 0);
+      const negativeMentions = Number(row.negativeMentions ?? 0);
+
+      const existing = mentionStatsMap.get(key);
+      if (existing) {
+        existing.mentions += mentions;
+        existing.positiveMentions += positiveMentions;
+        existing.neutralMentions += neutralMentions;
+        existing.negativeMentions += negativeMentions;
+      } else {
+        mentionStatsMap.set(key, {
+          entityKey: key,
+          entity: label,
+          mentions,
+          positiveMentions,
+          neutralMentions,
+          negativeMentions,
+          sharePercentage: 0,
+        });
+      }
+    }
+
+    const ensureEntityRow = (info: DemoEntityInfo) => {
+      if (!info.key) return;
+      if (!mentionStatsMap.has(info.key)) {
+        mentionStatsMap.set(info.key, {
+          entityKey: info.key,
+          entity: info.label,
+          mentions: 0,
+          positiveMentions: 0,
+          neutralMentions: 0,
+          negativeMentions: 0,
+          sharePercentage: 0,
+        });
+      }
+    };
+
+    ensureEntityRow(brand);
+    competitors.forEach(ensureEntityRow);
+
+    const shareOfVoiceArray = Array.from(mentionStatsMap.values()).sort((a, b) => b.mentions - a.mentions);
+    const totalMentions = shareOfVoiceArray.reduce((sum, row) => sum + row.mentions, 0);
+    const shareOfVoice: DemoShareOfVoiceRow[] = shareOfVoiceArray.map((row) => ({
+      ...row,
+      sharePercentage: totalMentions > 0 ? this.toPercentage(row.mentions / totalMentions) : 0,
+    }));
+
+    const citationRows = await this.prisma.$queryRaw<Array<{
+      domain: string | null;
+      references: number;
+    }>>(
+      `SELECT
+         LOWER(c."domain") AS "domain",
+         COUNT(*)::int AS "references"
+       FROM "Citation" c
+       JOIN "Answer" a ON a.id = c."answerId"
+       JOIN "PromptRun" pr ON pr.id = a."promptRunId"
+       JOIN "Prompt" p ON p.id = pr."promptId"
+       WHERE pr."workspaceId" = $1
+         AND 'demo' = ANY(p."tags")
+       GROUP BY LOWER(c."domain")
+       ORDER BY COUNT(*) DESC
+       LIMIT 10`,
+      [workspaceId],
+    );
+
+    const totalCitations = citationRows.reduce((sum, row) => sum + Number(row.references ?? 0), 0);
+    const citations: DemoCitationStat[] = citationRows
+      .filter((row) => (row.domain || '').trim().length > 0)
+      .map((row) => {
+        const domain = (row.domain || '').trim();
+        const references = Number(row.references ?? 0);
+        return {
+          domain,
+          references,
+          sharePercentage: totalCitations > 0 ? this.toPercentage(references / totalCitations) : 0,
+        };
+      });
+
+    const engineRows = await this.prisma.$queryRaw<Array<{
+      engine: string | null;
+      totalRuns: number;
+      successfulRuns: number;
+      totalCostCents: number;
+    }>>(
+      `SELECT
+         e."key" AS "engine",
+         COUNT(*)::int AS "totalRuns",
+         SUM(CASE WHEN pr."status" = 'SUCCESS' THEN 1 ELSE 0 END)::int AS "successfulRuns",
+         COALESCE(SUM(pr."costCents"), 0)::int AS "totalCostCents"
+       FROM "PromptRun" pr
+       JOIN "Prompt" p ON p.id = pr."promptId"
+       JOIN "Engine" e ON e.id = pr."engineId"
+       WHERE pr."workspaceId" = $1
+         AND 'demo' = ANY(p."tags")
+       GROUP BY e."key"
+       ORDER BY e."key"`,
+      [workspaceId],
+    );
+
+    const enginePerformance: DemoEnginePerformanceRow[] = engineRows.map((row) => {
+      const engineKey = (row.engine || 'UNKNOWN').toUpperCase();
+      const engineTotalRuns = Number(row.totalRuns ?? 0);
+      const successfulRuns = Number(row.successfulRuns ?? 0);
+      const failedRunsComputed = Math.max(0, engineTotalRuns - successfulRuns);
+      const totalEngineCost = Number(row.totalCostCents ?? 0);
+
+      return {
+        engine: engineKey,
+        totalRuns: engineTotalRuns,
+        successfulRuns,
+        failedRuns: failedRunsComputed,
+        successRate: engineTotalRuns > 0 ? this.toPercentage(successfulRuns / engineTotalRuns) : 0,
+        totalCostCents: totalEngineCost,
+      };
+    });
+
+    return {
+      demoRun,
+      brand,
+      brandDomain,
+      competitors,
+      metrics,
+      shareOfVoice,
+      enginePerformance,
+      citations,
+      generatedAt: new Date(),
+    };
+  }
+
+  private buildInsightHighlights(analysis: DemoAnalysisData): string[] {
+    const highlights: string[] = [];
+    const brandRow = analysis.shareOfVoice.find((row) => row.entityKey === analysis.brand.key);
+    const competitorRows = analysis.shareOfVoice
+      .filter((row) => row.entityKey !== analysis.brand.key)
+      .sort((a, b) => b.sharePercentage - a.sharePercentage);
+
+    const topCompetitor = competitorRows[0];
+
+    if (brandRow) {
+      if (topCompetitor && topCompetitor.sharePercentage - brandRow.sharePercentage >= 5) {
+        highlights.push(
+          `${topCompetitor.entity} leads share of voice by ${(topCompetitor.sharePercentage - brandRow.sharePercentage).toFixed(1)} pts over ${analysis.brand.label}.`,
+        );
+      } else if (brandRow.sharePercentage >= 40) {
+        highlights.push(`${analysis.brand.label} leads share of voice at ${brandRow.sharePercentage.toFixed(1)}%.`);
+      } else if (brandRow.sharePercentage > 0) {
+        highlights.push(`${analysis.brand.label} holds ${brandRow.sharePercentage.toFixed(1)}% share of voice across demo prompts.`);
+      }
+
+      if (brandRow.mentions > 0) {
+        const positiveShare = this.toPercentage(brandRow.positiveMentions / brandRow.mentions);
+        if (positiveShare < 35) {
+          highlights.push(
+            `${analysis.brand.label} sentiment skews cautious—only ${positiveShare.toFixed(1)}% of mentions are positive.`,
+          );
+        } else {
+          highlights.push(
+            `${analysis.brand.label} maintains ${positiveShare.toFixed(1)}% positive sentiment in captured answers.`,
+          );
+        }
+      }
+    }
+
+    if (analysis.citations.length === 0) {
+      highlights.push('No citations captured yet—focus on landing authoritative sources in follow-up runs.');
+    } else {
+      const citationLeader = analysis.citations[0];
+      highlights.push(
+        `${citationLeader.domain} contributes the most references (${citationLeader.sharePercentage.toFixed(1)}% of citations).`,
+      );
+    }
+
+    const strugglingEngine = analysis.enginePerformance.find((engine) => engine.successRate < 70);
+    if (strugglingEngine) {
+      highlights.push(
+        `${strugglingEngine.engine} success rate is only ${strugglingEngine.successRate.toFixed(1)}%—consider more targeted prompts.`,
+      );
+    } else if (analysis.enginePerformance.length > 0) {
+      const topEngine = [...analysis.enginePerformance].sort((a, b) => b.successRate - a.successRate)[0];
+      highlights.push(`${topEngine.engine} is the most reliable engine so far (${topEngine.successRate.toFixed(1)}% success).`);
+    }
+
+    const unique = Array.from(new Set(highlights));
+    return unique.slice(0, 5);
+  }
+
+  private generateRecommendations(analysis: DemoAnalysisData): DemoRecommendationItem[] {
+    const recommendations: DemoRecommendationItem[] = [];
+    const { metrics, demoRun: demoRunRecord } = analysis;
+    const brandRow = analysis.shareOfVoice.find((row) => row.entityKey === analysis.brand.key);
+    const competitorRows = analysis.shareOfVoice
+      .filter((row) => row.entityKey !== analysis.brand.key)
+      .sort((a, b) => b.sharePercentage - a.sharePercentage);
+    const topCompetitor = competitorRows[0];
+
+    if (brandRow && topCompetitor && topCompetitor.sharePercentage - brandRow.sharePercentage >= 5) {
+      const diff = topCompetitor.sharePercentage - brandRow.sharePercentage;
+      recommendations.push({
+        title: `Close visibility gap with ${topCompetitor.entity}`,
+        description: `${topCompetitor.entity} outpaces ${analysis.brand.label} by ${diff.toFixed(1)} pts in share of voice across demo prompts.`,
+        priority: 'high',
+        category: 'visibility',
+        relatedMetric: 'shareOfVoice',
+        actionItems: [
+          `Add prompts comparing ${analysis.brand.label} vs ${topCompetitor.entity} on pricing, trust, and feature depth.`,
+          `Highlight recent wins and customer proof points where ${analysis.brand.label} beats ${topCompetitor.entity}.`,
+        ],
+      });
+    } else if (brandRow && brandRow.sharePercentage < 35) {
+      recommendations.push({
+        title: 'Expand brand visibility footprint',
+        description: `${analysis.brand.label} captures only ${brandRow.sharePercentage.toFixed(1)}% of share of voice—boost coverage with broader prompt variety.`,
+        priority: 'medium',
+        category: 'visibility',
+        relatedMetric: 'shareOfVoice',
+        actionItems: [
+          'Spin up prompts covering new use cases, industries, and comparative angles.',
+          'Repurpose high-performing prompts with fresh messaging to capture additional impressions.',
+        ],
+      });
+    }
+
+    if (brandRow && brandRow.mentions > 0) {
+      const positiveShare = this.toPercentage(brandRow.positiveMentions / brandRow.mentions);
+      if (positiveShare < 35) {
+        recommendations.push({
+          title: 'Elevate positive sentiment signals',
+          description: `${analysis.brand.label} positive sentiment is only ${positiveShare.toFixed(1)}%. Reinforce proof points and address objections surfaced in negative snippets.`,
+          priority: 'medium',
+          category: 'sentiment',
+          relatedMetric: 'sentiment',
+          actionItems: [
+            'Highlight social proof, awards, and customer outcomes in prompt answers.',
+            'Draft objection-handling prompts that tackle common negative narratives head-on.',
+          ],
+        });
+      }
+    }
+
+    if (analysis.citations.length === 0) {
+      recommendations.push({
+        title: 'Land authoritative citations',
+        description: 'No authoritative sources were captured during the demo run. Prioritize trusted publications to back your answers.',
+        priority: 'high',
+        category: 'citations',
+        relatedMetric: 'citations',
+        actionItems: [
+          'Pitch or source content from tier-one publications covering your category.',
+          'Incorporate product documentation or analyst reports that can be cited in AI answers.',
+        ],
+      });
+    } else {
+      const citationLeader = analysis.citations[0];
+      const brandDomainKey = analysis.brandDomain ? this.normalizeDomain(analysis.brandDomain).host : null;
+      if (brandDomainKey && citationLeader.domain !== brandDomainKey) {
+        recommendations.push({
+          title: 'Increase branded citation coverage',
+          description: `${citationLeader.domain} currently leads citation volume. Secure more references pointing to ${analysis.brand.label}'s owned assets.`,
+          priority: 'medium',
+          category: 'citations',
+          relatedMetric: 'citations',
+          actionItems: [
+            'Publish or refresh cornerstone content that AI agents can cite confidently.',
+            'Build schema and metadata to improve discoverability of owned resources.',
+          ],
+        });
+      }
+    }
+
+    const strugglingEngines = analysis.enginePerformance.filter((engine) => engine.successRate < 70);
+    if (strugglingEngines.length > 0) {
+      const engineList = strugglingEngines.map((engine) => engine.engine).join(', ');
+      recommendations.push({
+        title: `Stabilize performance on ${engineList}`,
+        description: `Success rates on ${engineList} fall below 70%. Address provider errors or adjust prompts to improve completion.`,
+        priority: 'medium',
+        category: 'execution',
+        relatedMetric: 'enginePerformance',
+        actionItems: [
+          'Review provider logs for rate limits or auth issues and re-run failed jobs.',
+          'Adjust prompt wording to better align with each engine’s strengths.',
+        ],
+      });
+    }
+
+    const totalPlannedJobs = Number(demoRunRecord.analysisJobsTotal ?? metrics.totalRuns);
+    const finishedJobs = metrics.completedRuns + metrics.failedRuns;
+    if (totalPlannedJobs > finishedJobs) {
+      const remaining = totalPlannedJobs - finishedJobs;
+      recommendations.push({
+        title: 'Resume pending demo jobs',
+        description: `${remaining} queued jobs are still outstanding—complete them to unlock full insight coverage.`,
+        priority: 'medium',
+        category: 'coverage',
+        relatedMetric: 'analysisProgress',
+        actionItems: [
+          'Verify background workers are running and connected to Redis.',
+          'Re-run /v1/demo/run after resolving provider limits to finish the workload.',
+        ],
+      });
+    }
+
+    if (recommendations.length === 0) {
+      recommendations.push({
+        title: 'Maintain momentum',
+        description: 'The demo run is performing well—extend coverage with additional competitor comparisons to keep gaining insights.',
+        priority: 'low',
+        category: 'visibility',
+        relatedMetric: 'shareOfVoice',
+        actionItems: [
+          'Add prompts covering emerging competitors and adjacent categories.',
+          'Schedule periodic re-runs to monitor shifts in citations and sentiment.',
+        ],
+      });
+    }
+
+    return recommendations.slice(0, 6);
+  }
+
+  private normalizeEntityKey(value: string | null | undefined): string {
+    if (!value) {
+      return '';
+    }
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+
+  private formatEntityLabel(raw: string | null | undefined): string {
+    if (!raw) {
+      return 'Unknown';
+    }
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return 'Unknown';
+    }
+    return trimmed
+      .split(/\s+/)
+      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join(' ');
+  }
+
+  private toPercentage(value: number, precision = 2): number {
+    if (!Number.isFinite(value) || value <= 0) {
+      return 0;
+    }
+    const multiplier = 10 ** precision;
+    return Math.round(value * 100 * multiplier) / multiplier;
+  }
+
+  private ensureStatusAtLeast(demoRun: DemoRunRecord, requiredStatus: string, errorMessage: string): void {
+    const currentRank = this.statusOrder[demoRun.status] ?? -1;
+    const requiredRank = this.statusOrder[requiredStatus] ?? Number.MAX_SAFE_INTEGER;
+    if (currentRank < requiredRank) {
+      throw new BadRequestException(errorMessage);
+    }
+  }
+
+  private validateDemoConfiguration(engines: string[]): void {
+    if (process.env.MOCK_PROVIDERS === 'true') {
+      throw new BadRequestException('Turn off MOCK_PROVIDERS to run the live demo workflow.');
+    }
+
+    const missingCredentials: string[] = [];
+    for (const engine of engines) {
+      const requirements = this.engineEnvRequirements[engine];
+      if (!requirements) continue;
+
+      const missingForEngine = requirements.filter((variable) => {
+        const value = process.env[variable];
+        if (value === undefined || value === null || value.toString().trim().length === 0) {
+          return true;
+        }
+        return false;
+      });
+
+      if (missingForEngine.length > 0) {
+        missingCredentials.push(`${engine}: ${missingForEngine.join(', ')}`);
+      }
+    }
+
+    if (missingCredentials.length > 0) {
+      throw new BadRequestException(
+        `Missing provider credentials for engines: ${missingCredentials.join('; ')}. Set the required environment variables and retry.`,
+      );
+    }
+  }
+
+  private async loadDemoRun(demoRunId: string): Promise<DemoRunRecord> {
+    const rows = await this.prisma.$queryRaw<DemoRunRecord>(
+      `SELECT "id", "workspaceId", "domain", "brand", "summary", "competitors",
+              "analysisJobsTotal", "analysisJobsCompleted", "analysisJobsFailed",
+              "status", "progress", "updatedAt"
+       FROM "demo_runs"
+       WHERE "id" = $1
+       LIMIT 1`,
+      [demoRunId]
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`Demo run ${demoRunId} not found.`);
+    }
+
+    return rows[0];
+  }
+
+  private computeProgress(currentProgress: number, totalJobs: number, finishedJobs: number): number {
+    const base = currentProgress ?? 0;
+    if (totalJobs <= 0) {
+      return Math.min(100, Math.max(base, 80));
+    }
+
+    const ratio = Math.min(1, Math.max(0, finishedJobs / totalJobs));
+    const target = ratio >= 1 ? 100 : Math.max(80, Math.round(80 + ratio * 20));
+    return Math.min(100, Math.max(base, target));
+  }
+
+  private normalizeDomain(domain: string): { href: string; host: string } {
+    try {
+      const url = new URL(domain.startsWith('http') ? domain : `https://${domain}`);
+      return { href: url.origin, host: url.hostname.replace(/^www\./, '') };
+    } catch (error) {
+      this.logger.warn(`Invalid domain supplied (${domain}), using fallback.`);
+      const sanitized = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      return { href: `https://${sanitized}`, host: sanitized.split('/')[0].replace(/^www\./, '') };
+    }
+  }
+
+  private deriveBrandFromHost(host: string): string {
+    if (!host) return 'Demo Brand';
+    const parts = host.split('.');
+    const primary = parts[0];
+    return primary.charAt(0).toUpperCase() + primary.slice(1);
+  }
+
+  private generateWorkspaceId(host: string): string {
+    const safeHost = host.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    return `demo_${safeHost || randomUUID()}`;
+  }
+
+  private async ensureWorkspace(workspaceId: string, name: string): Promise<void> {
+    await this.prisma.$executeRaw(
+      `INSERT INTO "workspaces" ("id", "name", "tier", "createdAt")
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT ("id") DO UPDATE SET "name" = EXCLUDED."name"`,
+      [workspaceId, name, 'INSIGHTS']
+    );
+  }
+
+  private async generateSummary(
+    workspaceId: string,
+    domain: string,
+    brand: string,
+    override?: string,
+  ): Promise<{ summary: string; source: 'user' | 'llm' | 'fallback' }> {
+    if (override && override.trim().length > 0) {
+      return { summary: override.trim(), source: 'user' };
+    }
+
+    const prompt = `Analyze the brand hosted at ${domain}.
+Provide a concise 2-3 sentence overview describing what ${brand} does, who it serves, and its value proposition.
+Keep the tone factual and neutral.`;
+
+    try {
+      const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt);
+      const text = (response.content || response.text || '').trim();
+      if (text.length > 0) {
+        return { summary: text, source: 'llm' };
+      }
+    } catch (error) {
+      this.logger.warn(`LLM summary generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    const fallback = `${brand} operates at ${domain} and provides digital services for its customers.`;
+    return { summary: fallback, source: 'fallback' };
+  }
+
+  private async upsertWorkspaceProfile(workspaceId: string, brand: string, summary: string): Promise<void> {
+    const existing = await this.prisma.$queryRaw<{ id: string }>(
+      'SELECT "id" FROM "workspace_profiles" WHERE "workspaceId" = $1 LIMIT 1',
+      [workspaceId]
+    );
+
+    if (existing.length > 0) {
+      await this.prisma.$executeRaw(
+        `UPDATE "workspace_profiles"
+         SET "businessName" = $1,
+             "description" = $2,
+             "updatedAt" = NOW()
+         WHERE "workspaceId" = $3`,
+        [brand, summary, workspaceId]
+      );
+      return;
+    }
+
+    const profileId = `profile_${randomUUID()}`;
+    await this.prisma.$executeRaw(
+      `INSERT INTO "workspace_profiles"
+        ("id", "workspaceId", "businessName", "services", "description", "verified", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, false, NOW(), NOW())`,
+      [profileId, workspaceId, brand, [], summary]
+    );
+  }
+
+  private async createDemoRun(params: {
+    workspaceId: string;
+    domain: string;
+    brand: string;
+    summary: string;
+    status: string;
+    progress: number;
+  }): Promise<{ id: string }> {
+    const demoRunId = randomUUID();
+    const rows = await this.prisma.$queryRaw<{ id: string }>(
+      `INSERT INTO "demo_runs"
+        ("id", "workspaceId", "domain", "brand", "summary", "competitors",
+         "analysisJobsTotal", "analysisJobsCompleted", "analysisJobsFailed",
+         "status", "progress", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+       RETURNING "id"`,
+      [
+        demoRunId,
+        params.workspaceId,
+        params.domain,
+        params.brand,
+        params.summary,
+        [],
+        null,
+        0,
+        0,
+        params.status,
+        params.progress,
+      ]
+    );
+
+    return rows[0];
+  }
+
+  private normalizePromptList(
+    prompts: string[],
+    source: 'seed' | 'llm' | 'user'
+  ): Array<{ text: string; source: 'seed' | 'llm' | 'user' }> {
+    if (!prompts) return [];
+    const seen = new Set<string>();
+    const normalized: Array<{ text: string; source: 'seed' | 'llm' | 'user' }> = [];
+
+    for (const prompt of prompts) {
+      const trimmed = (prompt || '').replace(/\s+/g, ' ').trim();
+      if (trimmed.length === 0) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      normalized.push({ text: trimmed, source });
+    }
+
+    return normalized;
+  }
+
+  private mergePromptSources(
+    prompts: Array<{ text: string; source: 'seed' | 'llm' | 'user' }>
+  ): Array<{ text: string; source: 'seed' | 'llm' | 'user' }> {
+    const seen = new Set<string>();
+    const merged: Array<{ text: string; source: 'seed' | 'llm' | 'user' }> = [];
+
+    for (const prompt of prompts) {
+      const key = prompt.text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(prompt);
+    }
+
+    return merged;
+  }
+
+  private async generatePromptSuggestions(
+    workspaceId: string,
+    brand: string,
+    summary: string,
+    seedPrompts: string[],
+  ): Promise<Array<{ text: string; source: 'llm' | 'seed' }>> {
+    const prompt = `You are helping an analyst evaluate ${brand}.
+Use the brand summary below and the provided seed prompts to suggest additional high-impact prompts that capture how AI search users or customers might research this brand.
+
+Brand summary:
+${summary || 'No summary available.'}
+
+Seed prompts:
+${seedPrompts.map((p, idx) => `${idx + 1}. ${p}`).join('\n')}
+
+Return a JSON array of 3 to 6 concise prompts (strings). Each prompt should be unique and focus on comparisons, benefits, challenges, or alternatives related to ${brand}.`;
+
+    try {
+      const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt, {
+        temperature: 0.3,
+        maxTokens: 256,
+      });
+
+      const raw = (response.content || response.text || '').trim();
+      const parsed = JSON.parse(raw) as string[];
+      const suggestions = this.normalizePromptList(parsed, 'llm');
+      if (suggestions.length > 0) {
+        return suggestions;
+      }
+    } catch (error) {
+      this.logger.warn(`Prompt expansion failed, falling back to heuristics: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    return this.normalizePromptList(this.buildPromptFallbacks(brand, seedPrompts), 'llm');
+  }
+
+  private buildPromptFallbacks(brand: string, seedPrompts: string[]): string[] {
+    const base = seedPrompts.slice(0, 2);
+    const variations = [
+      `Why choose ${brand} over other competitors?`,
+      `Strengths and weaknesses of ${brand} in 2025`,
+      `Customer reviews and sentiment about ${brand}`,
+      `How does ${brand} pricing compare to alternatives?`,
+      `Top use cases for ${brand}`,
+    ];
+    return [...base, ...variations];
+  }
+
+  private async replaceWorkspacePrompts(
+    workspaceId: string,
+    prompts: Array<{ text: string; source: 'seed' | 'llm' | 'user' }>,
+  ): Promise<void> {
+    await this.prisma.$executeRaw(
+      `DELETE FROM "prompts"
+       WHERE "workspaceId" = $1
+         AND $2 = ANY("tags")`,
+      [workspaceId, 'demo']
+    );
+
+    for (const prompt of prompts) {
+      const id = `prompt_${randomUUID()}`;
+      await this.prisma.$executeRaw(
+        `INSERT INTO "prompts"
+          ("id", "workspaceId", "text", "canonicalText", "intent", "vertical", "active", "tags", "createdAt")
+         VALUES ($1, $2, $3, $4, $5, $6, true, $7, NOW())`,
+        [
+          id,
+          workspaceId,
+          prompt.text,
+          prompt.text,
+          this.inferIntent(prompt.text),
+          null,
+          ['demo'],
+        ]
+      );
+    }
+  }
+
+  private inferIntent(prompt: string): string {
+    const text = prompt.toLowerCase();
+    if (text.includes('vs ') || text.includes(' versus ') || text.includes('compare')) {
+      return 'VS';
+    }
+    if (text.includes('alternative') || text.includes('instead of')) {
+      return 'ALTERNATIVES';
+    }
+    if (text.includes('price') || text.includes('pricing') || text.includes('cost')) {
+      return 'PRICING';
+    }
+    if (text.includes('how to') || text.startsWith('how do')) {
+      return 'HOWTO';
+    }
+    return 'BEST';
+  }
+
+  private async updateDemoRun(
+    demoRunId: string,
+    update: {
+      status?: string;
+      progress?: number;
+      competitors?: string[];
+      analysisJobsTotal?: number | null;
+      analysisJobsCompleted?: number;
+      analysisJobsFailed?: number;
+    },
+  ): Promise<void> {
+    const fields: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (update.status) {
+      fields.push(`"status" = $${idx++}`);
+      params.push(update.status);
+    }
+    if (typeof update.progress === 'number') {
+      fields.push(`"progress" = $${idx++}`);
+      params.push(update.progress);
+    }
+    if (update.competitors !== undefined) {
+      fields.push(`"competitors" = $${idx++}`);
+      params.push(update.competitors);
+    }
+    if (update.analysisJobsTotal !== undefined) {
+      fields.push(`"analysisJobsTotal" = $${idx++}`);
+      params.push(update.analysisJobsTotal);
+    }
+    if (update.analysisJobsCompleted !== undefined) {
+      fields.push(`"analysisJobsCompleted" = $${idx++}`);
+      params.push(update.analysisJobsCompleted);
+    }
+    if (update.analysisJobsFailed !== undefined) {
+      fields.push(`"analysisJobsFailed" = $${idx++}`);
+      params.push(update.analysisJobsFailed);
+    }
+
+    if (fields.length === 0) return;
+
+    params.push(demoRunId);
+
+    await this.prisma.$executeRaw(
+      `UPDATE "demo_runs"
+       SET ${fields.join(', ')}, "updatedAt" = NOW()
+       WHERE "id" = $${idx}`,
+      params
+    );
+  }
+
+  private async getDemoPrompts(workspaceId: string): Promise<Array<{ id: string; text: string }>> {
+    return this.prisma.$queryRaw(
+      `SELECT "id", "text"
+       FROM "prompts"
+       WHERE "workspaceId" = $1
+         AND 'demo' = ANY("tags")
+       ORDER BY "createdAt" ASC`,
+      [workspaceId]
+    );
+  }
+
+  private normalizeDomainList(domains: string[]): string[] {
+    if (!domains) return [];
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+
+    for (const domain of domains) {
+      const cleaned = this.cleanDomain(domain);
+      if (!cleaned) continue;
+      if (seen.has(cleaned)) continue;
+      seen.add(cleaned);
+      normalized.push(cleaned);
+    }
+
+    return normalized;
+  }
+
+  private cleanDomain(domain: string): string | null {
+    const trimmed = (domain || '').trim().toLowerCase();
+    if (!trimmed) return null;
+
+    try {
+      const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
+      return url.hostname.replace(/^www\./, '');
+    } catch {
+      return trimmed.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    }
+  }
+
+  private normalizeEngines(engines?: string[]): string[] {
+    const allowed = new Set(['PERPLEXITY', 'AIO', 'BRAVE', 'OPENAI', 'ANTHROPIC', 'GEMINI']);
+    const normalized = (engines && engines.length > 0 ? engines : this.defaultEngines)
+      .map((engine) => (engine || '').toUpperCase().trim())
+      .filter((engine) => allowed.has(engine));
+
+    return normalized.length > 0 ? normalized : this.defaultEngines;
+  }
+
+  private async ensureEngines(workspaceId: string, engines: string[]): Promise<void> {
+    const rows = await this.prisma.$queryRaw<{ key: string }>(
+      `SELECT "key" FROM "engines" WHERE "workspaceId" = $1`,
+      [workspaceId]
+    );
+    const existing = new Set(rows.map((row) => row.key));
+
+    for (const engine of engines) {
+      if (existing.has(engine)) continue;
+      const id = `engine_${randomUUID()}`;
+      await this.prisma.$executeRaw(
+        `INSERT INTO "engines"
+          ("id", "workspaceId", "key", "enabled", "config", "dailyBudgetCents", "concurrency", "createdAt")
+         VALUES ($1, $2, $3, true, $4, $5, $6, NOW())`,
+        [id, workspaceId, engine, {}, 500, 1]
+      );
+    }
+  }
+
+  private async generateCompetitorSuggestions(
+    workspaceId: string,
+    brand: string,
+    summary: string,
+    promptTexts: string[],
+    domain?: string | null,
+  ): Promise<string[]> {
+    const prompt = `You are analyzing competitors for ${brand}.
+Use the brand summary and prompts below to identify likely competitors.
+
+Brand summary:
+${summary || 'No summary provided.'}
+
+Research prompts:
+${promptTexts.map((p, idx) => `${idx + 1}. ${p}`).join('\n')}
+
+Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal.com").`;
+
+    try {
+      const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt, {
+        temperature: 0.2,
+        maxTokens: 256,
+      });
+
+      const raw = (response.content || response.text || '').trim();
+      const parsed = JSON.parse(raw) as string[];
+      const normalized = this.normalizeDomainList(parsed);
+      if (normalized.length > 0) {
+        return normalized;
+      }
+    } catch (error) {
+      this.logger.warn(`Competitor suggestion generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    const host = domain ? this.normalizeDomain(domain).host : undefined;
+    return this.getDefaultCompetitors(brand, host);
+  }
+
+  private getDefaultCompetitors(brand: string, host?: string): string[] {
+    const generic = ['paypal.com', 'adyen.com', 'squareup.com', 'stripe.com', 'checkout.com'];
+    const brandWords = (brand || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const brandHost = (host || '').toLowerCase();
+    return generic.filter(comp => comp !== brandHost && !comp.includes(brandWords));
+  }
+}
+

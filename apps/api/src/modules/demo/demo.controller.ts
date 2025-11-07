@@ -1,0 +1,76 @@
+import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { ApiAcceptedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { DemoService } from './demo.service';
+import {
+  DemoCompetitorsRequestDto,
+  DemoPromptsRequestDto,
+  DemoPromptsResponseDto,
+  DemoRunRequestDto,
+  DemoRunResponseDto,
+  DemoSummaryRequestDto,
+  DemoSummaryResponseDto,
+  DemoCompetitorsResponseDto,
+  DemoInsightsResponseDto,
+  DemoRecommendationsResponseDto,
+  DemoStatusResponseDto,
+} from './dto/demo.dto';
+
+@ApiTags('Demo')
+@Controller('v1/demo')
+export class DemoController {
+  constructor(private readonly demoService: DemoService) {}
+
+  @Post('summary')
+  @HttpCode(202)
+  @ApiOperation({ summary: 'Submit a domain for summary generation' })
+  @ApiAcceptedResponse({ description: 'Summary generation request accepted.', type: DemoSummaryResponseDto })
+  async createSummary(@Body() payload: DemoSummaryRequestDto) {
+    return this.demoService.prepareSummary(payload);
+  }
+
+  @Post('prompts')
+  @HttpCode(202)
+  @ApiOperation({ summary: 'Submit baseline prompts for expansion' })
+  @ApiAcceptedResponse({ description: 'Prompt generation request accepted.', type: DemoPromptsResponseDto })
+  async createPrompts(@Body() payload: DemoPromptsRequestDto) {
+    return this.demoService.preparePrompts(payload);
+  }
+
+  @Post('competitors')
+  @HttpCode(202)
+  @ApiOperation({ summary: 'Submit competitor domains' })
+  @ApiAcceptedResponse({ description: 'Competitor discovery request accepted.', type: DemoCompetitorsResponseDto })
+  async createCompetitors(@Body() payload: DemoCompetitorsRequestDto) {
+    return this.demoService.prepareCompetitors(payload);
+  }
+
+  @Post('run')
+  @HttpCode(202)
+  @ApiOperation({ summary: 'Trigger the demo analysis run' })
+  @ApiAcceptedResponse({ description: 'Demo run request accepted.', type: DemoRunResponseDto })
+  async runDemo(@Body() payload: DemoRunRequestDto) {
+    return this.demoService.runDemo(payload);
+  }
+
+  @Get('status/:demoRunId')
+  @ApiOperation({ summary: 'Get current demo run status' })
+  @ApiOkResponse({ description: 'Returns the latest status for the demo run.', type: DemoStatusResponseDto })
+  async getStatus(@Param('demoRunId') demoRunId: string) {
+    return this.demoService.getStatus(demoRunId);
+  }
+
+  @Get('insights/:demoRunId')
+  @ApiOperation({ summary: 'Get demo visibility insights' })
+  @ApiOkResponse({ description: 'Returns aggregated insights for the demo run.', type: DemoInsightsResponseDto })
+  async getInsights(@Param('demoRunId') demoRunId: string) {
+    return this.demoService.getInsights(demoRunId);
+  }
+
+  @Get('recommendations/:demoRunId')
+  @ApiOperation({ summary: 'Get demo recommendations' })
+  @ApiOkResponse({ description: 'Returns prescriptive recommendations based on the analysis.', type: DemoRecommendationsResponseDto })
+  async getRecommendations(@Param('demoRunId') demoRunId: string) {
+    return this.demoService.getRecommendations(demoRunId);
+  }
+}
+

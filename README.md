@@ -92,6 +92,10 @@ Once running, visit:
 - **Health Check**: `http://localhost:3000/healthz`
 - **Metrics**: `http://localhost:3000/metrics`
 
+### Self-Serve Demo via Swagger
+
+To run the live demo workflow end-to-end, follow the step-by-step guide in `docs/demo-swagger-guide.md`. It covers generating the summary, expanding prompts, selecting competitors, queuing the analysis run, tracking progress, and reviewing the resulting insights/recommendations directly from Swagger.
+
 ## Architecture
 
 ### Monorepo Structure
