@@ -460,12 +460,12 @@ export class DemoService {
       };
     });
 
-    const [runMetricsRow] = await this.prisma.$queryRaw<Array<{
+    const [runMetricsRow] = await this.prisma.$queryRaw<{
       totalRuns: number;
       completedRuns: number;
       failedRuns: number;
       totalCostCents: number;
-    }>>(
+    }>(
       `SELECT
          COUNT(*)::int AS "totalRuns",
          SUM(CASE WHEN pr."status" = 'SUCCESS' THEN 1 ELSE 0 END)::int AS "completedRuns",
@@ -496,14 +496,14 @@ export class DemoService {
       avgCostCents,
     };
 
-    const mentionRows = await this.prisma.$queryRaw<Array<{
+    const mentionRows = await this.prisma.$queryRaw<{
       entityKey: string | null;
       entityLabel: string | null;
       mentions: number;
       positiveMentions: number;
       neutralMentions: number;
       negativeMentions: number;
-    }>>(
+    }>(
       `SELECT
          LOWER(m."brand") AS "entityKey",
          MIN(m."brand") AS "entityLabel",
@@ -579,10 +579,10 @@ export class DemoService {
       sharePercentage: totalMentions > 0 ? this.toPercentage(row.mentions / totalMentions) : 0,
     }));
 
-    const citationRows = await this.prisma.$queryRaw<Array<{
+    const citationRows = await this.prisma.$queryRaw<{
       domain: string | null;
       references: number;
-    }>>(
+    }>(
       `SELECT
          LOWER(c."domain") AS "domain",
          COUNT(*)::int AS "references"
@@ -611,12 +611,12 @@ export class DemoService {
         };
       });
 
-    const engineRows = await this.prisma.$queryRaw<Array<{
+    const engineRows = await this.prisma.$queryRaw<{
       engine: string | null;
       totalRuns: number;
       successfulRuns: number;
       totalCostCents: number;
-    }>>(
+    }>(
       `SELECT
          e."key" AS "engine",
          COUNT(*)::int AS "totalRuns",
@@ -1110,7 +1110,7 @@ Keep the tone factual and neutral.`;
     brand: string,
     summary: string,
     seedPrompts: string[],
-  ): Promise<Array<{ text: string; source: 'llm' | 'seed' }>> {
+  ): Promise<Array<{ text: string; source: 'llm' | 'seed' | 'user' }>> {
     const prompt = `You are helping an analyst evaluate ${brand}.
 Use the brand summary below and the provided seed prompts to suggest additional high-impact prompts that capture how AI search users or customers might research this brand.
 
