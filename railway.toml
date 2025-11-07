@@ -9,9 +9,15 @@ buildCommand = "pnpm install && pnpm build"
 # Deploy configuration
 [deploy]
 # startCommand is set in Dockerfile CMD - Railway will use Dockerfile CMD when Dockerfile is present
+restartPolicyType = "always"
+
+[services.ai-visibility-api.deploy]
 healthcheckPath = "/healthz"
 healthcheckTimeout = 300
-restartPolicyType = "always"
+
+[services.ai-visibility-jobs.deploy]
+# Disable HTTP healthcheck for the worker; it does not expose an HTTP server.
+healthcheckPath = ""
 
 # Environment variables
 [env]
@@ -32,12 +38,6 @@ externalPort = 443
 protocol = "https"
 
 # Health checks
-[healthcheck]
-path = "/healthz"
-interval = 30
-timeout = 10
-retries = 3
-
 # Logging
 [logging]
 level = "info"
