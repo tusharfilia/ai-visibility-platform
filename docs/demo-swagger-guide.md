@@ -15,9 +15,12 @@ This guide walks through testing the self-serve demo workflow entirely from Swag
 3. Click *Try it out* and send a payload such as:
    ```json
    {
-     "domain": "https://stripe.com"
+     "domain": "https://stripe.com",
+     "brand": "Stripe",
+     "summaryOverride": "Stripe provides financial infrastructure for online businesses."
    }
    ```
+   Only `domain` is required—`brand` and `summaryOverride` are optional overrides if you want to pre-fill them.
 4. Copy the returned `demoRunId`. Subsequent steps use this value.
 
 ## Step 2 – Build Prompts
