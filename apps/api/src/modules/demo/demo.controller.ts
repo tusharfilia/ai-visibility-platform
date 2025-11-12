@@ -16,7 +16,7 @@ import {
 } from './dto/demo.dto';
 
 @ApiTags('Demo')
-@Controller('v1/demo')
+@Controller('demo')
 export class DemoController {
   constructor(private readonly demoService: DemoService) {}
 
