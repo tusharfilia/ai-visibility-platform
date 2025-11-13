@@ -36,7 +36,11 @@ export class JobDeduplicationService {
   private cacheConfigs: Map<string, JobCacheConfig> = new Map();
 
   constructor(private configService: ConfigService) {
-    this.redis = new Redis(this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379');
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    if (!redisUrl) {
+      throw new Error('[JobDeduplicationService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
     this.initializeConfigurations();
   }
 

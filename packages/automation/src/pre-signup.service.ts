@@ -66,7 +66,11 @@ export class PreSignupService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
   ) {
-    this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[PreSignupService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
     this.scanQueue = new Queue('pre-signup-scan', {
       connection: this.redis,
       defaultJobOptions: {

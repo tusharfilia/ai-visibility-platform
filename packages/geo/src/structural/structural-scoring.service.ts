@@ -27,7 +27,11 @@ export class StructuralScoringService {
     private freshnessAnalyzer: FreshnessAnalyzerService,
     private pageStructureAnalyzer: PageStructureAnalyzerService
   ) {
-    this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[StructuralScoringService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
   }
 
   /**

@@ -28,7 +28,11 @@ export class ProgressService {
   private readonly PROGRESS_TTL = 86400; // 24 hours
 
   constructor(private eventEmitter: EventEmitterService) {
-    this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[ProgressService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
   }
 
   /**

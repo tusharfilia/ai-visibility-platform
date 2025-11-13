@@ -102,7 +102,11 @@ export class ObservabilityService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
   ) {
-    this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[ObservabilityService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
     this.initializeDefaultAlertRules();
   }
 

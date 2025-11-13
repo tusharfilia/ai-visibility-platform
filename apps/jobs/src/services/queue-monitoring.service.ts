@@ -69,7 +69,11 @@ export class QueueMonitoringService {
   private performanceHistory: Map<string, QueuePerformanceMetrics[]> = new Map();
 
   constructor(private configService: ConfigService) {
-    this.redis = new Redis(this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379');
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    if (!redisUrl) {
+      throw new Error('[QueueMonitoringService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
   }
 
   /**

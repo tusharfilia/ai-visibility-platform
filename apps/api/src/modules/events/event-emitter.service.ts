@@ -27,7 +27,11 @@ export class EventEmitterService extends EventEmitter implements OnModuleInit, O
   constructor(@Optional() redisAdapter: RedisSSEAdapter | undefined) {
     super();
     this.redisAdapter = redisAdapter;
-    this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[EventEmitterService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
   }
 
   async onModuleInit() {

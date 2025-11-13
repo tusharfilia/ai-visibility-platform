@@ -91,7 +91,11 @@ export class EnhancedCopilotService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
   ) {
-    this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[EnhancedCopilotService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
     this.executionQueue = new Queue('copilot-execution', {
       connection: this.redis,
       defaultJobOptions: {

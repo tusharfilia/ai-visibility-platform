@@ -30,14 +30,17 @@ export class PromptDiscoveryWorker {
   }
 
   private initializeWorker() {
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[PromptDiscoveryWorker] REDIS_URL is not configured');
+    }
+
     this.worker = new Worker(
       'prompt-discovery',
       this.processJob.bind(this),
       {
         connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379'),
-          password: process.env.REDIS_PASSWORD,
+          url: redisUrl,
         },
         concurrency: 3,
         removeOnComplete: 10,

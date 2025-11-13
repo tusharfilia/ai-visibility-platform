@@ -27,7 +27,10 @@ export class RedisSSEAdapter {
   private workspaceConnections: Map<string, Set<string>> = new Map();
 
   constructor(private configService: ConfigService) {
-    const redisUrl = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    if (!redisUrl) {
+      throw new Error('[RedisSSEAdapter] REDIS_URL is not configured');
+    }
     
     this.publisher = new Redis(redisUrl, {
       retryDelayOnFailover: 100,

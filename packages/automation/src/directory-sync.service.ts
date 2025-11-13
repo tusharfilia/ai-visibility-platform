@@ -110,7 +110,11 @@ export class DirectorySyncService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
   ) {
-    this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[DirectorySyncService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
     this.syncQueue = new Queue('directory-sync', {
       connection: this.redis,
       defaultJobOptions: {

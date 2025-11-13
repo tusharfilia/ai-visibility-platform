@@ -16,7 +16,11 @@ import { jobScheduler } from './schedulers';
 import { checkQueueHealth, getQueueMetrics, shutdownQueues } from './queues';
 
 // Redis connection
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const redisUrl = process.env.REDIS_URL;
+if (!redisUrl) {
+  throw new Error('[jobs] REDIS_URL is not configured');
+}
+const redis = new Redis(redisUrl);
 
 // Workers
 let runPromptWorker: RunPromptWorker;

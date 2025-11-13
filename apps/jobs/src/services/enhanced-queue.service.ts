@@ -42,7 +42,11 @@ export class EnhancedQueueService {
   private dependencies: Map<string, JobDependency> = new Map();
 
   constructor(private configService: ConfigService) {
-    this.redis = new Redis(this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379');
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    if (!redisUrl) {
+      throw new Error('[EnhancedQueueService] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
   }
 
   /**

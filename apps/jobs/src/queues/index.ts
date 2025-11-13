@@ -7,7 +7,11 @@ import { Redis } from 'ioredis';
 // Database operations will be handled by individual workers
 
 // Redis connection
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const redisUrl = process.env.REDIS_URL;
+if (!redisUrl) {
+  throw new Error('[queues] REDIS_URL is not configured');
+}
+const redis = new Redis(redisUrl);
 
 // Queue definitions
 export const runPromptQueue = new Queue('runPrompt', { connection: redis });

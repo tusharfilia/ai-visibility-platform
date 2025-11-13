@@ -13,7 +13,11 @@ export class IdempotencyMiddleware implements NestMiddleware {
   private redis: Redis;
 
   constructor(private workspaceContext: WorkspaceContextService) {
-    this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      throw new Error('[IdempotencyMiddleware] REDIS_URL is not configured');
+    }
+    this.redis = new Redis(redisUrl);
   }
 
   async use(req: Request, res: Response, next: NextFunction) {
