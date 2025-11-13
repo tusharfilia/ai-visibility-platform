@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface WhiteLabelConfig {
   id: string;
@@ -110,11 +111,7 @@ export class WhiteLabelService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
   ) {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[EnterpriseService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('EnterpriseService');
   }
 
   /**
@@ -272,11 +269,7 @@ export class ApiMarketplaceService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
   ) {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[EnterpriseService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('EnterpriseService');
   }
 
   /**

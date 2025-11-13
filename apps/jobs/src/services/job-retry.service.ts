@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 import { ConfigService } from '@nestjs/config';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface JobRetryStrategy {
   maxAttempts: number;
@@ -37,11 +38,7 @@ export class JobRetryService {
   private retryStrategies: Map<string, JobRetryStrategy> = new Map();
 
   constructor(private configService: ConfigService) {
-    const redisUrl = this.configService.get<string>('REDIS_URL');
-    if (!redisUrl) {
-      throw new Error('[JobRetryService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('JobRetryService');
     this.initializeRetryStrategies();
   }
 

@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Queue } from 'bullmq';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface DirectoryPlatform {
   id: string;
@@ -110,11 +111,7 @@ export class DirectorySyncService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
   ) {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[DirectorySyncService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('DirectorySyncService');
     this.syncQueue = new Queue('directory-sync', {
       connection: this.redis,
       defaultJobOptions: {

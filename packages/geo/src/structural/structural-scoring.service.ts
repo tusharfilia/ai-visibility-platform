@@ -8,6 +8,7 @@ import { SchemaAuditorService } from './schema-auditor';
 import { FreshnessAnalyzerService } from './freshness-analyzer';
 import { PageStructureAnalyzerService } from './page-structure-analyzer';
 import Redis from 'ioredis';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface StructuralScore {
   schemaScore: number;      // 0-100
@@ -27,11 +28,7 @@ export class StructuralScoringService {
     private freshnessAnalyzer: FreshnessAnalyzerService,
     private pageStructureAnalyzer: PageStructureAnalyzerService
   ) {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[StructuralScoringService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('StructuralScoringService');
   }
 
   /**

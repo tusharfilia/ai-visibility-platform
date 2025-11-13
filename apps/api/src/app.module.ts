@@ -30,6 +30,7 @@ import { DirectoryModule } from './modules/directory/directory.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { HealthController } from './health.controller';
 import { BullModule } from '@nestjs/bullmq';
+import { redisRequiresTls } from '@ai-visibility/shared';
 
 @Module({
   imports: [
@@ -50,21 +51,36 @@ import { BullModule } from '@nestjs/bullmq';
         const url = config.get<string>('REDIS_URL');
 
         // Prefer URL when provided to support managed Redis providers
+        const tlsRequired =
+          (url ? redisRequiresTls(url) : false) ||
+          config.get<string>('REDIS_TLS') === 'true' ||
+          host.includes('.proxy.rlwy.net');
+
         if (url) {
-          return {
-            connection: {
-              url,
-            },
+          const connection: Record<string, unknown> = { url };
+
+          if (tlsRequired) {
+            connection.tls = {
+              rejectUnauthorized: false,
+            };
+          }
+
+          return { connection };
+        }
+
+        const connection: Record<string, unknown> = {
+          host,
+          port,
+          password,
+        };
+
+        if (tlsRequired) {
+          connection.tls = {
+            rejectUnauthorized: false,
           };
         }
 
-        return {
-          connection: {
-            host,
-            port,
-            password,
-          },
-        };
+        return { connection };
       },
     }),
 

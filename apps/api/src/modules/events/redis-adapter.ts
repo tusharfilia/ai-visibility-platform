@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface SSEConnection {
   id: string;
@@ -27,22 +28,14 @@ export class RedisSSEAdapter {
   private workspaceConnections: Map<string, Set<string>> = new Map();
 
   constructor(private configService: ConfigService) {
-    const redisUrl = this.configService.get<string>('REDIS_URL');
-    if (!redisUrl) {
-      throw new Error('[RedisSSEAdapter] REDIS_URL is not configured');
-    }
-    
-    this.publisher = new Redis(redisUrl, {
+    const baseOptions = {
       retryDelayOnFailover: 100,
       enableReadyCheck: false,
       maxRetriesPerRequest: null,
-    } as any);
+    };
 
-    this.subscriber = new Redis(redisUrl, {
-      retryDelayOnFailover: 100,
-      enableReadyCheck: false,
-      maxRetriesPerRequest: null,
-    } as any);
+    this.publisher = createRedisClient('RedisSSEAdapter:publisher', baseOptions);
+    this.subscriber = createRedisClient('RedisSSEAdapter:subscriber', baseOptions);
 
     this.setupSubscriptions();
   }

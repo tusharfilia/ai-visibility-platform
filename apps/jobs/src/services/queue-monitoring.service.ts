@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Queue, Job } from 'bullmq';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 import { ConfigService } from '@nestjs/config';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface QueueHealthStatus {
   queueName: string;
@@ -69,11 +70,7 @@ export class QueueMonitoringService {
   private performanceHistory: Map<string, QueuePerformanceMetrics[]> = new Map();
 
   constructor(private configService: ConfigService) {
-    const redisUrl = this.configService.get<string>('REDIS_URL');
-    if (!redisUrl) {
-      throw new Error('[QueueMonitoringService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('QueueMonitoringService');
   }
 
   /**

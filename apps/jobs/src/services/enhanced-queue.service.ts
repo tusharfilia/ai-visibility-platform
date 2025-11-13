@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Queue, Worker, Job, QueueEvents } from 'bullmq';
-import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface QueueMetrics {
   queueName: string;
@@ -42,11 +43,7 @@ export class EnhancedQueueService {
   private dependencies: Map<string, JobDependency> = new Map();
 
   constructor(private configService: ConfigService) {
-    const redisUrl = this.configService.get<string>('REDIS_URL');
-    if (!redisUrl) {
-      throw new Error('[EnhancedQueueService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('EnhancedQueueService');
   }
 
   /**

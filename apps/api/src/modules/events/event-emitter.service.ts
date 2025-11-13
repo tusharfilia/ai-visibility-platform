@@ -4,9 +4,10 @@
  */
 
 import { Injectable, OnModuleInit, OnModuleDestroy, Optional } from '@nestjs/common';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 import { EventEmitter } from 'events';
 import { RedisSSEAdapter } from './redis-adapter';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface SSEEvent {
   id: string;
@@ -27,11 +28,7 @@ export class EventEmitterService extends EventEmitter implements OnModuleInit, O
   constructor(@Optional() redisAdapter: RedisSSEAdapter | undefined) {
     super();
     this.redisAdapter = redisAdapter;
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[EventEmitterService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('EventEmitterService');
   }
 
   async onModuleInit() {

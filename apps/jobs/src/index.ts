@@ -3,7 +3,6 @@
  * BullMQ workers and schedulers
  */
 
-import { Redis } from 'ioredis';
 // Database connection will be handled by individual workers
 import { RunPromptWorker } from './workers/run-prompt-worker';
 import { RunBatchWorker } from './workers/run-batch-worker';
@@ -14,13 +13,10 @@ import { MaturityRecomputeWorker } from './workers/maturity-recompute-worker';
 import { RecommendationRefreshWorker } from './workers/recommendation-refresh-worker';
 import { jobScheduler } from './schedulers';
 import { checkQueueHealth, getQueueMetrics, shutdownQueues } from './queues';
+import { createRedisClient } from '@ai-visibility/shared';
 
 // Redis connection
-const redisUrl = process.env.REDIS_URL;
-if (!redisUrl) {
-  throw new Error('[jobs] REDIS_URL is not configured');
-}
-const redis = new Redis(redisUrl);
+const redis = createRedisClient('jobs:index');
 
 // Workers
 let runPromptWorker: RunPromptWorker;

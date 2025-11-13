@@ -5,19 +5,16 @@
 
 import { Injectable, NestMiddleware, BadRequestException, ConflictException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 import { WorkspaceContextService } from './workspace-context';
+import { createRedisClient } from '@ai-visibility/shared';
 
 @Injectable()
 export class IdempotencyMiddleware implements NestMiddleware {
   private redis: Redis;
 
   constructor(private workspaceContext: WorkspaceContextService) {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[IdempotencyMiddleware] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('IdempotencyMiddleware');
   }
 
   async use(req: Request, res: Response, next: NextFunction) {

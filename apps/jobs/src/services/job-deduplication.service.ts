@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
+import Redis from 'ioredis';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface JobDeduplicationConfig {
   enabled: boolean;
@@ -36,11 +37,7 @@ export class JobDeduplicationService {
   private cacheConfigs: Map<string, JobCacheConfig> = new Map();
 
   constructor(private configService: ConfigService) {
-    const redisUrl = this.configService.get<string>('REDIS_URL');
-    if (!redisUrl) {
-      throw new Error('[JobDeduplicationService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('JobDeduplicationService');
     this.initializeConfigurations();
   }
 

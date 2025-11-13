@@ -4,8 +4,9 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 import { EventEmitterService } from '../events/event-emitter.service';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface ProgressState {
   id: string;
@@ -28,11 +29,7 @@ export class ProgressService {
   private readonly PROGRESS_TTL = 86400; // 24 hours
 
   constructor(private eventEmitter: EventEmitterService) {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[ProgressService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('ProgressService');
   }
 
   /**

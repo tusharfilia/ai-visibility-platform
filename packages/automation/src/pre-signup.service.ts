@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Queue } from 'bullmq';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface PreSignupRequest {
   id: string;
@@ -66,11 +67,7 @@ export class PreSignupService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
   ) {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[PreSignupService] REDIS_URL is not configured');
-    }
-    this.redis = new Redis(redisUrl);
+    this.redis = createRedisClient('PreSignupService');
     this.scanQueue = new Queue('pre-signup-scan', {
       connection: this.redis,
       defaultJobOptions: {

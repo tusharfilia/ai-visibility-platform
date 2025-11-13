@@ -3,15 +3,11 @@
  */
 
 import { Queue, Worker, QueueEvents } from 'bullmq';
-import { Redis } from 'ioredis';
+import { createRedisClient } from '@ai-visibility/shared';
 // Database operations will be handled by individual workers
 
 // Redis connection
-const redisUrl = process.env.REDIS_URL;
-if (!redisUrl) {
-  throw new Error('[queues] REDIS_URL is not configured');
-}
-const redis = new Redis(redisUrl);
+const redis = createRedisClient('queues:index');
 
 // Queue definitions
 export const runPromptQueue = new Queue('runPrompt', { connection: redis });

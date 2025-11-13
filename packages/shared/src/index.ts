@@ -39,3 +39,6 @@ export * from './observability.service';
 
 // Export enterprise services
 export * from './enterprise.service';
+
+// Export Redis helpers
+export * from './redis/create-client';

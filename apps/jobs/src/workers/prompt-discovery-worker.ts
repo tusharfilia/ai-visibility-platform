@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { PromptDiscoveryService } from '@ai-visibility/prompts/discovery.service';
 import { EventEmitterService } from '../events/event-emitter.service';
+import { createRedisClient } from '@ai-visibility/shared';
 
 export interface PromptDiscoveryPayload {
   workspaceId: string;
@@ -30,18 +31,12 @@ export class PromptDiscoveryWorker {
   }
 
   private initializeWorker() {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
-      throw new Error('[PromptDiscoveryWorker] REDIS_URL is not configured');
-    }
-
+    const redis = createRedisClient('PromptDiscoveryWorker');
     this.worker = new Worker(
       'prompt-discovery',
       this.processJob.bind(this),
       {
-        connection: {
-          url: redisUrl,
-        },
+        connection: redis,
         concurrency: 3,
         removeOnComplete: 10,
         removeOnFail: 5,
