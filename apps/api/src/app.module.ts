@@ -30,7 +30,6 @@ import { DirectoryModule } from './modules/directory/directory.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { HealthController } from './health.controller';
 import { BullModule } from '@nestjs/bullmq';
-import { redisRequiresTls } from '@ai-visibility/shared';
 
 @Module({
   imports: [
@@ -45,16 +44,35 @@ import { redisRequiresTls } from '@ai-visibility/shared';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const host = config.get<string>('REDIS_HOST') ?? 'localhost';
-        const port = Number(config.get<string>('REDIS_PORT') ?? '6379');
+        const host = config.get<string>('REDIS_HOST');
+        const port = config.get<string>('REDIS_PORT');
         const password = config.get<string>('REDIS_PASSWORD');
         const url = config.get<string>('REDIS_URL');
 
         // Prefer URL when provided to support managed Redis providers
-        const tlsRequired =
-          (url ? redisRequiresTls(url) : false) ||
-          config.get<string>('REDIS_TLS') === 'true' ||
-          host.includes('.proxy.rlwy.net');
+        const tlsRequired = (() => {
+          if (url) {
+            try {
+              const parsed = new URL(url);
+              if (
+                parsed.protocol === 'rediss:' ||
+                parsed.hostname.endsWith('.railway.app') ||
+                parsed.hostname.endsWith('.up.railway.app') ||
+                parsed.hostname.endsWith('.proxy.rlwy.net')
+              ) {
+                return true;
+              }
+            } catch (error) {
+              console.warn('[BullModule] Failed to parse REDIS_URL while determining TLS requirement:', (error as Error).message);
+            }
+          }
+
+          if (config.get<string>('REDIS_TLS') === 'true') {
+            return true;
+          }
+
+          return host?.includes('.proxy.rlwy.net') ?? false;
+        })();
 
         if (url) {
           const connection: Record<string, unknown> = { url };
@@ -65,12 +83,29 @@ import { redisRequiresTls } from '@ai-visibility/shared';
             };
           }
 
+          try {
+            const parsed = new URL(url);
+            console.log('[BullModule] Redis connection (url)', {
+              host: parsed.hostname,
+              port: parsed.port || 'default',
+              tls: !!connection.tls,
+            });
+          } catch (error) {
+            console.warn('[BullModule] Failed to parse REDIS_URL for logging:', (error as Error).message);
+          }
+
           return { connection };
         }
 
+        const numericPort = port ? Number(port) : undefined;
+
+        if (!host || !numericPort || Number.isNaN(numericPort)) {
+          throw new Error('REDIS_URL or REDIS_HOST/REDIS_PORT must be configured for BullMQ');
+        }
+
         const connection: Record<string, unknown> = {
-          host,
-          port,
+          host: host as string,
+          port: numericPort,
           password,
         };
 
@@ -79,6 +114,12 @@ import { redisRequiresTls } from '@ai-visibility/shared';
             rejectUnauthorized: false,
           };
         }
+
+        console.log('[BullModule] Redis connection (host/port)', {
+          host,
+          port,
+          tls: !!connection.tls,
+        });
 
         return { connection };
       },
