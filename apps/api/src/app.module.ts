@@ -30,6 +30,7 @@ import { DirectoryModule } from './modules/directory/directory.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { HealthController } from './health.controller';
 import { BullModule } from '@nestjs/bullmq';
+import { createRedisClient } from '@ai-visibility/shared';
 
 @Module({
   imports: [
@@ -44,44 +45,10 @@ import { BullModule } from '@nestjs/bullmq';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const host = config.get<string>('REDIS_HOST');
-        const port = config.get<string>('REDIS_PORT');
-        const password = config.get<string>('REDIS_PASSWORD');
         const url = config.get<string>('REDIS_URL');
 
-        // Prefer URL when provided to support managed Redis providers
-        const tlsRequired = (() => {
-          if (url) {
-            try {
-              const parsed = new URL(url);
-              if (
-                parsed.protocol === 'rediss:' ||
-                parsed.hostname.endsWith('.railway.app') ||
-                parsed.hostname.endsWith('.up.railway.app') ||
-                parsed.hostname.endsWith('.proxy.rlwy.net')
-              ) {
-                return true;
-              }
-            } catch (error) {
-              console.warn('[BullModule] Failed to parse REDIS_URL while determining TLS requirement:', (error as Error).message);
-            }
-          }
-
-          if (config.get<string>('REDIS_TLS') === 'true') {
-            return true;
-          }
-
-          return host?.includes('.proxy.rlwy.net') ?? false;
-        })();
-
         if (url) {
-          const connection: Record<string, unknown> = { url };
-
-          if (tlsRequired) {
-            connection.tls = {
-              rejectUnauthorized: false,
-            };
-          }
+          const connection = createRedisClient('BullModule');
 
           try {
             const parsed = new URL(url);
@@ -97,31 +64,7 @@ import { BullModule } from '@nestjs/bullmq';
           return { connection };
         }
 
-        const numericPort = port ? Number(port) : undefined;
-
-        if (!host || !numericPort || Number.isNaN(numericPort)) {
-          throw new Error('REDIS_URL or REDIS_HOST/REDIS_PORT must be configured for BullMQ');
-        }
-
-        const connection: Record<string, unknown> = {
-          host: host as string,
-          port: numericPort,
-          password,
-        };
-
-        if (tlsRequired) {
-          connection.tls = {
-            rejectUnauthorized: false,
-          };
-        }
-
-        console.log('[BullModule] Redis connection (host/port)', {
-          host,
-          port,
-          tls: !!connection.tls,
-        });
-
-        return { connection };
+        throw new Error('REDIS_URL must be configured for BullMQ');
       },
     }),
 

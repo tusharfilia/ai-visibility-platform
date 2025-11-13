@@ -8,7 +8,9 @@
     "emitDecoratorMetadata": true,
     "strictPropertyInitialization": false,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@ai-visibility/shared": ["../../packages/shared/src/index"],
+      "@ai-visibility/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src/**/*"],
