@@ -3,7 +3,7 @@
  */
 
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -29,6 +29,7 @@ import { RecommendationsModule } from './modules/recommendations/recommendations
 import { DirectoryModule } from './modules/directory/directory.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { HealthController } from './health.controller';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -38,6 +39,35 @@ import { HealthController } from './health.controller';
       envFilePath: '.env',
     }),
     
+    // Redis-backed queues
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const host = config.get<string>('REDIS_HOST') ?? 'localhost';
+        const port = Number(config.get<string>('REDIS_PORT') ?? '6379');
+        const password = config.get<string>('REDIS_PASSWORD');
+        const url = config.get<string>('REDIS_URL');
+
+        // Prefer URL when provided to support managed Redis providers
+        if (url) {
+          return {
+            connection: {
+              url,
+            },
+          };
+        }
+
+        return {
+          connection: {
+            host,
+            port,
+            password,
+          },
+        };
+      },
+    }),
+
     // Rate limiting
     ThrottlerModule.forRoot([
       {
