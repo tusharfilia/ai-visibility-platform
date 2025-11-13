@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import Redis from 'ioredis';
-import { createRedisClient } from '@ai-visibility/shared';
+import { createRedisClient } from './redis/create-client';
 
 export interface WhiteLabelConfig {
   id: string;
