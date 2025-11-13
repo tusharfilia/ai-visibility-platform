@@ -16,6 +16,11 @@ import { GlobalExceptionFilter } from './middleware/exception.filter';
 import { CorrelationIdInterceptor } from './middleware/correlation-id.interceptor';
 
 async function bootstrap() {
+  console.log('[bootstrap] Redis env snapshot', {
+    REDIS_URL: process.env.REDIS_URL,
+    REDIS_HOST: process.env.REDIS_HOST,
+    REDIS_PORT: process.env.REDIS_PORT,
+  });
   // Log to stderr so Railway captures it
   console.error('🚀 Starting AI Visibility API...');
   console.error(`📦 Node version: ${process.version}`);
