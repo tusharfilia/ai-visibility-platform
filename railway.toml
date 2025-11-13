@@ -25,6 +25,18 @@ NODE_ENV = "production"
 PORT = "8080"
 CI = "false"  # Disable frozen-lockfile in CI environments
 
+[services.ai-visibility-platform.env]
+REDIS_URL = "${{ Redis.REDIS_URL }}"
+REDIS_HOST = "redis.railway.internal"
+REDIS_PORT = "6379"
+REDIS_PASSWORD = "${{ Redis.REDIS_PASSWORD }}"
+
+[services.ai-visibility-jobs.env]
+REDIS_URL = "${{ Redis.REDIS_URL }}"
+REDIS_HOST = "redis.railway.internal"
+REDIS_PORT = "6379"
+REDIS_PASSWORD = "${{ Redis.REDIS_PASSWORD }}"
+
 # Scaling configuration
 [scale]
 minInstances = 1
