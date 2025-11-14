@@ -45,8 +45,6 @@ export function createRedisClient(label: string, overrides: RedisOptions = {}): 
     maxRetriesPerRequest: 3,
     // Enable ready check
     enableReadyCheck: true,
-    // Retry delay on failover
-    retryDelayOnFailover: 100,
     // Lazy connect - don't connect immediately, wait for first command
     lazyConnect: false,
     // Keep alive
