@@ -70,7 +70,9 @@ COPY --from=build /app/packages/shared/package.json ./packages/shared/package.js
 # Skip Puppeteer Chrome download during install
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-RUN pnpm install --prod --no-frozen-lockfile && \
+# Use pnpm install (not --prod) to ensure workspace packages are properly linked
+# Then we can prune dev dependencies if needed, but workspace linking is critical
+RUN pnpm install --no-frozen-lockfile && \
     echo "DEBUG: Verifying critical packages can be resolved from apps/api directory..." && \
     cd /app/apps/api && \
     node -e "try { require.resolve('@nestjs/core'); console.log('SUCCESS: @nestjs/core can be resolved'); } catch(e) { console.error('ERROR: @nestjs/core cannot be resolved:', e.message); process.exit(1); }" && \
