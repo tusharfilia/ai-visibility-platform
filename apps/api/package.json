@@ -24,6 +24,7 @@
     "@ai-visibility/db": "workspace:*",
     "@ai-visibility/geo": "workspace:*",
     "@ai-visibility/prompts": "workspace:*",
+    "@ai-visibility/providers": "workspace:*",
     "@ai-visibility/shared": "workspace:*",
     "@anthropic-ai/sdk": "^0.9.1",
     "@aws-sdk/client-s3": "^3.721.0",
