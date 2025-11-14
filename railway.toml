@@ -4,7 +4,7 @@
 # Build configuration
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm install && pnpm build"
+buildCommand = "pnpm install --no-frozen-lockfile --force && pnpm build"
 
 # Deploy configuration
 [deploy]
@@ -24,6 +24,7 @@ healthcheckPath = ""
 NODE_ENV = "production"
 PORT = "8080"
 CI = "false"  # Disable frozen-lockfile in CI environments
+PNPM_FORCE = "true"  # Skip confirmation prompts during install
 
 [services.ai-visibility-platform.env]
 REDIS_URL = "${{ Redis.REDIS_URL }}"
