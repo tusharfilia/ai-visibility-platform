@@ -26,10 +26,27 @@ export function redisRequiresTls(redisUrl: string): boolean {
 }
 
 export function createRedisClient(label: string, overrides: RedisOptions = {}): Redis {
+  // Prefer Railway internal networking if available
+  const redisHost = process.env.REDIS_HOST;
+  const redisPort = process.env.REDIS_PORT || '6379';
+  const redisPassword = process.env.REDIS_PASSWORD;
   const redisUrl = process.env.REDIS_URL;
 
-  if (!redisUrl) {
-    throw new Error(`[${label}] REDIS_URL is not configured`);
+  let finalRedisUrl: string;
+  let useInternal = false;
+
+  // Check if we should use Railway internal networking
+  if (redisHost === 'redis.railway.internal' && redisPassword) {
+    // Use internal Railway networking (no TLS, faster, more reliable)
+    finalRedisUrl = `redis://default:${redisPassword}@${redisHost}:${redisPort}`;
+    useInternal = true;
+    console.log(`[Redis] ${label} using Railway internal networking (${redisHost}:${redisPort})`);
+  } else if (redisUrl) {
+    // Fall back to REDIS_URL (external proxy, may require TLS)
+    finalRedisUrl = redisUrl;
+    console.log(`[Redis] ${label} using REDIS_URL (external connection)`);
+  } else {
+    throw new Error(`[${label}] Redis connection not configured. Need either REDIS_URL or REDIS_HOST=redis.railway.internal with REDIS_PASSWORD`);
   }
 
   const options: RedisOptions = {
@@ -52,7 +69,8 @@ export function createRedisClient(label: string, overrides: RedisOptions = {}): 
     ...overrides,
   };
 
-  if (redisRequiresTls(redisUrl)) {
+  // Only use TLS for external connections (not internal Railway networking)
+  if (!useInternal && redisRequiresTls(finalRedisUrl)) {
     options.tls = {
       rejectUnauthorized: false,
       ...(overrides.tls ?? {}),
@@ -60,14 +78,14 @@ export function createRedisClient(label: string, overrides: RedisOptions = {}): 
   }
 
   try {
-    const parsed = new URL(redisUrl);
+    const parsed = new URL(finalRedisUrl);
     const endpoint = `${parsed.protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}`;
     console.log(`[Redis] ${label} using endpoint ${endpoint} (tls=${Boolean(options.tls)}, timeout=${options.connectTimeout}ms)`);
   } catch (error) {
-    console.warn(`[Redis] ${label} failed to parse REDIS_URL for logging:`, (error as Error).message);
+    console.warn(`[Redis] ${label} failed to parse Redis URL for logging:`, (error as Error).message);
   }
 
-  const client = new Redis(redisUrl, options);
+  const client = new Redis(finalRedisUrl, options);
 
   // Add error handlers for better debugging
   client.on('error', (err: Error) => {
