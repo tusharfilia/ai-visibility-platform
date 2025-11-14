@@ -86,7 +86,16 @@ RUN pnpm install --prod --no-frozen-lockfile && \
       exit 1; \
     fi && \
     cd /app/apps/api && \
-    node -e "try { require.resolve('@ai-visibility/geo'); console.log('SUCCESS: @ai-visibility/geo can be resolved'); } catch(e) { console.warn('WARNING: @ai-visibility/geo cannot be resolved (may work at runtime):', e.message); }"
+    node -e "try { require.resolve('@ai-visibility/geo'); console.log('SUCCESS: @ai-visibility/geo can be resolved'); } catch(e) { console.warn('WARNING: @ai-visibility/geo cannot be resolved (may work at runtime):', e.message); }" && \
+    echo "DEBUG: Verifying providers package..." && \
+    if [ -d /app/packages/providers/dist ]; then \
+      echo "SUCCESS: @ai-visibility/providers dist found"; \
+    else \
+      echo "ERROR: @ai-visibility/providers dist not found"; \
+      exit 1; \
+    fi && \
+    cd /app/apps/api && \
+    node -e "try { require.resolve('@ai-visibility/providers'); console.log('SUCCESS: @ai-visibility/providers can be resolved'); } catch(e) { console.error('ERROR: @ai-visibility/providers cannot be resolved:', e.message); process.exit(1); }"
 
 # Keep WORKDIR at /app for proper module resolution
 WORKDIR /app
