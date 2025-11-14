@@ -13,6 +13,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@ai-visibility/providers": "workspace:*",
     "zod": "^3.22.4",
     "@nestjs/common": "^10.2.10",
     "@nestjs/config": "^3.3.0",
