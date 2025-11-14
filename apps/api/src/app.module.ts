@@ -47,24 +47,24 @@ import { createRedisClient } from '@ai-visibility/shared';
       useFactory: (config: ConfigService) => {
         const url = config.get<string>('REDIS_URL');
 
-        if (url) {
-          const connection = createRedisClient('BullModule');
-
-          try {
-            const parsed = new URL(url);
-            console.log('[BullModule] Redis connection (url)', {
-              host: parsed.hostname,
-              port: parsed.port || 'default',
-              tls: !!connection.tls,
-            });
-          } catch (error) {
-            console.warn('[BullModule] Failed to parse REDIS_URL for logging:', (error as Error).message);
-          }
-
-          return { connection };
+        if (!url) {
+          throw new Error('REDIS_URL must be configured for BullMQ');
         }
 
-        throw new Error('REDIS_URL must be configured for BullMQ');
+        const connection = createRedisClient('BullModule');
+
+        try {
+          const parsed = new URL(url);
+          console.log('[BullModule] Redis connection (url)', {
+            host: parsed.hostname,
+            port: parsed.port || 'default',
+            tls: parsed.protocol === 'rediss:',
+          });
+        } catch (error) {
+          console.warn('[BullModule] Failed to parse REDIS_URL for logging:', (error as Error).message);
+        }
+
+        return { connection };
       },
     }),
 
