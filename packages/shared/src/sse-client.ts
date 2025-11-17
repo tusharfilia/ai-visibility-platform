@@ -8,7 +8,7 @@ export interface SSEClientConfig {
   lastEventId?: string;
 }
 
-export interface SSEEvent {
+export interface SSERawEvent {
   id: string;
   event: string;
   data: any;
