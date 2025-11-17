@@ -35,6 +35,18 @@ COPY . .
 # This ensures shared is built before providers to avoid TypeScript errors
 RUN pnpm build
 
+# Prepare node_modules staging area for production stage
+# Copy all package node_modules to a staging directory preserving structure
+RUN mkdir -p /app/staging-node_modules && \
+    for dir in packages/*/node_modules apps/*/node_modules; do \
+      if [ -d "$dir" ]; then \
+        parent_dir=$(dirname "$dir"); \
+        target_parent="/app/staging-node_modules/$parent_dir"; \
+        mkdir -p "$target_parent"; \
+        cp -r "$dir" "$target_parent/"; \
+      fi; \
+    done
+
 # Production stage
 FROM node:20-alpine AS production
 
@@ -49,8 +61,8 @@ ENV PNPM_FORCE=true
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-# Set NODE_PATH to include workspace package node_modules for module resolution
-ENV NODE_PATH=/app/node_modules:/app/apps/jobs/node_modules
+# Set NODE_PATH to include all workspace package node_modules for module resolution
+ENV NODE_PATH=/app/node_modules:/app/packages/shared/node_modules:/app/packages/db/node_modules:/app/packages/providers/node_modules:/app/packages/parser/node_modules:/app/packages/copilot/node_modules:/app/packages/automation/node_modules:/app/packages/content/node_modules:/app/packages/geo/node_modules:/app/packages/optimizer/node_modules:/app/packages/prompts/node_modules:/app/apps/jobs/node_modules
 
 # Copy workspace configuration files (needed for module resolution)
 COPY --from=builder /app/package.json ./
@@ -86,12 +98,16 @@ COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 COPY --from=builder /app/apps/jobs/dist ./dist
 
 # Copy entire node_modules structure from builder (includes .pnpm store and all symlinks)
-# This ensures all dependencies including bullmq are available with correct symlink resolution
+# This ensures all dependencies including bullmq and zod are available with correct symlink resolution
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/jobs/node_modules ./apps/jobs/node_modules
+# Copy all workspace package node_modules from staging area (prepared in builder stage)
+# This preserves symlinks and ensures dependencies like zod are accessible
+COPY --from=builder /app/staging-node_modules/packages/ ./packages/
+COPY --from=builder /app/staging-node_modules/apps/ ./apps/
 
-# Verify bullmq is accessible (check symlink and target)
-RUN (test -L apps/jobs/node_modules/bullmq && test -e apps/jobs/node_modules/bullmq) || (echo "ERROR: bullmq not accessible!" && echo "Symlink:" && ls -la apps/jobs/node_modules/bullmq 2>/dev/null && echo "Target:" && readlink -f apps/jobs/node_modules/bullmq 2>/dev/null && exit 1)
+# Verify critical dependencies are accessible
+RUN (test -L apps/jobs/node_modules/bullmq && test -e apps/jobs/node_modules/bullmq) || (echo "ERROR: bullmq not accessible!" && exit 1)
+RUN (test -L packages/shared/node_modules/zod && test -e packages/shared/node_modules/zod) || (test -L node_modules/zod && test -e node_modules/zod) || (echo "ERROR: zod not accessible!" && echo "Checking packages/shared/node_modules:" && ls -la packages/shared/node_modules/ 2>/dev/null | head -20 && echo "Checking root node_modules:" && ls -la node_modules/ | grep -E "^l.*zod|^d.*zod" || echo "zod not found" && exit 1)
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
