@@ -40,9 +40,15 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Install pnpm for production install
+RUN npm install -g pnpm
+
 # Set CI environment variables
 ENV CI=true
+ENV PNPM_FORCE=true
 ENV NODE_ENV=production
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Copy workspace configuration files (needed for module resolution)
 COPY --from=builder /app/package.json ./
@@ -77,10 +83,10 @@ COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
 
-# Copy entire node_modules and .pnpm store from builder
-# This ensures all dependencies (including bullmq) are available
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.pnpm ./.pnpm
+# Install production dependencies
+# This ensures all dependencies (including bullmq) are properly installed
+# We have all package.json files and built dist folders, so pnpm can resolve everything
+RUN pnpm install --prod --no-frozen-lockfile --force
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
