@@ -106,9 +106,26 @@ async function bootstrap() {
       .map((s: string) => s.trim())
       .filter(Boolean);
     
+    // Add wildcard patterns for common preview deployment domains
+    const wildcardPatterns = [
+      /^https:\/\/.*\.lovableproject\.com$/,
+      /^https:\/\/.*\.vercel\.app$/,
+      /^https:\/\/.*\.railway\.app$/,
+    ];
+    
     app.enableCors({
       origin: (origin, cb) => {
-        if (!origin || allowList.includes(origin)) return cb(null, true);
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return cb(null, true);
+        
+        // Check exact matches
+        if (allowList.includes(origin)) return cb(null, true);
+        
+        // Check wildcard patterns
+        if (wildcardPatterns.some(pattern => pattern.test(origin))) {
+          return cb(null, true);
+        }
+        
         return cb(new Error(`CORS blocked for origin: ${origin}`), false);
       },
       credentials: true,
