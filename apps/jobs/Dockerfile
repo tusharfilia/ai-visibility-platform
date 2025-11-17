@@ -31,6 +31,9 @@ RUN pnpm install --no-frozen-lockfile --force
 # Copy source code
 COPY . .
 
+# Generate Prisma Client (needed before building TypeScript code that uses Prisma)
+RUN cd packages/db && pnpm generate
+
 # Build packages in dependency order (uses root package.json build script)
 # This ensures shared is built before providers to avoid TypeScript errors
 RUN pnpm build
