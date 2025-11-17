@@ -47,7 +47,6 @@ ENV NODE_ENV=production
 
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
-COPY --from=builder /app/apps/jobs/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 
 # Create non-root user
