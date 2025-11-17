@@ -40,21 +40,15 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install pnpm for production install
-RUN npm install -g pnpm
-
-# Set CI environment variables to prevent interactive prompts
+# Set CI environment variables
 ENV CI=true
-ENV PNPM_FORCE=true
 ENV NODE_ENV=production
-ENV PUPPETEER_SKIP_DOWNLOAD=true
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
-# Copy workspace configuration files needed for pnpm module resolution
+# Copy workspace configuration files (needed for module resolution)
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./
 
-# Copy all package.json files for workspace resolution
+# Copy all package.json files (needed for workspace resolution)
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 COPY --from=builder /app/packages/db/package.json ./packages/db/
 COPY --from=builder /app/packages/providers/package.json ./packages/providers/
@@ -75,7 +69,6 @@ COPY --from=builder /app/packages/providers/dist ./packages/providers/dist
 COPY --from=builder /app/packages/parser/dist ./packages/parser/dist
 COPY --from=builder /app/packages/copilot/dist ./packages/copilot/dist
 COPY --from=builder /app/packages/automation/dist ./packages/automation/dist
-# Copy content package dist if it exists (optional package)
 COPY --from=builder /app/packages/content/dist ./packages/content/dist
 COPY --from=builder /app/packages/geo/dist ./packages/geo/dist
 COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
@@ -84,9 +77,10 @@ COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
 
-# Install only production dependencies
-# This ensures all dependencies (including bullmq) are properly installed
-RUN pnpm install --prod --no-frozen-lockfile --force
+# Copy entire node_modules and .pnpm store from builder
+# This ensures all dependencies (including bullmq) are available
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.pnpm ./.pnpm
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
