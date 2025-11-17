@@ -16,14 +16,15 @@ restartPolicyType = "always"
 healthcheckPath = "/healthz"
 healthcheckTimeout = 300
 
+[services.ai-visibility-jobs.build]
+# Explicitly use Dockerfile builder (overrides global nixpacks builder)
+builder = "dockerfile"
+dockerfilePath = "apps/jobs/Dockerfile"
+
 [services.ai-visibility-jobs.deploy]
 # Disable HTTP healthcheck for the worker; it does not expose an HTTP server.
 healthcheckPath = ""
-# Use Dockerfile for jobs service to ensure proper build process
-dockerfilePath = "apps/jobs/Dockerfile"
 # Don't set startCommand - let Railway use Dockerfile CMD directly
-[services.ai-visibility-jobs.build]
-builder = "dockerfile"
 
 # Environment variables
 [env]
