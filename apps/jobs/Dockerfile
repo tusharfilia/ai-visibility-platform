@@ -23,6 +23,9 @@ RUN npm install -g pnpm
 # Set CI=true to skip all interactive prompts
 ENV CI=true
 ENV PNPM_FORCE=true
+# Skip Puppeteer Chrome download to speed up build (not needed for jobs service)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 RUN pnpm install --no-frozen-lockfile --force
 
 # Copy source code
