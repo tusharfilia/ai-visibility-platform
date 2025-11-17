@@ -68,29 +68,18 @@ ENV NODE_PATH=/app/node_modules:/app/packages/shared/node_modules:/app/packages/
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./
 
-# Copy entire workspace package directories (package.json + dist)
-# This ensures workspace symlinks in node_modules resolve correctly
-# pnpm creates symlinks that point to these package directories
+# Copy workspace package package.json files (needed for workspace resolution)
+# NOTE: We copy dist folders AFTER node_modules to prevent overwriting
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder /app/packages/shared/dist ./packages/shared/
 COPY --from=builder /app/packages/db/package.json ./packages/db/
-COPY --from=builder /app/packages/db/dist ./packages/db/
 COPY --from=builder /app/packages/providers/package.json ./packages/providers/
-COPY --from=builder /app/packages/providers/dist ./packages/providers/
 COPY --from=builder /app/packages/parser/package.json ./packages/parser/
-COPY --from=builder /app/packages/parser/dist ./packages/parser/
 COPY --from=builder /app/packages/copilot/package.json ./packages/copilot/
-COPY --from=builder /app/packages/copilot/dist ./packages/copilot/
 COPY --from=builder /app/packages/automation/package.json ./packages/automation/
-COPY --from=builder /app/packages/automation/dist ./packages/automation/
 COPY --from=builder /app/packages/content/package.json ./packages/content/
-COPY --from=builder /app/packages/content/dist ./packages/content/
 COPY --from=builder /app/packages/geo/package.json ./packages/geo/
-COPY --from=builder /app/packages/geo/dist ./packages/geo/
 COPY --from=builder /app/packages/optimizer/package.json ./packages/optimizer/
-COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/
 COPY --from=builder /app/packages/prompts/package.json ./packages/prompts/
-COPY --from=builder /app/packages/prompts/dist ./packages/prompts/
 COPY --from=builder /app/apps/jobs/package.json ./apps/jobs/
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 
@@ -102,8 +91,20 @@ COPY --from=builder /app/apps/jobs/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 # Copy all workspace package node_modules from staging area (prepared in builder stage)
 # This preserves symlinks and ensures dependencies like zod are accessible
+# NOTE: Copy node_modules FIRST, then dist folders to ensure dist is not overwritten
 COPY --from=builder /app/staging-node_modules/packages/ ./packages/
 COPY --from=builder /app/staging-node_modules/apps/ ./apps/
+# Re-copy dist folders AFTER node_modules to ensure they're not overwritten
+COPY --from=builder /app/packages/shared/dist ./packages/shared/
+COPY --from=builder /app/packages/db/dist ./packages/db/
+COPY --from=builder /app/packages/providers/dist ./packages/providers/
+COPY --from=builder /app/packages/parser/dist ./packages/parser/
+COPY --from=builder /app/packages/copilot/dist ./packages/copilot/
+COPY --from=builder /app/packages/automation/dist ./packages/automation/
+COPY --from=builder /app/packages/content/dist ./packages/content/
+COPY --from=builder /app/packages/geo/dist ./packages/geo/
+COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/
+COPY --from=builder /app/packages/prompts/dist ./packages/prompts/
 
 # Verify critical dependencies are accessible
 RUN (test -L apps/jobs/node_modules/bullmq && test -e apps/jobs/node_modules/bullmq) || (echo "ERROR: bullmq not accessible!" && exit 1)
