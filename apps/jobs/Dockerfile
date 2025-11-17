@@ -2,14 +2,21 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files (lockfile is optional since we use --no-frozen-lockfile)
-COPY package.json ./
+# Copy workspace configuration and all package.json files
+COPY package.json pnpm-workspace.yaml ./
+# Copy all package.json files so pnpm can properly resolve workspace dependencies
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 COPY packages/providers/package.json ./packages/providers/
 COPY packages/parser/package.json ./packages/parser/
 COPY packages/copilot/package.json ./packages/copilot/
+COPY packages/automation/package.json ./packages/automation/
+COPY packages/content/package.json ./packages/content/
+COPY packages/geo/package.json ./packages/geo/
+COPY packages/optimizer/package.json ./packages/optimizer/
+COPY packages/prompts/package.json ./packages/prompts/
 COPY apps/jobs/package.json ./apps/jobs/
+COPY apps/api/package.json ./apps/api/
 
 # Install dependencies
 RUN npm install -g pnpm
