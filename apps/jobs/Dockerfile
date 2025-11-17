@@ -2,6 +2,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install OpenSSL for Prisma (required for Prisma query engine during generation)
+RUN apk add --no-cache openssl1.1-compat
+
 # Copy workspace configuration and all package.json files
 COPY package.json pnpm-workspace.yaml ./
 # Copy all package.json files so pnpm can properly resolve workspace dependencies
@@ -65,6 +68,10 @@ RUN echo "=== Checking builder stage dist folders ===" && \
 FROM node:20-alpine AS production
 
 WORKDIR /app
+
+# Install OpenSSL for Prisma (required for Prisma query engine)
+# Alpine Linux uses musl libc, so we need openssl1.1-compat for Prisma
+RUN apk add --no-cache openssl1.1-compat
 
 # Install pnpm for production install
 RUN npm install -g pnpm
