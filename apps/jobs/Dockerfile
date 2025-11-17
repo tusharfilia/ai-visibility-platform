@@ -13,7 +13,10 @@ COPY apps/jobs/package.json ./apps/jobs/
 
 # Install dependencies
 RUN npm install -g pnpm
-RUN pnpm install --frozen-lockfile
+# Set CI=true to skip all interactive prompts
+ENV CI=true
+ENV PNPM_FORCE=true
+RUN pnpm install --no-frozen-lockfile --force
 
 # Copy source code
 COPY . .
