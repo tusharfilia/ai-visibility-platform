@@ -133,10 +133,32 @@ COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 # Copy Prisma schema and generate Prisma Client in production stage
 # This ensures the generated client is available at runtime in the correct location
 COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
-# Use npx to run prisma generate (prisma should be in node_modules from builder)
-RUN cd packages/db && npx prisma generate
+# Install prisma CLI if not available (it's a devDependency but needed for generation)
+# Then generate Prisma Client - this ensures the generated client is in node_modules/.prisma/client
+RUN cd packages/db && \
+    (pnpm exec prisma generate || \
+     npx prisma generate || \
+     (echo "Installing prisma temporarily..." && pnpm add -D prisma@^5.22.0 && pnpm exec prisma generate)) && \
+    echo "Prisma Client generation completed"
 
-# Debug: Verify Prisma Client was generated
+# Ensure Prisma Client is accessible from pnpm store location
+# With pnpm, @prisma/client might look for the generated client in its own package directory
+RUN if [ -d node_modules/.prisma/client ]; then \
+      echo "Prisma Client generated at node_modules/.prisma/client"; \
+      # Find @prisma/client in pnpm store and ensure .prisma/client exists there
+      find node_modules/.pnpm -path "*/@prisma+client*/node_modules/@prisma/client" -type d | while read client_dir; do \
+        prisma_dir="$(dirname "$client_dir")/.prisma"; \
+        if [ ! -d "$prisma_dir/client" ]; then \
+          echo "Creating .prisma/client in pnpm store location: $prisma_dir"; \
+          mkdir -p "$prisma_dir"; \
+          cp -r node_modules/.prisma/client "$prisma_dir/"; \
+        fi; \
+      done; \
+    else \
+      echo "WARNING: Prisma Client not found at node_modules/.prisma/client"; \
+    fi
+
+# Debug: Verify Prisma Client was generated and accessible
 RUN echo "=== Checking Prisma Client in production ===" && \
     (test -d node_modules/.prisma/client && echo "✓ Prisma Client found at node_modules/.prisma/client" && ls -la node_modules/.prisma/client/ | head -5) || \
     (echo "WARNING: Prisma Client not found in node_modules/.prisma/client" && \
