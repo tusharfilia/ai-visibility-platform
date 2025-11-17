@@ -131,71 +131,48 @@ COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
 COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 
 # Copy Prisma schema and generate Prisma Client in production stage
-# This ensures the generated client is available at runtime in the correct location
+# Generate Prisma Client directly in the pnpm store location where @prisma/client expects it
 COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
-# Install prisma CLI if not available (it's a devDependency but needed for generation)
-# Then generate Prisma Client - this ensures the generated client is in node_modules/.prisma/client
-# Note: When running from packages/db, the output path ../../node_modules/.prisma/client 
-# resolves to packages/node_modules/.prisma/client, so we need to copy it to the root
-RUN cd packages/db && \
-    echo "Attempting to generate Prisma Client..." && \
-    (pnpm exec prisma generate 2>&1 || \
-     (echo "pnpm exec failed, trying npx..." && npx prisma generate 2>&1) || \
-     (echo "npx failed, installing prisma temporarily..." && pnpm add -D prisma@^5.22.0 && pnpm exec prisma generate 2>&1)) && \
-    echo "Prisma Client generation command completed" && \
+# Find where @prisma/client is installed and copy generated client there
+RUN set -e && \
+    echo "Finding @prisma/client location in pnpm store..." && \
+    PRISMA_CLIENT_DIR=$(find node_modules/.pnpm -path "*/@prisma+client*/node_modules/@prisma/client" -type d | head -1) && \
+    if [ -z "$PRISMA_CLIENT_DIR" ]; then \
+      echo "ERROR: @prisma/client not found in pnpm store!"; \
+      find node_modules -name "@prisma" -type d | head -5; \
+      exit 1; \
+    fi && \
+    echo "Found @prisma/client at: $PRISMA_CLIENT_DIR" && \
+    NODE_MODULES_DIR="$(dirname "$(dirname "$PRISMA_CLIENT_DIR")")" && \
+    TARGET_PRISMA_DIR="$NODE_MODULES_DIR/.prisma" && \
+    echo "Target .prisma directory: $TARGET_PRISMA_DIR" && \
+    mkdir -p "$TARGET_PRISMA_DIR" && \
+    cd packages/db && \
+    echo "Generating Prisma Client..." && \
+    (pnpm exec prisma generate --schema=prisma/schema.prisma 2>&1 || \
+     (echo "pnpm exec failed, trying npx..." && npx prisma generate --schema=prisma/schema.prisma 2>&1) || \
+     (echo "npx failed, installing prisma temporarily..." && pnpm add -D prisma@^5.22.0 && pnpm exec prisma generate --schema=prisma/schema.prisma 2>&1)) && \
     cd /app && \
-    # Check if client was generated in packages/node_modules/.prisma/client (relative path from packages/db)
     if [ -d packages/node_modules/.prisma/client ]; then \
-      echo "Found Prisma Client at packages/node_modules/.prisma/client, copying to root..."; \
-      mkdir -p node_modules/.prisma; \
-      cp -r packages/node_modules/.prisma/client node_modules/.prisma/ && \
-      echo "✓ Copied Prisma Client to node_modules/.prisma/client"; \
+      echo "Found generated client at packages/node_modules/.prisma/client, copying to pnpm store..." && \
+      cp -r packages/node_modules/.prisma/client "$TARGET_PRISMA_DIR/" && \
+      echo "✓ Copied Prisma Client to $TARGET_PRISMA_DIR/client"; \
     elif [ -d node_modules/.prisma/client ]; then \
-      echo "✓ Prisma Client already at node_modules/.prisma/client"; \
+      echo "Found generated client at node_modules/.prisma/client, copying to pnpm store..." && \
+      cp -r node_modules/.prisma/client "$TARGET_PRISMA_DIR/" && \
+      echo "✓ Copied Prisma Client to $TARGET_PRISMA_DIR/client"; \
     else \
-      echo "ERROR: Prisma Client generation failed - not found in expected locations!"; \
-      echo "Searching for .prisma directories..."; \
+      echo "ERROR: Prisma Client not found after generation!"; \
       find . -path "*/.prisma/client" -type d 2>/dev/null | head -10; \
       exit 1; \
     fi && \
-    echo "Verifying Prisma Client at root location..." && \
-    ls -la node_modules/.prisma/client/ | head -5
-
-# Ensure Prisma Client is accessible from pnpm store location
-# With pnpm, @prisma/client looks for the generated client relative to its package location
-# The error shows it's looking at: node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma/client
-# @prisma/client is at: node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client
-# So .prisma/client should be at: node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma/client
-# (same level as @prisma, not inside @prisma)
-RUN if [ -d node_modules/.prisma/client ]; then \
-      echo "✓ Prisma Client generated at node_modules/.prisma/client"; \
-      echo "Finding @prisma/client locations in pnpm store..."; \
-      find node_modules/.pnpm -path "*/@prisma+client*/node_modules/@prisma/client" -type d | while read client_dir; do \
-        # client_dir is: .../node_modules/@prisma/client
-        # We need: .../node_modules/.prisma/client
-        # So go up from @prisma/client to @prisma, then up to node_modules, then create .prisma there
-        node_modules_dir="$(dirname "$(dirname "$client_dir")")"; \
-        prisma_dir="$node_modules_dir/.prisma"; \
-        echo "Found @prisma/client at: $client_dir"; \
-        echo "Target .prisma directory: $prisma_dir"; \
-        if [ ! -d "$prisma_dir/client" ]; then \
-          echo "Creating .prisma/client in pnpm store location: $prisma_dir"; \
-          mkdir -p "$prisma_dir"; \
-          cp -r node_modules/.prisma/client "$prisma_dir/" && \
-          echo "✓ Copied Prisma Client to $prisma_dir/client" && \
-          ls -la "$prisma_dir/client/" | head -3; \
-        else \
-          echo "✓ Prisma Client already exists at $prisma_dir/client"; \
-        fi; \
-      done; \
-      echo "Verifying all .prisma/client locations..."; \
-      find node_modules -path "*/.prisma/client" -type d | head -5; \
-    else \
-      echo "ERROR: Prisma Client not found at node_modules/.prisma/client"; \
-      echo "Listing node_modules structure..."; \
-      ls -la node_modules/ | head -10; \
-      exit 1; \
-    fi
+    mkdir -p node_modules/.prisma && \
+    cp -r "$TARGET_PRISMA_DIR/client" node_modules/.prisma/ 2>/dev/null || true && \
+    echo "✓ Prisma Client setup complete" && \
+    echo "Verifying at pnpm store location: $TARGET_PRISMA_DIR/client" && \
+    test -d "$TARGET_PRISMA_DIR/client" && ls -la "$TARGET_PRISMA_DIR/client/" | head -3 && \
+    echo "Verifying at root location: node_modules/.prisma/client" && \
+    test -d node_modules/.prisma/client && ls -la node_modules/.prisma/client/ | head -3
 
 # Debug: Verify Prisma Client was generated and accessible
 RUN echo "=== Checking Prisma Client in production ===" && \
