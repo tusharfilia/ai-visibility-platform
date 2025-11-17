@@ -43,6 +43,7 @@ WORKDIR /app
 # Set CI environment variables to prevent interactive prompts
 ENV CI=true
 ENV PNPM_FORCE=true
+ENV NODE_ENV=production
 
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
@@ -52,6 +53,12 @@ COPY --from=builder /app/node_modules ./node_modules
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S worker -u 1001
+
+# Change ownership of app directory
+RUN chown -R worker:nodejs /app
+
 USER worker
 
-CMD ["node", "dist/index.js"]
+# Use absolute path and explicit node command
+ENTRYPOINT ["node"]
+CMD ["dist/index.js"]
