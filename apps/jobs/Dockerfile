@@ -31,8 +31,8 @@ RUN pnpm install --no-frozen-lockfile --force
 # Copy source code
 COPY . .
 
-# Build packages
-RUN pnpm -r build
+# Build packages in dependency order (uses root package.json build script)
+RUN pnpm build
 
 # Production stage
 FROM node:20-alpine AS production
