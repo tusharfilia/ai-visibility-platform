@@ -135,6 +135,8 @@ COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
 # Install prisma CLI if not available (it's a devDependency but needed for generation)
 # Then generate Prisma Client - this ensures the generated client is in node_modules/.prisma/client
+# Note: When running from packages/db, the output path ../../node_modules/.prisma/client 
+# resolves to packages/node_modules/.prisma/client, so we need to copy it to the root
 RUN cd packages/db && \
     echo "Attempting to generate Prisma Client..." && \
     (pnpm exec prisma generate 2>&1 || \
@@ -142,16 +144,22 @@ RUN cd packages/db && \
      (echo "npx failed, installing prisma temporarily..." && pnpm add -D prisma@^5.22.0 && pnpm exec prisma generate 2>&1)) && \
     echo "Prisma Client generation command completed" && \
     cd /app && \
-    if [ -d node_modules/.prisma/client ]; then \
-      echo "✓ Prisma Client successfully generated at node_modules/.prisma/client"; \
-      ls -la node_modules/.prisma/client/ | head -5; \
+    # Check if client was generated in packages/node_modules/.prisma/client (relative path from packages/db)
+    if [ -d packages/node_modules/.prisma/client ]; then \
+      echo "Found Prisma Client at packages/node_modules/.prisma/client, copying to root..."; \
+      mkdir -p node_modules/.prisma; \
+      cp -r packages/node_modules/.prisma/client node_modules/.prisma/ && \
+      echo "✓ Copied Prisma Client to node_modules/.prisma/client"; \
+    elif [ -d node_modules/.prisma/client ]; then \
+      echo "✓ Prisma Client already at node_modules/.prisma/client"; \
     else \
-      echo "ERROR: Prisma Client generation failed - node_modules/.prisma/client not found!"; \
-      echo "Current directory: $(pwd)"; \
-      echo "Checking for prisma in node_modules..."; \
-      find node_modules -name "prisma" -type f | head -5; \
+      echo "ERROR: Prisma Client generation failed - not found in expected locations!"; \
+      echo "Searching for .prisma directories..."; \
+      find . -path "*/.prisma/client" -type d 2>/dev/null | head -10; \
       exit 1; \
-    fi
+    fi && \
+    echo "Verifying Prisma Client at root location..." && \
+    ls -la node_modules/.prisma/client/ | head -5
 
 # Ensure Prisma Client is accessible from pnpm store location
 # With pnpm, @prisma/client looks for the generated client relative to its package location
