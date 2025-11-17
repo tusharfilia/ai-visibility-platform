@@ -35,7 +35,10 @@ COPY . .
 RUN cd packages/db && pnpm generate
 
 # Debug: Verify Prisma Client was generated in builder stage
-RUN echo "=== Checking Prisma Client in builder ===" && ls -la node_modules/.prisma/client/ 2>/dev/null | head -5 || echo "WARNING: Prisma Client not found in builder!"
+RUN echo "=== Checking Prisma Client in builder ===" && \
+    (test -d node_modules/.prisma/client && echo "Found at node_modules/.prisma/client" && ls -la node_modules/.prisma/client/ | head -5) || \
+    (test -d packages/db/node_modules/.prisma/client && echo "Found at packages/db/node_modules/.prisma/client" && ls -la packages/db/node_modules/.prisma/client/ | head -5) || \
+    (echo "WARNING: Prisma Client not found! Searching..." && find . -name ".prisma" -type d 2>/dev/null | head -5)
 
 # Build packages in dependency order (uses root package.json build script)
 # This ensures shared is built before providers to avoid TypeScript errors
@@ -127,13 +130,13 @@ COPY --from=builder /app/packages/geo/dist ./packages/geo/dist
 COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
 COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 
-# Copy generated Prisma Client from builder stage
-# Prisma generates to node_modules/.prisma/client (root node_modules)
-# This ensures the generated client is available at runtime
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-
-# Debug: Verify Prisma Client was copied
-RUN echo "=== Checking Prisma Client ===" && ls -la node_modules/.prisma/client/ 2>/dev/null | head -5 || echo "WARNING: Prisma Client not found!"
+# Prisma Client should already be in node_modules/.prisma/client from the node_modules copy
+# Debug: Verify Prisma Client exists in copied node_modules
+RUN echo "=== Checking Prisma Client in production ===" && \
+    (test -d node_modules/.prisma/client && echo "✓ Prisma Client found at node_modules/.prisma/client" && ls -la node_modules/.prisma/client/ | head -5) || \
+    (echo "WARNING: Prisma Client not found in node_modules/.prisma/client" && \
+     echo "Searching for .prisma directories..." && \
+     find node_modules -name ".prisma" -type d 2>/dev/null | head -5)
 
 # Debug: Verify dist was copied correctly
 RUN echo "=== Checking packages/db after dist copy ===" && ls -la packages/db/ && echo "=== Checking if dist exists ===" && ls -la packages/db/dist/ 2>/dev/null || echo "dist folder missing!"
