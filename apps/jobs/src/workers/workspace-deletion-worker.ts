@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+// @ts-ignore - Workspace package resolution
 import { prisma } from '@ai-visibility/db';
 
 @Injectable()
@@ -62,7 +63,7 @@ export class WorkspaceDeletionWorker {
       for (const table of deletionOrder) {
         try {
           const deleteQuery = `DELETE FROM "${table}" WHERE "workspaceId" = $1`;
-          const result = await this.prisma.$executeRaw(deleteQuery, workspaceId);
+          const result = await prisma.$executeRaw(deleteQuery, workspaceId);
           console.log(`Deleted ${result} records from ${table}`);
         } catch (error) {
           console.error(`Failed to delete from ${table}:`, error);

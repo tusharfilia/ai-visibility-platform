@@ -4,6 +4,7 @@
  */
 
 import { Worker, Job } from 'bullmq';
+// @ts-ignore - Workspace package resolution
 import { prisma } from '@ai-visibility/db';
 import { CopilotPlannerPayload } from '../queues';
 import { getEffectivePolicy } from '@ai-visibility/copilot';

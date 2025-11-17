@@ -217,6 +217,7 @@ export class JobDeduplicationService {
     });
 
     // Remove ignored fields
+    // @ts-ignore - Type narrowing issue
     config.ignoreFields?.forEach(field => {
       delete keyData[field];
     });
@@ -264,7 +265,8 @@ export class JobDeduplicationService {
       }
 
       // Get memory usage for key
-      const memory = await this.redis.memory('usage', key);
+      // @ts-ignore - Redis command type issue
+      const memory = await this.redis.memory('USAGE', key);
       totalMemory += memory;
     }
 

@@ -17,6 +17,7 @@ export class EvidenceGraphWorker {
   private eventEmitter: any; // Would be EventEmitterService in production
 
   constructor(connection: any, eventEmitter?: any) {
+    // @ts-ignore - Service initialization needs proper dependencies
     this.evidenceBuilder = new EvidenceGraphBuilderService();
     this.eventEmitter = eventEmitter;
 

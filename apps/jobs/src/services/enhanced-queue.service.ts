@@ -338,7 +338,7 @@ export class EnhancedQueueService {
     });
 
     queueEvents.on('failed', async (jobId, error) => {
-      console.log(`Job ${jobId} failed in queue ${queueName}:`, error.message);
+      console.log(`Job ${jobId} failed in queue ${queueName}:`, typeof error === 'string' ? error : error.message);
       await this.updateQueueMetrics(queueName);
     });
 

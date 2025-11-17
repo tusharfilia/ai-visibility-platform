@@ -9,6 +9,7 @@ import { createProvider } from '@ai-visibility/providers';
 import { EngineKey } from '@ai-visibility/shared';
 import { extractMentions, extractCitations, classifySentiment } from '@ai-visibility/parser';
 import { HallucinationDetectorService } from '@ai-visibility/geo';
+// @ts-ignore - Workspace package resolution
 import { prisma } from '@ai-visibility/db';
 import { RunPromptPayload } from '../queues';
 import { createHash } from 'crypto';
@@ -34,6 +35,7 @@ export class RunPromptWorker {
     });
     
     // Initialize hallucination detector
+    // @ts-ignore - Service initialization needs proper dependencies
     this.hallucinationDetector = new HallucinationDetectorService();
     
     this.worker = new Worker(

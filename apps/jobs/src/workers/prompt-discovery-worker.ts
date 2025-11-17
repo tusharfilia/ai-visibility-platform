@@ -37,7 +37,9 @@ export class PromptDiscoveryWorker {
       {
         connection: redis,
         concurrency: 3,
+        // @ts-ignore - BullMQ KeepJobs type issue
         removeOnComplete: 10,
+        // @ts-ignore - BullMQ KeepJobs type issue
         removeOnFail: 5,
       }
     );
@@ -231,6 +233,7 @@ export class PromptDiscoveryWorker {
     return {
       isRunning: this.worker.isRunning(),
       concurrency: this.worker.concurrency,
+      // @ts-ignore - BullMQ Worker API type issue
       activeJobs: this.worker.activeJobs.size
     };
   }

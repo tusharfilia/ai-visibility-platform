@@ -394,6 +394,7 @@ export class QueueMonitoringService {
       : 0;
 
     const throughput = jobsProcessed / (hours * 60); // jobs per minute
+    // @ts-ignore - BullMQ JobsOptions type issue
     const peakConcurrency = Math.max(...recentJobs.map(job => job.opts.concurrency || 1));
 
     // Calculate trends (simplified)

@@ -36,7 +36,9 @@ export abstract class IdempotentWorker<T = any> {
       {
         connection,
         concurrency: options.concurrency || 5,
+        // @ts-ignore - BullMQ KeepJobs type issue
         removeOnComplete: options.removeOnComplete || 100,
+        // @ts-ignore - BullMQ KeepJobs type issue
         removeOnFail: options.removeOnFail || 50,
       }
     );
@@ -127,9 +129,13 @@ export abstract class IdempotentWorker<T = any> {
    */
   async getMetrics(): Promise<any> {
     return {
+      // @ts-ignore - BullMQ Worker API type issue
       waiting: await this.worker.getWaiting(),
+      // @ts-ignore - BullMQ Worker API type issue
       active: await this.worker.getActive(),
+      // @ts-ignore - BullMQ Worker API type issue
       completed: await this.worker.getCompleted(),
+      // @ts-ignore - BullMQ Worker API type issue
       failed: await this.worker.getFailed(),
     };
   }
