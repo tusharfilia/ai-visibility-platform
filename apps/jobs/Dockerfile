@@ -83,10 +83,12 @@ COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
 
-# Install production dependencies
-# This ensures all dependencies (including bullmq) are properly installed
-# We have all package.json files and built dist folders, so pnpm can resolve everything
-RUN pnpm install --prod --no-frozen-lockfile --force
+# Install production dependencies for the jobs package specifically
+# Using --filter ensures we install dependencies for @ai-visibility/jobs
+RUN pnpm install --prod --filter @ai-visibility/jobs --no-frozen-lockfile --force
+
+# Verify bullmq is available
+RUN test -d node_modules/bullmq || (echo "ERROR: bullmq not found!" && echo "Checking node_modules structure:" && ls -la node_modules/ | head -30 && echo "Checking apps/jobs/node_modules:" && ls -la apps/jobs/node_modules/ 2>/dev/null | head -30 || echo "apps/jobs/node_modules doesn't exist" && exit 1)
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
