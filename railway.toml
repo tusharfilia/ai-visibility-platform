@@ -4,7 +4,7 @@
 # Build configuration
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm install --no-frozen-lockfile --force && pnpm build"
+buildCommand = "CI=true pnpm install --no-frozen-lockfile --force && pnpm build"
 
 # Deploy configuration
 [deploy]
@@ -18,12 +18,14 @@ healthcheckTimeout = 300
 [services.ai-visibility-jobs.deploy]
 # Disable HTTP healthcheck for the worker; it does not expose an HTTP server.
 healthcheckPath = ""
+# Use Dockerfile for jobs service to ensure proper build process
+dockerfilePath = "apps/jobs/Dockerfile"
 
 # Environment variables
 [env]
 NODE_ENV = "production"
 PORT = "8080"
-CI = "false"  # Disable frozen-lockfile in CI environments
+CI = "true"  # Enable CI mode to skip all interactive prompts during pnpm install
 PNPM_FORCE = "true"  # Skip confirmation prompts during install
 
 [services.ai-visibility-platform.env]
@@ -37,6 +39,8 @@ REDIS_URL = "${{ Redis.REDIS_URL }}"
 REDIS_HOST = "redis.railway.internal"
 REDIS_PORT = "6379"
 REDIS_PASSWORD = "${{ Redis.REDIS_PASSWORD }}"
+CI = "true"  # Enable CI mode to skip all interactive prompts during pnpm install
+PNPM_FORCE = "true"  # Skip confirmation prompts during install
 
 # Scaling configuration
 [scale]

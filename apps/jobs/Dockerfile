@@ -29,6 +29,10 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Set CI environment variables to prevent interactive prompts
+ENV CI=true
+ENV PNPM_FORCE=true
+
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
 COPY --from=builder /app/apps/jobs/package.json ./
