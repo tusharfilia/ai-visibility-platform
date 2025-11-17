@@ -8,7 +8,8 @@ import { Pool } from 'pg';
 import { createProvider } from '@ai-visibility/providers';
 import { EngineKey } from '@ai-visibility/shared';
 import { extractMentions, extractCitations, classifySentiment } from '@ai-visibility/parser';
-import { HallucinationDetectorService } from '@ai-visibility/geo/validation/hallucination-detector.service';
+import { HallucinationDetectorService } from '@ai-visibility/geo';
+import { prisma } from '@ai-visibility/db';
 import { RunPromptPayload } from '../queues';
 import { createHash } from 'crypto';
 

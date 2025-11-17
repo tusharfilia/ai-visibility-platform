@@ -1,6 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { DirectorySyncService } from '@ai-visibility/automation/directory-sync.service';
+import { DirectorySyncService } from '@ai-visibility/automation';
 
 @Processor('directory-sync')
 export class DirectorySyncWorker extends WorkerHost {

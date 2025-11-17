@@ -4,8 +4,7 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import { EvidenceGraphBuilderService } from '@ai-visibility/geo/evidence/evidence-graph.builder';
-import { EventEmitterService } from '@ai-visibility/shared/events';
+import { EvidenceGraphBuilderService } from '@ai-visibility/geo';
 
 export interface EvidenceGraphPayload {
   workspaceId: string;

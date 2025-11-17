@@ -1,7 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptDiscoveryService } from '@ai-visibility/prompts/discovery.service';
-import { EventEmitterService } from '../events/event-emitter.service';
+import { PromptDiscoveryService } from '@ai-visibility/prompts';
 import { createRedisClient } from '@ai-visibility/shared';
 
 export interface PromptDiscoveryPayload {
@@ -25,7 +24,7 @@ export class PromptDiscoveryWorker {
 
   constructor(
     private discoveryService: PromptDiscoveryService,
-    private eventEmitter: EventEmitterService
+    private eventEmitter?: any // EventEmitterService - optional for now
   ) {
     this.initializeWorker();
   }
@@ -63,7 +62,7 @@ export class PromptDiscoveryWorker {
 
     try {
       // Emit start event
-      await this.eventEmitter.emitToWorkspace(data.workspaceId, {
+      await this.eventEmitter?.emitToWorkspace(data.workspaceId, {
         type: 'prompt.discovery.started',
         data: {
           jobId: job.id,
@@ -86,7 +85,7 @@ export class PromptDiscoveryWorker {
       }
 
       // Emit completion event
-      await this.eventEmitter.emitToWorkspace(data.workspaceId, {
+      await this.eventEmitter?.emitToWorkspace(data.workspaceId, {
         type: 'prompt.discovery.completed',
         data: {
           jobId: job.id,
@@ -101,7 +100,7 @@ export class PromptDiscoveryWorker {
       this.logger.error(`Job ${job.id} failed:`, error);
 
       // Emit error event
-      await this.eventEmitter.emitToWorkspace(data.workspaceId, {
+      await this.eventEmitter?.emitToWorkspace(data.workspaceId, {
         type: 'prompt.discovery.failed',
         data: {
           jobId: job.id,
@@ -121,7 +120,7 @@ export class PromptDiscoveryWorker {
     this.logger.log(`Starting prompt discovery for workspace ${workspaceId}, industry: ${industry}`);
 
     // Emit progress event
-    await this.eventEmitter.emitToWorkspace(workspaceId, {
+    await this.eventEmitter?.emitToWorkspace(workspaceId, {
       type: 'prompt.discovery.progress',
       data: {
         step: 'discovering',
@@ -137,7 +136,7 @@ export class PromptDiscoveryWorker {
       maxPrompts
     );
 
-    await this.eventEmitter.emitToWorkspace(workspaceId, {
+    await this.eventEmitter?.emitToWorkspace(workspaceId, {
       type: 'prompt.discovery.progress',
       data: {
         step: 'clustering',
@@ -149,7 +148,7 @@ export class PromptDiscoveryWorker {
     // 2. Cluster prompts
     const clusters = await this.discoveryService.clusterPrompts(workspaceId, discoveredPrompts);
 
-    await this.eventEmitter.emitToWorkspace(workspaceId, {
+    await this.eventEmitter?.emitToWorkspace(workspaceId, {
       type: 'prompt.discovery.progress',
       data: {
         step: 'completed',
@@ -176,7 +175,7 @@ export class PromptDiscoveryWorker {
     this.logger.log(`Refreshing clusters for workspace ${workspaceId}`);
 
     // Emit progress event
-    await this.eventEmitter.emitToWorkspace(workspaceId, {
+    await this.eventEmitter?.emitToWorkspace(workspaceId, {
       type: 'prompt.discovery.progress',
       data: {
         step: 'refreshing',
@@ -188,7 +187,7 @@ export class PromptDiscoveryWorker {
     // Refresh clusters
     const refreshedClusters = await this.discoveryService.refreshClusters(workspaceId);
 
-    await this.eventEmitter.emitToWorkspace(workspaceId, {
+    await this.eventEmitter?.emitToWorkspace(workspaceId, {
       type: 'prompt.discovery.progress',
       data: {
         step: 'completed',

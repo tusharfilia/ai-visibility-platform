@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../modules/database/prisma.service';
+import { prisma } from '@ai-visibility/db';
 
 @Injectable()
 export class WorkspaceDeletionWorker {
-  constructor(private prisma: PrismaService) {}
 
   /**
    * Process workspace deletion job
@@ -72,7 +71,7 @@ export class WorkspaceDeletionWorker {
       }
 
       // Log the deletion completion
-      await this.prisma.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           workspaceId,
           actorUserId: 'system',
@@ -90,7 +89,7 @@ export class WorkspaceDeletionWorker {
       console.error(`Workspace deletion failed for ${workspaceId}:`, error);
       
       // Log the failure
-      await this.prisma.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           workspaceId,
           actorUserId: 'system',
@@ -114,7 +113,7 @@ export class WorkspaceDeletionWorker {
     status: 'none' | 'pending' | 'scheduled' | 'completed';
     scheduledFor?: Date;
   }> {
-    const deletionLogs = await this.prisma.auditLog.findMany({
+    const deletionLogs = await prisma.auditLog.findMany({
       where: {
         workspaceId,
         action: {
@@ -158,7 +157,7 @@ export class WorkspaceDeletionWorker {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 90); // Keep logs for 90 days
 
-    const deletedLogs = await this.prisma.auditLog.deleteMany({
+    const deletedLogs = await prisma.auditLog.deleteMany({
       where: {
         action: {
           in: ['GDPR_DELETION_REQUESTED', 'WORKSPACE_DELETION_COMPLETED', 'GDPR_DELETION_CANCELLED']
@@ -181,7 +180,7 @@ export class WorkspaceDeletionWorker {
     scheduledFor: Date;
     requestedAt: Date;
   }>> {
-    const pendingDeletions = await this.prisma.auditLog.findMany({
+    const pendingDeletions = await prisma.auditLog.findMany({
       where: {
         action: 'GDPR_DELETION_REQUESTED',
         createdAt: {

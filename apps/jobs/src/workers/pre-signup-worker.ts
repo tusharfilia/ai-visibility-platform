@@ -1,6 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { PreSignupService } from '@ai-visibility/automation/pre-signup.service';
+import { PreSignupService } from '@ai-visibility/automation';
 
 @Processor('pre-signup-scan')
 export class PreSignupWorker extends WorkerHost {

@@ -4,8 +4,7 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import { GEOMaturityCalculatorService } from '@ai-visibility/geo/maturity/maturity-calculator.service';
-import { EventEmitterService } from '@ai-visibility/shared/events';
+import { GEOMaturityCalculatorService } from '@ai-visibility/geo';
 
 export interface MaturityRecomputePayload {
   workspaceId: string;

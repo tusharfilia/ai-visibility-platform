@@ -4,8 +4,7 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import { PrescriptiveRecommendationEngine } from '@ai-visibility/geo/maturity/prescriptive-recommendations.service';
-import { EventEmitterService } from '@ai-visibility/shared/events';
+import { PrescriptiveRecommendationEngine } from '@ai-visibility/geo';
 
 export interface RecommendationRefreshPayload {
   workspaceId: string;

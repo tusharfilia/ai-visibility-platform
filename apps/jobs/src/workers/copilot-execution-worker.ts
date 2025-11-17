@@ -1,6 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { EnhancedCopilotService } from '@ai-visibility/automation/enhanced-copilot.service';
+import { EnhancedCopilotService } from '@ai-visibility/automation';
 
 @Processor('copilot-execution')
 export class CopilotExecutionWorker extends WorkerHost {
