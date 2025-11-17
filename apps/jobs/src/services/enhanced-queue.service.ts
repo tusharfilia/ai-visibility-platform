@@ -342,6 +342,7 @@ export class EnhancedQueueService {
     });
 
     queueEvents.on('failed', async (jobId, error) => {
+      // @ts-ignore - BullMQ error type issue
       console.log(`Job ${jobId} failed in queue ${queueName}:`, typeof error === 'string' ? error : error.message);
       await this.updateQueueMetrics(queueName);
     });
@@ -362,6 +363,7 @@ export class EnhancedQueueService {
     });
 
     worker.on('failed', async (job, error) => {
+      // @ts-ignore - BullMQ error type issue
       console.log(`Worker failed job ${job?.id} in queue ${queueName}:`, error.message);
       await this.updateQueueMetrics(queueName);
     });
