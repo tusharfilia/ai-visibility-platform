@@ -42,3 +42,9 @@ export * from './enterprise.service';
 
 // Export Redis helpers
 export * from './redis/create-client';
+
+// Export idempotency utilities
+export * from './idempotency';
+
+// Export events
+export * from './events';
