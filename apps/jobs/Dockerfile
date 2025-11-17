@@ -89,12 +89,20 @@ COPY --from=builder /app/apps/jobs/dist ./dist
 # Copy entire node_modules structure from builder (includes .pnpm store and all symlinks)
 # This ensures all dependencies including bullmq and zod are available with correct symlink resolution
 COPY --from=builder /app/node_modules ./node_modules
-# Copy all workspace package node_modules from staging area (prepared in builder stage)
-# This preserves symlinks and ensures dependencies like zod are accessible
-# NOTE: Copy node_modules FIRST, then dist folders to ensure dist is not overwritten
-COPY --from=builder /app/staging-node_modules/packages/ ./packages/
-COPY --from=builder /app/staging-node_modules/apps/ ./apps/
-# Re-copy dist folders AFTER node_modules to ensure they're not overwritten
+# Copy workspace package node_modules directories explicitly (only node_modules, not entire directories)
+# This preserves symlinks without overwriting other files like dist
+COPY --from=builder /app/staging-node_modules/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=builder /app/staging-node_modules/packages/db/node_modules ./packages/db/node_modules
+COPY --from=builder /app/staging-node_modules/packages/providers/node_modules ./packages/providers/node_modules
+COPY --from=builder /app/staging-node_modules/packages/parser/node_modules ./packages/parser/node_modules
+COPY --from=builder /app/staging-node_modules/packages/copilot/node_modules ./packages/copilot/node_modules
+COPY --from=builder /app/staging-node_modules/packages/automation/node_modules ./packages/automation/node_modules
+COPY --from=builder /app/staging-node_modules/packages/content/node_modules ./packages/content/node_modules
+COPY --from=builder /app/staging-node_modules/packages/geo/node_modules ./packages/geo/node_modules
+COPY --from=builder /app/staging-node_modules/packages/optimizer/node_modules ./packages/optimizer/node_modules
+COPY --from=builder /app/staging-node_modules/packages/prompts/node_modules ./packages/prompts/node_modules
+COPY --from=builder /app/staging-node_modules/apps/jobs/node_modules ./apps/jobs/node_modules
+# Copy dist folders AFTER node_modules to ensure they're not overwritten
 COPY --from=builder /app/packages/shared/dist ./packages/shared/
 COPY --from=builder /app/packages/db/dist ./packages/db/
 COPY --from=builder /app/packages/providers/dist ./packages/providers/
