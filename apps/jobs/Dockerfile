@@ -106,6 +106,9 @@ COPY --from=builder /app/packages/geo/dist ./packages/geo/
 COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/
 COPY --from=builder /app/packages/prompts/dist ./packages/prompts/
 
+# Debug: Verify dist was copied correctly
+RUN echo "=== Checking packages/db after dist copy ===" && ls -la packages/db/ && echo "=== Checking if dist exists ===" && ls -la packages/db/dist/ 2>/dev/null || echo "dist folder missing!"
+
 # Verify critical dependencies are accessible
 RUN (test -L apps/jobs/node_modules/bullmq && test -e apps/jobs/node_modules/bullmq) || (echo "ERROR: bullmq not accessible!" && exit 1)
 RUN (test -L packages/shared/node_modules/zod && test -e packages/shared/node_modules/zod) || (test -L node_modules/zod && test -e node_modules/zod) || (echo "ERROR: zod not accessible!" && echo "Checking packages/shared/node_modules:" && ls -la packages/shared/node_modules/ 2>/dev/null | head -20 && echo "Checking root node_modules:" && ls -la node_modules/ | grep -E "^l.*zod|^d.*zod" || echo "zod not found" && exit 1)
