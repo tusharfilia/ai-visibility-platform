@@ -68,31 +68,31 @@ ENV NODE_PATH=/app/node_modules:/app/packages/shared/node_modules:/app/packages/
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./
 
-# Copy all package.json files (needed for workspace resolution)
+# Copy entire workspace package directories (package.json + dist)
+# This ensures workspace symlinks in node_modules resolve correctly
+# pnpm creates symlinks that point to these package directories
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/shared/dist ./packages/shared/
 COPY --from=builder /app/packages/db/package.json ./packages/db/
+COPY --from=builder /app/packages/db/dist ./packages/db/
 COPY --from=builder /app/packages/providers/package.json ./packages/providers/
+COPY --from=builder /app/packages/providers/dist ./packages/providers/
 COPY --from=builder /app/packages/parser/package.json ./packages/parser/
+COPY --from=builder /app/packages/parser/dist ./packages/parser/
 COPY --from=builder /app/packages/copilot/package.json ./packages/copilot/
+COPY --from=builder /app/packages/copilot/dist ./packages/copilot/
 COPY --from=builder /app/packages/automation/package.json ./packages/automation/
+COPY --from=builder /app/packages/automation/dist ./packages/automation/
 COPY --from=builder /app/packages/content/package.json ./packages/content/
+COPY --from=builder /app/packages/content/dist ./packages/content/
 COPY --from=builder /app/packages/geo/package.json ./packages/geo/
+COPY --from=builder /app/packages/geo/dist ./packages/geo/
 COPY --from=builder /app/packages/optimizer/package.json ./packages/optimizer/
+COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/
 COPY --from=builder /app/packages/prompts/package.json ./packages/prompts/
+COPY --from=builder /app/packages/prompts/dist ./packages/prompts/
 COPY --from=builder /app/apps/jobs/package.json ./apps/jobs/
 COPY --from=builder /app/apps/api/package.json ./apps/api/
-
-# Copy built workspace packages (needed for workspace dependencies)
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/db/dist ./packages/db/dist
-COPY --from=builder /app/packages/providers/dist ./packages/providers/dist
-COPY --from=builder /app/packages/parser/dist ./packages/parser/dist
-COPY --from=builder /app/packages/copilot/dist ./packages/copilot/dist
-COPY --from=builder /app/packages/automation/dist ./packages/automation/dist
-COPY --from=builder /app/packages/content/dist ./packages/content/dist
-COPY --from=builder /app/packages/geo/dist ./packages/geo/dist
-COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
-COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
@@ -108,6 +108,8 @@ COPY --from=builder /app/staging-node_modules/apps/ ./apps/
 # Verify critical dependencies are accessible
 RUN (test -L apps/jobs/node_modules/bullmq && test -e apps/jobs/node_modules/bullmq) || (echo "ERROR: bullmq not accessible!" && exit 1)
 RUN (test -L packages/shared/node_modules/zod && test -e packages/shared/node_modules/zod) || (test -L node_modules/zod && test -e node_modules/zod) || (echo "ERROR: zod not accessible!" && echo "Checking packages/shared/node_modules:" && ls -la packages/shared/node_modules/ 2>/dev/null | head -20 && echo "Checking root node_modules:" && ls -la node_modules/ | grep -E "^l.*zod|^d.*zod" || echo "zod not found" && exit 1)
+# Verify workspace package symlinks resolve correctly
+RUN (test -L packages/copilot/node_modules/@ai-visibility/db && test -e packages/copilot/node_modules/@ai-visibility/db && test -f packages/copilot/node_modules/@ai-visibility/db/dist/index.js) || (echo "ERROR: @ai-visibility/db workspace symlink not accessible!" && echo "Checking symlink:" && ls -la packages/copilot/node_modules/@ai-visibility/db 2>/dev/null && echo "Target:" && readlink -f packages/copilot/node_modules/@ai-visibility/db 2>/dev/null && echo "Checking if dist exists:" && ls -la packages/db/dist/ 2>/dev/null | head -10 && exit 1)
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
