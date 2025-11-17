@@ -40,14 +40,53 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Install pnpm for production install
+RUN npm install -g pnpm
+
 # Set CI environment variables to prevent interactive prompts
 ENV CI=true
 ENV PNPM_FORCE=true
 ENV NODE_ENV=production
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# Copy workspace configuration files needed for pnpm module resolution
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pnpm-workspace.yaml ./
+
+# Copy all package.json files for workspace resolution
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/db/package.json ./packages/db/
+COPY --from=builder /app/packages/providers/package.json ./packages/providers/
+COPY --from=builder /app/packages/parser/package.json ./packages/parser/
+COPY --from=builder /app/packages/copilot/package.json ./packages/copilot/
+COPY --from=builder /app/packages/automation/package.json ./packages/automation/
+COPY --from=builder /app/packages/content/package.json ./packages/content/
+COPY --from=builder /app/packages/geo/package.json ./packages/geo/
+COPY --from=builder /app/packages/optimizer/package.json ./packages/optimizer/
+COPY --from=builder /app/packages/prompts/package.json ./packages/prompts/
+COPY --from=builder /app/apps/jobs/package.json ./apps/jobs/
+COPY --from=builder /app/apps/api/package.json ./apps/api/
+
+# Copy built workspace packages (needed for workspace dependencies)
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/db/dist ./packages/db/dist
+COPY --from=builder /app/packages/providers/dist ./packages/providers/dist
+COPY --from=builder /app/packages/parser/dist ./packages/parser/dist
+COPY --from=builder /app/packages/copilot/dist ./packages/copilot/dist
+COPY --from=builder /app/packages/automation/dist ./packages/automation/dist
+# Copy content package dist if it exists (optional package)
+COPY --from=builder /app/packages/content/dist ./packages/content/dist
+COPY --from=builder /app/packages/geo/dist ./packages/geo/dist
+COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
+COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+
+# Install only production dependencies
+# This ensures all dependencies (including bullmq) are properly installed
+RUN pnpm install --prod --no-frozen-lockfile --force
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
