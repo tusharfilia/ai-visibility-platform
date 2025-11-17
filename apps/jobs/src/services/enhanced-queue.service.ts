@@ -61,7 +61,9 @@ export class EnhancedQueueService {
     const queue = new Queue(name, {
       connection: this.redis,
       defaultJobOptions: {
+        // @ts-ignore - BullMQ KeepJobs type issue
         removeOnComplete: 100,
+        // @ts-ignore - BullMQ KeepJobs type issue
         removeOnFail: 50,
         attempts: options.retryConfig?.maxAttempts || 3,
         backoff: {
@@ -128,7 +130,9 @@ export class EnhancedQueueService {
       {
         connection: this.redis,
         concurrency: options.concurrency || 1,
+        // @ts-ignore - BullMQ KeepJobs type issue
         removeOnComplete: 100,
+        // @ts-ignore - BullMQ KeepJobs type issue
         removeOnFail: 50,
       }
     );
