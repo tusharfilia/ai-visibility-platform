@@ -20,6 +20,8 @@ healthcheckTimeout = 300
 healthcheckPath = ""
 # Use Dockerfile for jobs service to ensure proper build process
 dockerfilePath = "apps/jobs/Dockerfile"
+# Explicitly set start command to use node (not pnpm)
+startCommand = "node dist/index.js"
 
 # Environment variables
 [env]
