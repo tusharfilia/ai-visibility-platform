@@ -34,6 +34,9 @@ COPY . .
 # Generate Prisma Client (needed before building TypeScript code that uses Prisma)
 RUN cd packages/db && pnpm generate
 
+# Debug: Verify Prisma Client was generated in builder stage
+RUN echo "=== Checking Prisma Client in builder ===" && ls -la node_modules/.prisma/client/ 2>/dev/null | head -5 || echo "WARNING: Prisma Client not found in builder!"
+
 # Build packages in dependency order (uses root package.json build script)
 # This ensures shared is built before providers to avoid TypeScript errors
 RUN pnpm build
@@ -124,10 +127,13 @@ COPY --from=builder /app/packages/geo/dist ./packages/geo/dist
 COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
 COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 
-# Copy Prisma schema and generate Prisma Client in production stage
+# Copy generated Prisma Client from builder stage
+# Prisma generates to node_modules/.prisma/client (root node_modules)
 # This ensures the generated client is available at runtime
-COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
-RUN cd packages/db && pnpm generate
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# Debug: Verify Prisma Client was copied
+RUN echo "=== Checking Prisma Client ===" && ls -la node_modules/.prisma/client/ 2>/dev/null | head -5 || echo "WARNING: Prisma Client not found!"
 
 # Debug: Verify dist was copied correctly
 RUN echo "=== Checking packages/db after dist copy ===" && ls -la packages/db/ && echo "=== Checking if dist exists ===" && ls -la packages/db/dist/ 2>/dev/null || echo "dist folder missing!"
