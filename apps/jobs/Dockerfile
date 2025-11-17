@@ -130,8 +130,13 @@ COPY --from=builder /app/packages/geo/dist ./packages/geo/dist
 COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
 COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 
-# Prisma Client should already be in node_modules/.prisma/client from the node_modules copy
-# Debug: Verify Prisma Client exists in copied node_modules
+# Copy Prisma schema and generate Prisma Client in production stage
+# This ensures the generated client is available at runtime in the correct location
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+# Use npx to run prisma generate (prisma should be in node_modules from builder)
+RUN cd packages/db && npx prisma generate
+
+# Debug: Verify Prisma Client was generated
 RUN echo "=== Checking Prisma Client in production ===" && \
     (test -d node_modules/.prisma/client && echo "✓ Prisma Client found at node_modules/.prisma/client" && ls -la node_modules/.prisma/client/ | head -5) || \
     (echo "WARNING: Prisma Client not found in node_modules/.prisma/client" && \
