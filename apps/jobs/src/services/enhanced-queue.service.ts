@@ -43,7 +43,8 @@ export class EnhancedQueueService {
   private dependencies: Map<string, JobDependency> = new Map();
 
   constructor(private configService: ConfigService) {
-    this.redis = createRedisClient('EnhancedQueueService');
+    // BullMQ requires maxRetriesPerRequest: null for blocking commands
+    this.redis = createRedisClient('EnhancedQueueService', { maxRetriesPerRequest: null });
   }
 
   /**

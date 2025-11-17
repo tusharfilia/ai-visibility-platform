@@ -30,7 +30,8 @@ export class PromptDiscoveryWorker {
   }
 
   private initializeWorker() {
-    const redis = createRedisClient('PromptDiscoveryWorker');
+    // BullMQ requires maxRetriesPerRequest: null for blocking commands
+    const redis = createRedisClient('PromptDiscoveryWorker', { maxRetriesPerRequest: null });
     this.worker = new Worker(
       'prompt-discovery',
       this.processJob.bind(this),

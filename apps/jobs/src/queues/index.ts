@@ -6,8 +6,9 @@ import { Queue, Worker, QueueEvents } from 'bullmq';
 import { createRedisClient } from '@ai-visibility/shared';
 // Database operations will be handled by individual workers
 
-// Redis connection
-const redis = createRedisClient('queues:index');
+// Redis connection for BullMQ
+// BullMQ requires maxRetriesPerRequest: null for blocking commands (BLPOP, BRPOP)
+const redis = createRedisClient('queues:index', { maxRetriesPerRequest: null });
 
 // Queue definitions
 export const runPromptQueue = new Queue('runPrompt', { connection: redis });

@@ -37,7 +37,8 @@ export class JobDeduplicationService {
   private cacheConfigs: Map<string, JobCacheConfig> = new Map();
 
   constructor(private configService: ConfigService) {
-    this.redis = createRedisClient('JobDeduplicationService');
+    // BullMQ requires maxRetriesPerRequest: null for blocking commands
+    this.redis = createRedisClient('JobDeduplicationService', { maxRetriesPerRequest: null });
     this.initializeConfigurations();
   }
 

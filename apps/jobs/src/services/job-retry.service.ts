@@ -38,7 +38,8 @@ export class JobRetryService {
   private retryStrategies: Map<string, JobRetryStrategy> = new Map();
 
   constructor(private configService: ConfigService) {
-    this.redis = createRedisClient('JobRetryService');
+    // BullMQ requires maxRetriesPerRequest: null for blocking commands
+    this.redis = createRedisClient('JobRetryService', { maxRetriesPerRequest: null });
     this.initializeRetryStrategies();
   }
 

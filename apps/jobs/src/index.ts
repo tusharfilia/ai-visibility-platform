@@ -15,8 +15,9 @@ import { jobScheduler } from './schedulers';
 import { checkQueueHealth, getQueueMetrics, shutdownQueues } from './queues';
 import { createRedisClient } from '@ai-visibility/shared';
 
-// Redis connection
-const redis = createRedisClient('jobs:index');
+// Redis connection for BullMQ
+// BullMQ requires maxRetriesPerRequest: null for blocking commands
+const redis = createRedisClient('jobs:index', { maxRetriesPerRequest: null });
 
 // Workers
 let runPromptWorker: RunPromptWorker;

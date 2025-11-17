@@ -70,7 +70,8 @@ export class QueueMonitoringService {
   private performanceHistory: Map<string, QueuePerformanceMetrics[]> = new Map();
 
   constructor(private configService: ConfigService) {
-    this.redis = createRedisClient('QueueMonitoringService');
+    // BullMQ requires maxRetriesPerRequest: null for blocking commands
+    this.redis = createRedisClient('QueueMonitoringService', { maxRetriesPerRequest: null });
   }
 
   /**
