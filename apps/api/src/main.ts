@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import compression from 'compression';
 import * as fs from 'fs';
+import * as path from 'path';
 import { AppModule } from './app.module';
 import { LoggerService } from './middleware/logger.service';
 import { GlobalExceptionFilter } from './middleware/exception.filter';
@@ -27,6 +28,61 @@ async function bootstrap() {
   console.error(`📁 Working directory: ${process.cwd()}`);
   console.error(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.error(`🔌 PORT: ${process.env.PORT || '8080'}`);
+  
+  // Run database migrations before starting the app
+  if (process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
+    try {
+      console.error('🔄 Running database migrations...');
+      // Try to find prisma schema in various locations
+      const possibleSchemaPaths = [
+        path.join(process.cwd(), 'packages/db/prisma/schema.prisma'),
+        path.join(process.cwd(), '../packages/db/prisma/schema.prisma'),
+        path.join(__dirname, '../../packages/db/prisma/schema.prisma'),
+      ];
+      
+      let schemaPath: string | null = null;
+      for (const schemaPathCandidate of possibleSchemaPaths) {
+        if (fs.existsSync(schemaPathCandidate)) {
+          schemaPath = schemaPathCandidate;
+          console.error(`📁 Found Prisma schema at: ${schemaPath}`);
+          break;
+        }
+      }
+      
+      if (schemaPath) {
+        // Use Prisma's programmatic migration API
+        const { execSync } = require('child_process');
+        const schemaDir = path.dirname(schemaPath);
+        try {
+          execSync('npx prisma migrate deploy', {
+            stdio: 'inherit',
+            cwd: schemaDir,
+            env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+          });
+          console.error('✅ Database migrations completed successfully');
+        } catch (migrateError) {
+          console.error('⚠️  Migration command failed, trying alternative...');
+          // Fallback: try with full path to prisma
+          execSync(`npx --yes prisma@latest migrate deploy --schema=${schemaPath}`, {
+            stdio: 'inherit',
+            env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+          });
+          console.error('✅ Database migrations completed successfully');
+        }
+      } else {
+        console.error('⚠️  Prisma schema not found, skipping migrations');
+        console.error('💡 To run migrations manually, use: pnpm --filter @ai-visibility/db prisma migrate deploy');
+      }
+    } catch (error) {
+      console.error('⚠️  Database migration failed:', error instanceof Error ? error.message : String(error));
+      console.error('💡 You can run migrations manually using Railway CLI:');
+      console.error('   railway run pnpm --filter @ai-visibility/db prisma migrate deploy');
+      // Don't exit - allow app to start even if migrations fail
+      // This allows manual migration if needed
+    }
+  } else {
+    console.error('⏭️  Skipping migrations (not in production or DATABASE_URL not set)');
+  }
   
   try {
     const app = await NestFactory.create(AppModule, { 
