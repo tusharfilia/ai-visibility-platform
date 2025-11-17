@@ -58,6 +58,9 @@ RUN chown -R worker:nodejs /app
 
 USER worker
 
+# Verify dist/index.js exists before starting
+RUN test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && ls -la dist/ && exit 1)
+
 # Use node command - Railway should use this CMD directly
 # This prevents Railway from trying to auto-detect and use pnpm
 CMD ["node", "dist/index.js"]
