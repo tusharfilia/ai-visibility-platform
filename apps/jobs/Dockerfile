@@ -32,6 +32,7 @@ RUN pnpm install --no-frozen-lockfile --force
 COPY . .
 
 # Build packages in dependency order (uses root package.json build script)
+# This ensures shared is built before providers to avoid TypeScript errors
 RUN pnpm build
 
 # Production stage
