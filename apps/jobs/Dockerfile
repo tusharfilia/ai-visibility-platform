@@ -3,7 +3,11 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install OpenSSL for Prisma (required for Prisma query engine during generation)
-RUN apk add --no-cache openssl1.1-compat
+# Prisma needs libssl.so.1.1, but Alpine 3.22 has OpenSSL 3.x
+# Install openssl and create compatibility symlinks
+RUN apk add --no-cache openssl && \
+    find /usr/lib /lib -name "libssl.so.3" -exec sh -c 'ln -sf {} $(dirname {})/libssl.so.1.1' \; 2>/dev/null || true && \
+    find /usr/lib /lib -name "libcrypto.so.3" -exec sh -c 'ln -sf {} $(dirname {})/libcrypto.so.1.1' \; 2>/dev/null || true
 
 # Copy workspace configuration and all package.json files
 COPY package.json pnpm-workspace.yaml ./
@@ -70,8 +74,11 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Install OpenSSL for Prisma (required for Prisma query engine)
-# Alpine Linux uses musl libc, so we need openssl1.1-compat for Prisma
-RUN apk add --no-cache openssl1.1-compat
+# Prisma needs libssl.so.1.1, but Alpine 3.22 has OpenSSL 3.x
+# Install openssl and create compatibility symlinks
+RUN apk add --no-cache openssl && \
+    find /usr/lib /lib -name "libssl.so.3" -exec sh -c 'ln -sf {} $(dirname {})/libssl.so.1.1' \; 2>/dev/null || true && \
+    find /usr/lib /lib -name "libcrypto.so.3" -exec sh -c 'ln -sf {} $(dirname {})/libcrypto.so.1.1' \; 2>/dev/null || true
 
 # Install pnpm for production install
 RUN npm install -g pnpm
