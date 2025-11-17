@@ -47,6 +47,11 @@ RUN mkdir -p /app/staging-node_modules && \
       fi; \
     done
 
+# Debug: Verify dist folders exist in builder stage
+RUN echo "=== Checking builder stage dist folders ===" && \
+    ls -la packages/db/dist/ 2>/dev/null | head -5 || echo "WARNING: packages/db/dist not found in builder!" && \
+    ls -la packages/shared/dist/ 2>/dev/null | head -5 || echo "WARNING: packages/shared/dist not found in builder!"
+
 # Production stage
 FROM node:20-alpine AS production
 
@@ -103,16 +108,18 @@ COPY --from=builder /app/staging-node_modules/packages/optimizer/node_modules ./
 COPY --from=builder /app/staging-node_modules/packages/prompts/node_modules ./packages/prompts/node_modules
 COPY --from=builder /app/staging-node_modules/apps/jobs/node_modules ./apps/jobs/node_modules
 # Copy dist folders AFTER node_modules to ensure they're not overwritten
-COPY --from=builder /app/packages/shared/dist ./packages/shared/
-COPY --from=builder /app/packages/db/dist ./packages/db/
-COPY --from=builder /app/packages/providers/dist ./packages/providers/
-COPY --from=builder /app/packages/parser/dist ./packages/parser/
-COPY --from=builder /app/packages/copilot/dist ./packages/copilot/
-COPY --from=builder /app/packages/automation/dist ./packages/automation/
-COPY --from=builder /app/packages/content/dist ./packages/content/
-COPY --from=builder /app/packages/geo/dist ./packages/geo/
-COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/
-COPY --from=builder /app/packages/prompts/dist ./packages/prompts/
+# Ensure directories exist first, then copy dist explicitly
+RUN mkdir -p packages/shared packages/db packages/providers packages/parser packages/copilot packages/automation packages/content packages/geo packages/optimizer packages/prompts
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/db/dist ./packages/db/dist
+COPY --from=builder /app/packages/providers/dist ./packages/providers/dist
+COPY --from=builder /app/packages/parser/dist ./packages/parser/dist
+COPY --from=builder /app/packages/copilot/dist ./packages/copilot/dist
+COPY --from=builder /app/packages/automation/dist ./packages/automation/dist
+COPY --from=builder /app/packages/content/dist ./packages/content/dist
+COPY --from=builder /app/packages/geo/dist ./packages/geo/dist
+COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
+COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 
 # Debug: Verify dist was copied correctly
 RUN echo "=== Checking packages/db after dist copy ===" && ls -la packages/db/ && echo "=== Checking if dist exists ===" && ls -la packages/db/dist/ 2>/dev/null || echo "dist folder missing!"
