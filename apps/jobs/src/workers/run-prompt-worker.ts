@@ -53,6 +53,8 @@ export class RunPromptWorker {
   }
 
   private async processJob(job: Job<RunPromptPayload | ClusterScanPayload>): Promise<void> {
+    console.log(`[RunPromptWorker] Received job ${job.id} of type ${'clusterId' in job.data ? 'clusterScan' : 'individualPrompt'}`);
+    
     // Check if this is a cluster scan or individual prompt
     if ('clusterId' in job.data) {
       return this.processClusterScan(job as Job<ClusterScanPayload>);
@@ -132,7 +134,7 @@ export class RunPromptWorker {
   private async processIndividualPrompt(job: Job<RunPromptPayload>): Promise<void> {
     const { workspaceId, promptId, engineKey, idempotencyKey, userId, demoRunId } = job.data;
     
-    console.log(`Processing prompt run: ${promptId} with ${engineKey}`);
+    console.log(`[RunPromptWorker] Starting job ${job.id} - promptId: ${promptId}, engineKey: ${engineKey}, idempotencyKey: ${idempotencyKey}, demoRunId: ${demoRunId || 'none'}`);
     
     try {
       // Check idempotency
@@ -395,7 +397,19 @@ export class RunPromptWorker {
     });
 
     this.worker.on('failed', (job, err) => {
-      console.error(`Job ${job?.id} failed:`, err);
+      const jobData = job?.data as RunPromptPayload | undefined;
+      console.error(`[RunPromptWorker] Job ${job?.id} failed:`, {
+        jobId: job?.id,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        jobData: jobData ? {
+          workspaceId: jobData.workspaceId,
+          promptId: jobData.promptId,
+          engineKey: jobData.engineKey,
+          idempotencyKey: jobData.idempotencyKey,
+          demoRunId: jobData.demoRunId,
+        } : undefined,
+      });
     });
 
     this.worker.on('error', (err) => {
