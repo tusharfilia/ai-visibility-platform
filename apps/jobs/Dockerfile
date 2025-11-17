@@ -164,11 +164,18 @@ RUN cd packages/db && \
 # Ensure Prisma Client is accessible from pnpm store location
 # With pnpm, @prisma/client looks for the generated client relative to its package location
 # The error shows it's looking at: node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma/client
+# @prisma/client is at: node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client
+# So .prisma/client should be at: node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma/client
+# (same level as @prisma, not inside @prisma)
 RUN if [ -d node_modules/.prisma/client ]; then \
       echo "✓ Prisma Client generated at node_modules/.prisma/client"; \
       echo "Finding @prisma/client locations in pnpm store..."; \
       find node_modules/.pnpm -path "*/@prisma+client*/node_modules/@prisma/client" -type d | while read client_dir; do \
-        prisma_dir="$(dirname "$client_dir")/.prisma"; \
+        # client_dir is: .../node_modules/@prisma/client
+        # We need: .../node_modules/.prisma/client
+        # So go up from @prisma/client to @prisma, then up to node_modules, then create .prisma there
+        node_modules_dir="$(dirname "$(dirname "$client_dir")")"; \
+        prisma_dir="$node_modules_dir/.prisma"; \
         echo "Found @prisma/client at: $client_dir"; \
         echo "Target .prisma directory: $prisma_dir"; \
         if [ ! -d "$prisma_dir/client" ]; then \
