@@ -49,6 +49,8 @@ ENV PNPM_FORCE=true
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+# Set NODE_PATH to include workspace package node_modules for module resolution
+ENV NODE_PATH=/app/node_modules:/app/apps/jobs/node_modules
 
 # Copy workspace configuration files (needed for module resolution)
 COPY --from=builder /app/package.json ./
@@ -83,12 +85,13 @@ COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 # Copy built application
 COPY --from=builder /app/apps/jobs/dist ./dist
 
-# Install production dependencies for the jobs package specifically
-# Using --filter ensures we install dependencies for @ai-visibility/jobs
-RUN pnpm install --prod --filter @ai-visibility/jobs --no-frozen-lockfile --force
+# Copy entire node_modules structure from builder (includes .pnpm store and all symlinks)
+# This ensures all dependencies including bullmq are available with correct symlink resolution
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/jobs/node_modules ./apps/jobs/node_modules
 
-# Verify bullmq is available
-RUN test -d node_modules/bullmq || (echo "ERROR: bullmq not found!" && echo "Checking node_modules structure:" && ls -la node_modules/ | head -30 && echo "Checking apps/jobs/node_modules:" && ls -la apps/jobs/node_modules/ 2>/dev/null | head -30 || echo "apps/jobs/node_modules doesn't exist" && exit 1)
+# Verify bullmq is accessible (check symlink and target)
+RUN (test -L apps/jobs/node_modules/bullmq && test -e apps/jobs/node_modules/bullmq) || (echo "ERROR: bullmq not accessible!" && echo "Symlink:" && ls -la apps/jobs/node_modules/bullmq 2>/dev/null && echo "Target:" && readlink -f apps/jobs/node_modules/bullmq 2>/dev/null && exit 1)
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
