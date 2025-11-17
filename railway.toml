@@ -20,10 +20,7 @@ healthcheckTimeout = 300
 healthcheckPath = ""
 # Use Dockerfile for jobs service to ensure proper build process
 dockerfilePath = "apps/jobs/Dockerfile"
-# Explicitly set start command to use node (not pnpm)
-# Railway should use Dockerfile CMD, but this ensures it doesn't try pnpm
-startCommand = "node dist/index.js"
-# Disable any auto-detection that might try to use pnpm
+# Don't set startCommand - let Railway use Dockerfile CMD directly
 [services.ai-visibility-jobs.build]
 builder = "dockerfile"
 

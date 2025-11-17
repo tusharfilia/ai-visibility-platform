@@ -58,6 +58,6 @@ RUN chown -R worker:nodejs /app
 
 USER worker
 
-# Use absolute path and explicit node command
-ENTRYPOINT ["node"]
-CMD ["dist/index.js"]
+# Use explicit node command with absolute path
+# Railway should use this CMD directly without trying pnpm
+CMD ["/usr/local/bin/node", "dist/index.js"]
