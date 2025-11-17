@@ -198,8 +198,15 @@ export class RunPromptWorker {
       });
 
       // Get provider
+      const apiKeyEnvVar = `${engineKey}_API_KEY`;
+      const apiKey = process.env[apiKeyEnvVar];
+      
+      if (!apiKey) {
+        throw new Error(`Missing API key for engine ${engineKey}. Please set ${apiKeyEnvVar} environment variable in the jobs service.`);
+      }
+
       const provider = createProvider(engineKey as EngineKey, {
-        apiKey: process.env[`${engineKey}_API_KEY`],
+        apiKey,
       });
 
       // Execute prompt
@@ -282,7 +289,17 @@ export class RunPromptWorker {
       }
       
     } catch (error) {
-      console.error(`Prompt run failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      console.error(`[RunPromptWorker] Prompt run failed for ${idempotencyKey}:`, {
+        error: errorMessage,
+        stack: errorStack,
+        workspaceId,
+        promptId,
+        engineKey,
+        demoRunId,
+      });
       
       // Update prompt run with error
       try {
@@ -291,12 +308,12 @@ export class RunPromptWorker {
           data: {
             status: 'FAILED',
             finishedAt: new Date(),
-            errorMsg: error.message,
+            errorMsg: errorMessage,
           },
         });
       } catch (updateError) {
         const message = updateError instanceof Error ? updateError.message : String(updateError);
-        console.warn(`Unable to persist prompt run failure for ${idempotencyKey}: ${message}`);
+        console.warn(`[RunPromptWorker] Unable to persist prompt run failure for ${idempotencyKey}: ${message}`);
       }
 
       if (demoRunId) {
