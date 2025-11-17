@@ -124,6 +124,11 @@ COPY --from=builder /app/packages/geo/dist ./packages/geo/dist
 COPY --from=builder /app/packages/optimizer/dist ./packages/optimizer/dist
 COPY --from=builder /app/packages/prompts/dist ./packages/prompts/dist
 
+# Copy Prisma schema and generate Prisma Client in production stage
+# This ensures the generated client is available at runtime
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+RUN cd packages/db && pnpm generate
+
 # Debug: Verify dist was copied correctly
 RUN echo "=== Checking packages/db after dist copy ===" && ls -la packages/db/ && echo "=== Checking if dist exists ===" && ls -la packages/db/dist/ 2>/dev/null || echo "dist folder missing!"
 
