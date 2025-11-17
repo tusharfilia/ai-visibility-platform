@@ -1,10 +1,11 @@
 # Railway Production Configuration
 # This file configures the production deployment for Railway
 
-# Build configuration
+# Build configuration (global - can be overridden per service)
 [build]
 builder = "nixpacks"
 buildCommand = "CI=true pnpm install --no-frozen-lockfile --force && pnpm build"
+# Note: ai-visibility-jobs service uses Dockerfile builder (see [services.ai-visibility-jobs.build])
 
 # Deploy configuration
 [deploy]
