@@ -74,7 +74,7 @@ export class RunPromptWorker {
     try {
       // Get cluster prompts
       const clusterResult = await this.dbPool.query(
-        'SELECT * FROM "PromptCluster" WHERE id = $1 AND "workspaceId" = $2',
+        'SELECT * FROM "prompt_clusters" WHERE id = $1 AND "workspaceId" = $2',
         [clusterId, workspaceId]
       );
       const cluster = clusterResult.rows[0];
@@ -95,7 +95,7 @@ export class RunPromptWorker {
           
           // Check if prompt run already exists
           const existingRun = await this.dbPool.query(
-            'SELECT id FROM "PromptRun" WHERE "idempotencyKey" = $1',
+            'SELECT id FROM "prompt_runs" WHERE "idempotencyKey" = $1',
             [promptRunIdempotencyKey]
           );
           
@@ -109,7 +109,7 @@ export class RunPromptWorker {
           
           // Create prompt run
           const promptRun = await this.dbPool.query(
-            `INSERT INTO "PromptRun" 
+            `INSERT INTO "prompt_runs" 
              ("workspaceId", "promptId", "engineId", "idempotencyKey", "status", "startedAt")
              VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING *`,
@@ -139,7 +139,7 @@ export class RunPromptWorker {
     try {
       // Check idempotency
       const existingRunResult = await this.dbPool.query(
-        'SELECT id FROM "PromptRun" WHERE "idempotencyKey" = $1',
+        'SELECT id FROM "prompt_runs" WHERE "idempotencyKey" = $1',
         [idempotencyKey]
       );
       
@@ -150,7 +150,7 @@ export class RunPromptWorker {
 
       // Get prompt and engine
       const promptResult = await this.dbPool.query(
-        'SELECT * FROM "Prompt" WHERE id = $1',
+        'SELECT * FROM "prompts" WHERE id = $1',
         [promptId]
       );
       const prompt = promptResult.rows[0];
@@ -160,7 +160,7 @@ export class RunPromptWorker {
       }
 
       const engineResult = await this.dbPool.query(
-        'SELECT * FROM "Engine" WHERE "workspaceId" = $1 AND key = $2 AND enabled = true',
+        'SELECT * FROM "engines" WHERE "workspaceId" = $1 AND key = $2 AND enabled = true',
         [workspaceId, engineKey]
       );
       const engine = engineResult.rows[0];
@@ -429,7 +429,7 @@ export class RunPromptWorker {
     try {
       // Get workspace profile
       const profileResult = await this.dbPool.query(
-        'SELECT * FROM "WorkspaceProfile" WHERE "workspaceId" = $1',
+        'SELECT * FROM "workspace_profiles" WHERE "workspaceId" = $1',
         [workspaceId]
       );
       
@@ -456,7 +456,7 @@ export class RunPromptWorker {
       // Store alerts in database
       for (const alert of alerts) {
         await this.dbPool.query(
-          `INSERT INTO "HallucinationAlert" 
+          `INSERT INTO "hallucination_alerts" 
            ("workspaceId", "engineKey", "promptId", "factType", "aiStatement", 
             "correctFact", "severity", "status", "confidence", "context", "createdAt", "updatedAt")
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
@@ -493,7 +493,7 @@ export class RunPromptWorker {
   private async getOrCreatePrompt(workspaceId: string, text: string, intent: string): Promise<string> {
     // Check if prompt already exists
     const existingPrompt = await this.dbPool.query(
-      'SELECT id FROM "Prompt" WHERE "workspaceId" = $1 AND text = $2',
+      'SELECT id FROM "prompts" WHERE "workspaceId" = $1 AND text = $2',
       [workspaceId, text]
     );
     
@@ -503,7 +503,7 @@ export class RunPromptWorker {
     
     // Create new prompt
     const newPrompt = await this.dbPool.query(
-      `INSERT INTO "Prompt" ("workspaceId", text, intent, active, tags)
+      `INSERT INTO "prompts" ("workspaceId", text, intent, active, tags)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
       [workspaceId, text, intent, true, []]

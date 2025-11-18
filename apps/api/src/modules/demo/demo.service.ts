@@ -331,11 +331,11 @@ export class DemoService {
       try {
         const engineRows = await this.prisma.$queryRaw<{ engineKey: string }>(
           `SELECT DISTINCT e."key" AS "engineKey"
-           FROM "PromptRun" pr
-           JOIN "Prompt" p ON p.id = pr."promptId"
-           JOIN "Engine" e ON e.id = pr."engineId"
-           JOIN "Answer" a ON a."promptRunId" = pr.id
-           JOIN "Mention" m ON m."answerId" = a.id
+           FROM "prompt_runs" pr
+           JOIN "prompts" p ON p.id = pr."promptId"
+           JOIN "engines" e ON e.id = pr."engineId"
+           JOIN "answers" a ON a."promptRunId" = pr.id
+           JOIN "mentions" m ON m."answerId" = a.id
            WHERE pr."workspaceId" = $1
              AND pr."status" = 'SUCCESS'
              AND 'demo' = ANY(p."tags")
@@ -511,8 +511,8 @@ export class DemoService {
          SUM(CASE WHEN pr."status" = 'SUCCESS' THEN 1 ELSE 0 END)::int AS "completedRuns",
          SUM(CASE WHEN pr."status" = 'FAILED' THEN 1 ELSE 0 END)::int AS "failedRuns",
          COALESCE(SUM(pr."costCents"), 0)::int AS "totalCostCents"
-       FROM "PromptRun" pr
-       JOIN "Prompt" p ON p.id = pr."promptId"
+       FROM "prompt_runs" pr
+       JOIN "prompts" p ON p.id = pr."promptId"
        WHERE pr."workspaceId" = $1
          AND 'demo' = ANY(p."tags")`,
       [workspaceId],
@@ -551,10 +551,10 @@ export class DemoService {
          SUM(CASE WHEN m."sentiment" = 'POS' THEN 1 ELSE 0 END)::int AS "positiveMentions",
          SUM(CASE WHEN m."sentiment" = 'NEU' THEN 1 ELSE 0 END)::int AS "neutralMentions",
          SUM(CASE WHEN m."sentiment" = 'NEG' THEN 1 ELSE 0 END)::int AS "negativeMentions"
-       FROM "Mention" m
-       JOIN "Answer" a ON a.id = m."answerId"
-       JOIN "PromptRun" pr ON pr.id = a."promptRunId"
-       JOIN "Prompt" p ON p.id = pr."promptId"
+       FROM "mentions" m
+       JOIN "answers" a ON a.id = m."answerId"
+       JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+       JOIN "prompts" p ON p.id = pr."promptId"
        WHERE pr."workspaceId" = $1
          AND 'demo' = ANY(p."tags")
        GROUP BY LOWER(m."brand")
@@ -626,10 +626,10 @@ export class DemoService {
       `SELECT
          LOWER(c."domain") AS "domain",
          COUNT(*)::int AS "references"
-       FROM "Citation" c
-       JOIN "Answer" a ON a.id = c."answerId"
-       JOIN "PromptRun" pr ON pr.id = a."promptRunId"
-       JOIN "Prompt" p ON p.id = pr."promptId"
+       FROM "citations" c
+       JOIN "answers" a ON a.id = c."answerId"
+       JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+       JOIN "prompts" p ON p.id = pr."promptId"
        WHERE pr."workspaceId" = $1
          AND 'demo' = ANY(p."tags")
        GROUP BY LOWER(c."domain")
@@ -662,9 +662,9 @@ export class DemoService {
          COUNT(*)::int AS "totalRuns",
          SUM(CASE WHEN pr."status" = 'SUCCESS' THEN 1 ELSE 0 END)::int AS "successfulRuns",
          COALESCE(SUM(pr."costCents"), 0)::int AS "totalCostCents"
-       FROM "PromptRun" pr
-       JOIN "Prompt" p ON p.id = pr."promptId"
-       JOIN "Engine" e ON e.id = pr."engineId"
+       FROM "prompt_runs" pr
+       JOIN "prompts" p ON p.id = pr."promptId"
+       JOIN "engines" e ON e.id = pr."engineId"
        WHERE pr."workspaceId" = $1
          AND 'demo' = ANY(p."tags")
        GROUP BY e."key"
