@@ -101,10 +101,15 @@ async function bootstrap() {
     app.use(compression());
 
     // CORS configuration
-    const allowList = (configService.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,https://geku-henna.vercel.app,https://geku.ai,https://www.geku.ai'))
+    // Always include required production domains, even if CORS_ALLOWED_ORIGINS env var is set
+    const requiredOrigins = ['https://geku.ai', 'https://www.geku.ai'];
+    const envOrigins = (configService.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,https://geku-henna.vercel.app'))
       .split(',')
       .map((s: string) => s.trim())
       .filter(Boolean);
+    
+    // Merge and deduplicate
+    const allowList = [...new Set([...requiredOrigins, ...envOrigins])];
     
     // Log CORS configuration for debugging
     console.error('🔒 CORS allowList:', allowList);
