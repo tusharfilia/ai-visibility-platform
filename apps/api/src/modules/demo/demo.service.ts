@@ -325,6 +325,45 @@ export class DemoService {
 
     const progress = this.computeProgress(demoRun.progress, total, finished);
 
+    // Get engine visibility - which engines have successful runs with mentions
+    let engines: Array<{ key: string; visible: boolean }> = [];
+    if (demoRun.workspaceId && completed > 0) {
+      try {
+        const engineRows = await this.prisma.$queryRaw<{ engineKey: string }>(
+          `SELECT DISTINCT e."key" AS "engineKey"
+           FROM "PromptRun" pr
+           JOIN "Prompt" p ON p.id = pr."promptId"
+           JOIN "Engine" e ON e.id = pr."engineId"
+           JOIN "Answer" a ON a."promptRunId" = pr.id
+           JOIN "Mention" m ON m."answerId" = a.id
+           WHERE pr."workspaceId" = $1
+             AND pr."status" = 'SUCCESS'
+             AND 'demo' = ANY(p."tags")
+           GROUP BY e."key"`,
+          [demoRun.workspaceId],
+        );
+
+        const enginesWithMentions = new Set(engineRows.map((r) => r.engineKey));
+        engines = this.defaultEngines.map((engineKey) => ({
+          key: engineKey,
+          visible: enginesWithMentions.has(engineKey),
+        }));
+      } catch (error) {
+        this.logger.warn(`Failed to get engine visibility for demoRun ${demoRunId}: ${error instanceof Error ? error.message : String(error)}`);
+        // Fallback to all false if query fails
+        engines = this.defaultEngines.map((engineKey) => ({
+          key: engineKey,
+          visible: false,
+        }));
+      }
+    } else {
+      // No completed jobs yet, all engines are not visible
+      engines = this.defaultEngines.map((engineKey) => ({
+        key: engineKey,
+        visible: false,
+      }));
+    }
+
     return {
       ok: true,
       data: {
@@ -336,6 +375,7 @@ export class DemoService {
         completedJobs: completed,
         failedJobs: failed,
         remainingJobs: remaining,
+        engines, // Include engine visibility
         updatedAt: demoRun.updatedAt.toISOString(),
       },
     };
