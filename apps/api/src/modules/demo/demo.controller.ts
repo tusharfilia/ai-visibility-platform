@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiAcceptedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DemoService } from './demo.service';
 import {
@@ -77,6 +77,9 @@ export class DemoController {
   @ApiOperation({ summary: 'Get instant AI visibility summary for a domain (orchestrates all demo steps automatically)' })
   @ApiOkResponse({ description: 'Returns instant summary with auto-generated prompts, competitors, and analysis status.' })
   async getInstantSummary(@Query('domain') domain: string) {
+    if (!domain || typeof domain !== 'string' || domain.trim().length === 0) {
+      throw new BadRequestException('Domain query parameter is required');
+    }
     return this.demoService.getInstantSummary(domain);
   }
 }
