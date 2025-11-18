@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiAcceptedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DemoService } from './demo.service';
 import {
@@ -71,6 +71,13 @@ export class DemoController {
   @ApiOkResponse({ description: 'Returns prescriptive recommendations based on the analysis.', type: DemoRecommendationsResponseDto })
   async getRecommendations(@Param('demoRunId') demoRunId: string) {
     return this.demoService.getRecommendations(demoRunId);
+  }
+
+  @Get('instant-summary')
+  @ApiOperation({ summary: 'Get instant AI visibility summary for a domain (orchestrates all demo steps automatically)' })
+  @ApiOkResponse({ description: 'Returns instant summary with auto-generated prompts, competitors, and analysis status.' })
+  async getInstantSummary(@Query('domain') domain: string) {
+    return this.demoService.getInstantSummary(domain);
   }
 }
 

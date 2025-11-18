@@ -1363,5 +1363,97 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
     const brandHost = (host || '').toLowerCase();
     return generic.filter(comp => comp !== brandHost && !comp.includes(brandWords));
   }
+
+  /**
+   * Orchestrates all demo steps automatically for instant summary
+   * Returns summary, prompts, competitors, and starts analysis in background
+   */
+  async getInstantSummary(domain: string): Promise<{ ok: boolean; data: any }> {
+    try {
+      // Step 1: Generate summary
+      const summaryResult = await this.prepareSummary({ domain });
+      if (!summaryResult.ok || !summaryResult.data.demoRunId) {
+        throw new BadRequestException('Failed to generate summary');
+      }
+
+      const demoRunId = summaryResult.data.demoRunId;
+      const workspaceId = summaryResult.data.workspaceId;
+      const summary = summaryResult.data.summary;
+      const brand = summaryResult.data.brand;
+
+      // Step 2: Auto-generate prompts (use brand name as seed)
+      const seedPrompts = [`Best ${brand} alternatives`, `Compare ${brand} with competitors`];
+      const promptsResult = await this.preparePrompts({
+        demoRunId,
+        seedPrompts,
+      });
+
+      if (!promptsResult.ok) {
+        throw new BadRequestException('Failed to generate prompts');
+      }
+
+      const prompts = promptsResult.data.prompts.map((p: { text: string }) => p.text);
+
+      // Step 3: Auto-detect competitors
+      const competitorsResult = await this.prepareCompetitors({
+        demoRunId,
+        competitorDomains: undefined, // Auto-detect
+      });
+
+      if (!competitorsResult.ok) {
+        throw new BadRequestException('Failed to detect competitors');
+      }
+
+      const competitors = competitorsResult.data.finalCompetitors || [];
+
+      // Step 4: Start analysis in background
+      const runResult = await this.runDemo({
+        demoRunId,
+        engines: undefined, // Use defaults
+      });
+
+      if (!runResult.ok) {
+        this.logger.warn(`Analysis queueing failed for demoRunId ${demoRunId}, but returning partial results`);
+      }
+
+      // Step 5: Get initial engine visibility status (all false initially, will update as jobs complete)
+      const engines = this.defaultEngines.map((engineKey) => ({
+        key: engineKey,
+        visible: false, // Will be true once jobs complete
+      }));
+
+      // Step 6: Calculate initial GEO score (0 until analysis completes)
+      const geoScore = 0;
+      const insights: string[] = [];
+
+      // Get current status
+      const statusResult = await this.getStatus(demoRunId);
+
+      return {
+        ok: true,
+        data: {
+          demoRunId,
+          workspaceId,
+          domain: summaryResult.data.domain,
+          brand,
+          summary,
+          detectedPrompts: prompts,
+          competitors,
+          engines,
+          geoScore,
+          insights,
+          status: statusResult.data.status,
+          progress: statusResult.data.progress,
+          totalJobs: statusResult.data.totalJobs,
+          completedJobs: statusResult.data.completedJobs,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Instant summary failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error instanceof BadRequestException
+        ? error
+        : new BadRequestException(`Failed to generate instant summary: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 

@@ -101,7 +101,7 @@ async function bootstrap() {
     app.use(compression());
 
     // CORS configuration
-    const allowList = (configService.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,https://geku-henna.vercel.app,https://geku.ai'))
+    const allowList = (configService.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,https://geku-henna.vercel.app,https://geku.ai,https://www.geku.ai'))
       .split(',')
       .map((s: string) => s.trim())
       .filter(Boolean);
