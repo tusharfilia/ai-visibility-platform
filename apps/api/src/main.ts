@@ -106,6 +106,10 @@ async function bootstrap() {
       .map((s: string) => s.trim())
       .filter(Boolean);
     
+    // Log CORS configuration for debugging
+    console.error('🔒 CORS allowList:', allowList);
+    console.error('🔒 CORS_ALLOWED_ORIGINS env:', configService.get('CORS_ALLOWED_ORIGINS', 'not set'));
+    
     // Add wildcard patterns for common preview deployment domains
     const wildcardPatterns = [
       /^https:\/\/.*\.lovable\.app$/,  // Fixed: was lovableproject.com, should be lovable.app
@@ -119,13 +123,18 @@ async function bootstrap() {
         if (!origin) return cb(null, true);
         
         // Check exact matches
-        if (allowList.includes(origin)) return cb(null, true);
-        
-        // Check wildcard patterns
-        if (wildcardPatterns.some(pattern => pattern.test(origin))) {
+        if (allowList.includes(origin)) {
+          console.error(`✅ CORS allowed (exact match): ${origin}`);
           return cb(null, true);
         }
         
+        // Check wildcard patterns
+        if (wildcardPatterns.some(pattern => pattern.test(origin))) {
+          console.error(`✅ CORS allowed (wildcard match): ${origin}`);
+          return cb(null, true);
+        }
+        
+        console.error(`❌ CORS blocked: ${origin} (not in allowList: ${allowList.join(', ')})`);
         return cb(new Error(`CORS blocked for origin: ${origin}`), false);
       },
       credentials: true,
