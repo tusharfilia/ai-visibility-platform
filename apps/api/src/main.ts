@@ -101,14 +101,14 @@ async function bootstrap() {
     app.use(compression());
 
     // CORS configuration
-    const allowList = (configService.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,https://geku-henna.vercel.app'))
+    const allowList = (configService.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,https://geku-henna.vercel.app,https://geku.ai'))
       .split(',')
       .map((s: string) => s.trim())
       .filter(Boolean);
     
     // Add wildcard patterns for common preview deployment domains
     const wildcardPatterns = [
-      /^https:\/\/.*\.lovableproject\.com$/,
+      /^https:\/\/.*\.lovable\.app$/,  // Fixed: was lovableproject.com, should be lovable.app
       /^https:\/\/.*\.vercel\.app$/,
       /^https:\/\/.*\.railway\.app$/,
     ];
