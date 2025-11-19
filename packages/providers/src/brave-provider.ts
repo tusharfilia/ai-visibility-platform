@@ -59,6 +59,63 @@ export class BraveProvider extends BaseProvider {
 
       if (!searchResponse.ok) {
         const errorText = await searchResponse.text();
+        
+        // Handle rate limiting (429) with retry
+        if (searchResponse.status === 429) {
+          const errorData = JSON.parse(errorText).error || {};
+          const retryAfter = errorData.meta?.rate_limit ? 60 : 60; // Default to 60 seconds
+          
+          // Wait before retrying (respect rate limit)
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          
+          // Retry once after waiting
+          const retryResponse = await fetch(
+            `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(prompt)}&count=10`,
+            {
+              method: 'GET',
+              headers: {
+                'X-Subscription-Token': apiKey,
+                'Accept': 'application/json',
+              },
+            }
+          );
+          
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            throw new Error(`Brave API error: ${retryResponse.status} ${retryErrorText}`);
+          }
+          
+          // Use retry response
+          const retryData = await retryResponse.json() as any;
+          const webResults = (retryData.web?.results || []) as any[];
+          const answerText = this.buildAnswerFromResults(prompt, webResults);
+          
+          const citations: Array<{ url: string; domain: string; confidence?: number }> = webResults
+            .slice(0, 10)
+            .map((result: any, index: number) => ({
+              url: result.url || '',
+              domain: result.url ? new URL(result.url).hostname.replace('www.', '') : '',
+              confidence: 0.95 - (index * 0.05),
+            }))
+            .filter((c: any) => c.url);
+
+          const mentions = this.extractMentions(answerText, options?.brandName || '');
+          const latency = Date.now() - startTime;
+
+          return this.createEngineAnswer(
+            prompt,
+            answerText,
+            mentions,
+            citations,
+            {
+              model: 'brave-search',
+              tokens: answerText.length / 4,
+              latency,
+              cost: 0.001,
+            }
+          );
+        }
+        
         throw new Error(`Brave API error: ${searchResponse.status} ${errorText}`);
       }
 

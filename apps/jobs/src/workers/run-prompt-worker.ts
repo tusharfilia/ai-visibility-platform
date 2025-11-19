@@ -200,7 +200,11 @@ export class RunPromptWorker {
       });
 
       // Get provider
-      const apiKeyEnvVar = `${engineKey}_API_KEY`;
+      // AIO uses SERPAPI_KEY instead of AIO_API_KEY
+      let apiKeyEnvVar = `${engineKey}_API_KEY`;
+      if (engineKey === 'AIO') {
+        apiKeyEnvVar = 'SERPAPI_KEY';
+      }
       const apiKey = process.env[apiKeyEnvVar];
       
       if (!apiKey) {
