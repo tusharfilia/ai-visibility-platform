@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GEOMaturityCalculatorService } from '../maturity/maturity-calculator.service';
+import { StructuralScoringService } from '../structural/structural-scoring.service';
+import { TrustSignalAggregator } from '../trust/trust-signal-aggregator.service';
 
 export interface GEOVisibilityScore {
   overall: number;
@@ -57,7 +60,12 @@ export class EnhancedGEOScoringService {
     'default': 1.0,
   };
 
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    private maturityCalculator: GEOMaturityCalculatorService,
+    private structuralScoring: StructuralScoringService,
+    private trustAggregator: TrustSignalAggregator
+  ) {}
 
   /**
    * Calculate comprehensive GEO visibility score
@@ -423,5 +431,329 @@ export class EnhancedGEOScoringService {
     };
     
     return weights[engine] || 0.5;
+  }
+
+  /**
+   * Calculate comprehensive GEO score with 7 sub-scores
+   * Formula: Entity Strength (25%) + Citation Depth (20%) + Structural Clarity (20%) + 
+   *          Update Cadence (15%) + Competitor Gap (10%) + Engine Coverage (5%) + Trust Signals (5%)
+   */
+  async calculateComprehensiveGEOScore(
+    workspaceId: string,
+    context?: {
+      brandName?: string;
+      competitors?: string[];
+      engines?: string[];
+    }
+  ): Promise<{
+    overall: number;
+    subScores: {
+      entityStrength: number;
+      citationDepth: number;
+      structuralClarity: number;
+      updateCadence: number;
+      competitorGap: number;
+      engineCoverage: number;
+      trustSignals: number;
+    };
+    breakdown: {
+      entityStrength: { score: number; weight: number; weighted: number };
+      citationDepth: { score: number; weight: number; weighted: number };
+      structuralClarity: { score: number; weight: number; weighted: number };
+      updateCadence: { score: number; weight: number; weighted: number };
+      competitorGap: { score: number; weight: number; weighted: number };
+      engineCoverage: { score: number; weight: number; weighted: number };
+      trustSignals: { score: number; weight: number; weighted: number };
+    };
+    benchmarked?: {
+      category?: string;
+      industryAverage?: number;
+      percentile?: number;
+    };
+  }> {
+    try {
+      // Get maturity score (includes Entity Strength, Citation Depth, Structural Clarity, Update Cadence)
+      const maturityScore = await this.maturityCalculator.calculateMaturityScore(workspaceId);
+
+      // Calculate Competitor Gap (10%)
+      const competitorGap = await this.calculateCompetitorGapScore(
+        workspaceId,
+        context?.brandName,
+        context?.competitors || []
+      );
+
+      // Calculate Engine Coverage (5%)
+      const engineCoverage = await this.calculateEngineCoverageScore(
+        workspaceId,
+        context?.engines || ['PERPLEXITY', 'BRAVE', 'AIO']
+      );
+
+      // Calculate Trust Signals (5%)
+      const trustSignals = await this.calculateTrustSignalsScore(workspaceId);
+
+      // Calculate weighted overall score
+      const weights = {
+        entityStrength: 0.25,
+        citationDepth: 0.20,
+        structuralClarity: 0.20,
+        updateCadence: 0.15,
+        competitorGap: 0.10,
+        engineCoverage: 0.05,
+        trustSignals: 0.05,
+      };
+
+      const overall = Math.round(
+        maturityScore.entityStrength * weights.entityStrength +
+        maturityScore.citationDepth * weights.citationDepth +
+        maturityScore.structuralClarity * weights.structuralClarity +
+        maturityScore.updateCadence * weights.updateCadence +
+        competitorGap * weights.competitorGap +
+        engineCoverage * weights.engineCoverage +
+        trustSignals * weights.trustSignals
+      );
+
+      return {
+        overall: Math.min(100, Math.max(0, overall)),
+        subScores: {
+          entityStrength: Math.round(maturityScore.entityStrength),
+          citationDepth: Math.round(maturityScore.citationDepth),
+          structuralClarity: Math.round(maturityScore.structuralClarity),
+          updateCadence: Math.round(maturityScore.updateCadence),
+          competitorGap: Math.round(competitorGap),
+          engineCoverage: Math.round(engineCoverage),
+          trustSignals: Math.round(trustSignals),
+        },
+        breakdown: {
+          entityStrength: {
+            score: maturityScore.entityStrength,
+            weight: weights.entityStrength,
+            weighted: maturityScore.entityStrength * weights.entityStrength,
+          },
+          citationDepth: {
+            score: maturityScore.citationDepth,
+            weight: weights.citationDepth,
+            weighted: maturityScore.citationDepth * weights.citationDepth,
+          },
+          structuralClarity: {
+            score: maturityScore.structuralClarity,
+            weight: weights.structuralClarity,
+            weighted: maturityScore.structuralClarity * weights.structuralClarity,
+          },
+          updateCadence: {
+            score: maturityScore.updateCadence,
+            weight: weights.updateCadence,
+            weighted: maturityScore.updateCadence * weights.updateCadence,
+          },
+          competitorGap: {
+            score: competitorGap,
+            weight: weights.competitorGap,
+            weighted: competitorGap * weights.competitorGap,
+          },
+          engineCoverage: {
+            score: engineCoverage,
+            weight: weights.engineCoverage,
+            weighted: engineCoverage * weights.engineCoverage,
+          },
+          trustSignals: {
+            score: trustSignals,
+            weight: weights.trustSignals,
+            weighted: trustSignals * weights.trustSignals,
+          },
+        },
+      };
+    } catch (error) {
+      console.error('Error calculating comprehensive GEO score:', error);
+      throw new Error(`Failed to calculate comprehensive GEO score: ${error.message}`);
+    }
+  }
+
+  /**
+   * Calculate competitor gap score (0-100)
+   * Higher score = better position relative to competitors
+   */
+  private async calculateCompetitorGapScore(
+    workspaceId: string,
+    brandName?: string,
+    competitors: string[] = []
+  ): Promise<number> {
+    if (!brandName || competitors.length === 0) {
+      return 50; // Neutral score if no competitors
+    }
+
+    try {
+      // Get share of voice for brand and competitors
+      const Pool = require('pg').Pool;
+      const dbPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+
+      // Get mention counts
+      const mentionQuery = `
+        SELECT 
+          LOWER(m."brand") AS "brand",
+          COUNT(*)::int AS "mentions"
+        FROM "mentions" m
+        JOIN "answers" a ON a.id = m."answerId"
+        JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+        WHERE pr."workspaceId" = $1
+        GROUP BY LOWER(m."brand")
+      `;
+
+      const mentionResult = await dbPool.query(mentionQuery, [workspaceId]);
+      const mentionMap = new Map<string, number>();
+      
+      for (const row of mentionResult.rows) {
+        mentionMap.set(row.brand.toLowerCase(), row.mentions);
+      }
+
+      const brandMentions = mentionMap.get(brandName.toLowerCase()) || 0;
+      const competitorMentions = competitors
+        .map(c => mentionMap.get(c.toLowerCase()) || 0)
+        .reduce((sum, count) => sum + count, 0);
+
+      const totalMentions = brandMentions + competitorMentions;
+      if (totalMentions === 0) {
+        return 50; // Neutral if no mentions
+      }
+
+      // Calculate share of voice
+      const brandSOV = (brandMentions / totalMentions) * 100;
+      const avgCompetitorSOV = competitors.length > 0
+        ? (competitorMentions / competitors.length) / totalMentions * 100
+        : 0;
+
+      // Score based on how much better we are than average competitor
+      const gap = brandSOV - avgCompetitorSOV;
+      
+      // Normalize to 0-100 scale
+      // If gap is positive (we're ahead), score is 50 + (gap * 2) capped at 100
+      // If gap is negative (we're behind), score is 50 + (gap * 2) floored at 0
+      const score = Math.min(100, Math.max(0, 50 + (gap * 2)));
+
+      return score;
+    } catch (error) {
+      console.warn('Failed to calculate competitor gap:', error);
+      return 50; // Neutral fallback
+    }
+  }
+
+  /**
+   * Calculate engine coverage score (0-100)
+   * Higher score = visible in more engines
+   */
+  private async calculateEngineCoverageScore(
+    workspaceId: string,
+    engines: string[] = ['PERPLEXITY', 'BRAVE', 'AIO']
+  ): Promise<number> {
+    try {
+      const Pool = require('pg').Pool;
+      const dbPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+
+      // Count engines where we have successful runs with mentions
+      const coverageQuery = `
+        SELECT DISTINCT e."key" AS "engine"
+        FROM "prompt_runs" pr
+        JOIN "engines" e ON e.id = pr."engineId"
+        JOIN "answers" a ON a."promptRunId" = pr.id
+        JOIN "mentions" m ON m."answerId" = a.id
+        WHERE pr."workspaceId" = $1
+          AND pr."status" = 'SUCCESS'
+          AND e."key" = ANY($2::text[])
+      `;
+
+      const coverageResult = await dbPool.query(coverageQuery, [workspaceId, engines]);
+      const enginesWithMentions = coverageResult.rows.length;
+
+      // Score: percentage of engines where we're visible
+      const score = (enginesWithMentions / engines.length) * 100;
+      return Math.round(score);
+    } catch (error) {
+      console.warn('Failed to calculate engine coverage:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Calculate trust signals score (0-100)
+   * Based on reviews, certifications, verified listings, etc.
+   */
+  private async calculateTrustSignalsScore(workspaceId: string): Promise<number> {
+    try {
+      // Get workspace profile for verified status
+      const Pool = require('pg').Pool;
+      const dbPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      });
+
+      const profileQuery = 'SELECT "verified", "description" FROM "workspace_profiles" WHERE "workspaceId" = $1';
+      const profileResult = await dbPool.query(profileQuery, [workspaceId]);
+      const profile = profileResult.rows[0];
+
+      let score = 0;
+
+      // Verified status (30 points)
+      if (profile?.verified) {
+        score += 30;
+      }
+
+      // Profile completeness (20 points)
+      if (profile?.description && profile.description.length > 50) {
+        score += 20;
+      }
+
+      // Licensed publisher citations (25 points)
+      const licensedQuery = `
+        SELECT COUNT(*)::int AS "count"
+        FROM "citations" c
+        JOIN "answers" a ON a.id = c."answerId"
+        JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+        WHERE pr."workspaceId" = $1
+          AND c."isLicensed" = true
+      `;
+      const licensedResult = await dbPool.query(licensedQuery, [workspaceId]);
+      const licensedCount = licensedResult.rows[0]?.count || 0;
+      score += Math.min(25, licensedCount * 5); // 5 points per licensed citation, max 25
+
+      // Directory listings (15 points)
+      const directoryQuery = `
+        SELECT COUNT(DISTINCT c."domain")::int AS "count"
+        FROM "citations" c
+        JOIN "answers" a ON a.id = c."answerId"
+        JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+        WHERE pr."workspaceId" = $1
+          AND c."directoryType" IS NOT NULL
+      `;
+      const directoryResult = await dbPool.query(directoryQuery, [workspaceId]);
+      const directoryCount = directoryResult.rows[0]?.count || 0;
+      score += Math.min(15, directoryCount * 3); // 3 points per directory, max 15
+
+      // Positive sentiment (10 points)
+      const sentimentQuery = `
+        SELECT 
+          SUM(CASE WHEN m."sentiment" = 'POS' THEN 1 ELSE 0 END)::int AS "positive",
+          COUNT(*)::int AS "total"
+        FROM "mentions" m
+        JOIN "answers" a ON a.id = m."answerId"
+        JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+        WHERE pr."workspaceId" = $1
+      `;
+      const sentimentResult = await dbPool.query(sentimentQuery, [workspaceId]);
+      const positive = sentimentResult.rows[0]?.positive || 0;
+      const total = sentimentResult.rows[0]?.total || 0;
+      if (total > 0) {
+        const positiveRatio = positive / total;
+        score += Math.round(positiveRatio * 10); // Up to 10 points for positive sentiment
+      }
+
+      return Math.min(100, score);
+    } catch (error) {
+      console.warn('Failed to calculate trust signals:', error);
+      return 0;
+    }
   }
 }

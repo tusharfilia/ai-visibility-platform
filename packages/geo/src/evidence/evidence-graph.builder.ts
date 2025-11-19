@@ -61,6 +61,13 @@ export interface FactConsensusScore {
   independentSources: number;
   facts: ExtractedFact[];
   mostCommonValue?: string;
+  validation: {
+    validated: boolean;
+    validationScore: number; // 0-100
+    crossEngineConsensus: number; // 0-100
+    trustedSourceCount: number;
+    conflictingSourceCount: number;
+  };
 }
 
 @Injectable()
@@ -347,6 +354,26 @@ export class EvidenceGraphBuilderService {
           ? Math.round((agreementCount / total) * 100)
           : 0;
 
+        // Enhanced validation: track trusted sources and cross-engine consensus
+        const trustedSourceTypes: CitationSourceType[] = ['licensed_publisher', 'curated', 'directory'];
+        const trustedFacts = facts.filter(f => trustedSourceTypes.includes(f.sourceType));
+        const trustedSourceCount = trustedFacts.length;
+        const conflictingSourceCount = contradictionCount;
+
+        // Calculate validation score based on trusted sources agreeing
+        const trustedAgreements = trustedFacts.filter(f => 
+          f.normalizedValue === mostCommonValue || f.value.toLowerCase().trim() === mostCommonValue
+        ).length;
+        const validationScore = trustedSourceCount > 0
+          ? Math.round((trustedAgreements / trustedSourceCount) * 100)
+          : consensus; // Fallback to general consensus if no trusted sources
+
+        // Cross-engine consensus: how many different engines/sources agree
+        const crossEngineConsensus = this.calculateCrossEngineConsensus(facts, mostCommonValue);
+
+        // Fact is validated if trusted sources agree and consensus is high
+        const validated = validationScore >= 70 && consensus >= 60 && contradictionCount === 0;
+
         consensusScores.push({
           factType: type,
           consensus,
@@ -355,6 +382,13 @@ export class EvidenceGraphBuilderService {
           independentSources,
           facts,
           mostCommonValue: mostCommonValue ? facts.find(f => f.normalizedValue === mostCommonValue)?.value : undefined,
+          validation: {
+            validated,
+            validationScore,
+            crossEngineConsensus,
+            trustedSourceCount,
+            conflictingSourceCount,
+          },
         });
       }
 
@@ -558,6 +592,140 @@ export class EvidenceGraphBuilderService {
     };
 
     return mapping[sourceType] || 'curated_content';
+  }
+
+  /**
+   * Calculate cross-engine consensus for facts
+   * Measures how many different engines/sources agree on a fact value
+   */
+  private calculateCrossEngineConsensus(
+    facts: ExtractedFact[],
+    mostCommonValue?: string
+  ): number {
+    if (!mostCommonValue || facts.length === 0) {
+      return 0;
+    }
+
+    // Group facts by source type (representing different engines/sources)
+    const sourceTypeGroups = new Map<CitationSourceType, ExtractedFact[]>();
+    for (const fact of facts) {
+      if (!sourceTypeGroups.has(fact.sourceType)) {
+        sourceTypeGroups.set(fact.sourceType, []);
+      }
+      sourceTypeGroups.get(fact.sourceType)!.push(fact);
+    }
+
+    // Count how many source types agree with the most common value
+    let agreeingSources = 0;
+    for (const [sourceType, groupFacts] of sourceTypeGroups) {
+      const matchingFacts = groupFacts.filter(f => 
+        (f.normalizedValue || f.value.toLowerCase().trim()) === mostCommonValue
+      );
+      if (matchingFacts.length > 0) {
+        agreeingSources++;
+      }
+    }
+
+    // Consensus = percentage of source types that agree
+    const totalSourceTypes = sourceTypeGroups.size;
+    return totalSourceTypes > 0
+      ? Math.round((agreeingSources / totalSourceTypes) * 100)
+      : 0;
+  }
+
+  /**
+   * Validate facts against workspace profile
+   * Checks if extracted facts match known business information
+   */
+  async validateFactsAgainstProfile(
+    workspaceId: string,
+    facts: ExtractedFact[]
+  ): Promise<Map<string, { validated: boolean; confidence: number; profileValue?: string }>> {
+    const validationMap = new Map<string, { validated: boolean; confidence: number; profileValue?: string }>();
+
+    try {
+      // Get workspace profile
+      const profileResult = await this.dbPool!.query(
+        'SELECT * FROM "workspace_profiles" WHERE "workspaceId" = $1',
+        [workspaceId]
+      );
+      const profile = profileResult.rows[0];
+
+      if (!profile) {
+        // No profile to validate against
+        for (const fact of facts) {
+          validationMap.set(fact.sourceNodeId, { validated: false, confidence: 0 });
+        }
+        return validationMap;
+      }
+
+      // Validate each fact against profile
+      for (const fact of facts) {
+        let validated = false;
+        let confidence = 0;
+        let profileValue: string | undefined;
+
+        switch (fact.type) {
+          case 'address':
+            if (profile.address) {
+              const normalizedProfile = this.normalizeAddress(profile.address);
+              const normalizedFact = fact.normalizedValue || this.normalizeAddress(fact.value);
+              validated = normalizedProfile === normalizedFact;
+              confidence = validated ? 0.9 : 0.3;
+              profileValue = profile.address;
+            }
+            break;
+          case 'phone':
+            if (profile.phone) {
+              const normalizedProfile = this.normalizePhone(profile.phone);
+              const normalizedFact = fact.normalizedValue || this.normalizePhone(fact.value);
+              validated = normalizedProfile === normalizedFact;
+              confidence = validated ? 0.9 : 0.3;
+              profileValue = profile.phone;
+            }
+            break;
+          case 'services':
+            if (profile.services && Array.isArray(profile.services)) {
+              const factValue = fact.value.toLowerCase().trim();
+              const matches = profile.services.some((svc: string) => 
+                svc.toLowerCase().includes(factValue) || factValue.includes(svc.toLowerCase())
+              );
+              validated = matches;
+              confidence = matches ? 0.8 : 0.4;
+              profileValue = profile.services.join(', ');
+            }
+            break;
+        }
+
+        validationMap.set(fact.sourceNodeId, { validated, confidence, profileValue });
+      }
+    } catch (error) {
+      console.warn('Failed to validate facts against profile:', error);
+      // Return unvalidated facts
+      for (const fact of facts) {
+        validationMap.set(fact.sourceNodeId, { validated: false, confidence: 0 });
+      }
+    }
+
+    return validationMap;
+  }
+
+  /**
+   * Normalize address for comparison
+   */
+  private normalizeAddress(address: string): string {
+    return address
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Normalize phone for comparison
+   */
+  private normalizePhone(phone: string): string {
+    return phone.replace(/[^\d]/g, '');
   }
 
   /**

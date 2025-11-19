@@ -4,6 +4,8 @@ import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { URL } from 'url';
 import { LLMRouterService } from '@ai-visibility/shared';
+import { EntityExtractorService, CompetitorDetectorService, DiagnosticInsightsService } from '@ai-visibility/geo';
+import { IntentClustererService } from '@ai-visibility/prompts';
 import { PrismaService } from '../database/prisma.service';
 import { DemoCompetitorsRequestDto, DemoPromptsRequestDto, DemoRunRequestDto, DemoSummaryRequestDto } from './dto/demo.dto';
 
@@ -109,6 +111,10 @@ export class DemoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly llmRouter: LLMRouterService,
+    private readonly entityExtractor: EntityExtractorService,
+    private readonly competitorDetector: CompetitorDetectorService,
+    private readonly intentClusterer: IntentClustererService,
+    private readonly diagnosticInsights: DiagnosticInsightsService,
     @InjectQueue('runPrompt') private readonly runPromptQueue: Queue,
   ) {}
 
@@ -142,6 +148,7 @@ export class DemoService {
         brand,
         summary: summaryResult.summary,
         summarySource: summaryResult.source,
+        entityData: summaryResult.entityData, // Include comprehensive entity data
       },
     };
   }
@@ -170,7 +177,8 @@ export class DemoService {
         demoRun.workspaceId,
         demoRun.brand ?? 'Brand',
         demoRun.summary ?? '',
-        seedPrompts.map(p => p.text)
+        seedPrompts.map(p => p.text),
+        demoRun.domain
       );
       finalPrompts = this.mergePromptSources([...seedPrompts, ...generated]);
     }
@@ -395,7 +403,13 @@ export class DemoService {
     );
 
     const analysis = await this.collectAnalysisData(demoRun);
-    const insightHighlights = this.buildInsightHighlights(analysis);
+    const insightHighlights = await this.buildInsightHighlights(
+      analysis,
+      demoRun.workspaceId!,
+      analysis.brand.label,
+      demoRun.domain,
+      analysis.competitors.map(c => c.label)
+    );
 
     return {
       ok: true,
@@ -442,7 +456,13 @@ export class DemoService {
     );
 
     const analysis = await this.collectAnalysisData(demoRun);
-    const recommendations = this.generateRecommendations(analysis);
+    const recommendations = await this.generateRecommendations(
+      analysis,
+      demoRun.workspaceId!,
+      analysis.brand.label,
+      demoRun.domain,
+      analysis.competitors.map(c => c.label)
+    );
 
     return {
       ok: true,
@@ -702,66 +722,136 @@ export class DemoService {
     };
   }
 
-  private buildInsightHighlights(analysis: DemoAnalysisData): string[] {
+  private async buildInsightHighlights(
+    analysis: DemoAnalysisData,
+    workspaceId: string,
+    brandName: string,
+    domain?: string | null,
+    competitors: string[] = []
+  ): Promise<string[]> {
     const highlights: string[] = [];
-    const brandRow = analysis.shareOfVoice.find((row) => row.entityKey === analysis.brand.key);
-    const competitorRows = analysis.shareOfVoice
-      .filter((row) => row.entityKey !== analysis.brand.key)
-      .sort((a, b) => b.sharePercentage - a.sharePercentage);
 
-    const topCompetitor = competitorRows[0];
+    try {
+      // Use DiagnosticInsightsService for comprehensive, evidence-backed insights
+      const diagnosticResult = await this.diagnosticInsights.generateInsights(
+        workspaceId,
+        brandName,
+        domain || undefined,
+        competitors
+      );
 
-    if (brandRow) {
-      if (topCompetitor && topCompetitor.sharePercentage - brandRow.sharePercentage >= 5) {
-        highlights.push(
-          `${topCompetitor.entity} leads share of voice by ${(topCompetitor.sharePercentage - brandRow.sharePercentage).toFixed(1)} pts over ${analysis.brand.label}.`,
-        );
-      } else if (brandRow.sharePercentage >= 40) {
-        highlights.push(`${analysis.brand.label} leads share of voice at ${brandRow.sharePercentage.toFixed(1)}%.`);
-      } else if (brandRow.sharePercentage > 0) {
-        highlights.push(`${analysis.brand.label} holds ${brandRow.sharePercentage.toFixed(1)}% share of voice across demo prompts.`);
+      // Extract top insights from diagnostic service
+      const topInsights = diagnosticResult.topIssues.slice(0, 5);
+      for (const insight of topInsights) {
+        // Format insight as a highlight
+        let highlight = insight.title;
+        if (insight.description) {
+          highlight += `: ${insight.description}`;
+        }
+        highlights.push(highlight);
       }
 
-      if (brandRow.mentions > 0) {
-        const positiveShare = this.toPercentage(brandRow.positiveMentions / brandRow.mentions);
-        if (positiveShare < 35) {
-          highlights.push(
-            `${analysis.brand.label} sentiment skews cautious—only ${positiveShare.toFixed(1)}% of mentions are positive.`,
-          );
+      // If we have fewer than 5 insights, supplement with basic analysis
+      if (highlights.length < 5) {
+        const brandRow = analysis.shareOfVoice.find((row) => row.entityKey === analysis.brand.key);
+        const competitorRows = analysis.shareOfVoice
+          .filter((row) => row.entityKey !== analysis.brand.key)
+          .sort((a, b) => b.sharePercentage - a.sharePercentage);
+
+        const topCompetitor = competitorRows[0];
+
+        if (brandRow) {
+          if (topCompetitor && topCompetitor.sharePercentage - brandRow.sharePercentage >= 5) {
+            highlights.push(
+              `${topCompetitor.entity} leads share of voice by ${(topCompetitor.sharePercentage - brandRow.sharePercentage).toFixed(1)} pts over ${analysis.brand.label}.`,
+            );
+          } else if (brandRow.sharePercentage >= 40) {
+            highlights.push(`${analysis.brand.label} leads share of voice at ${brandRow.sharePercentage.toFixed(1)}%.`);
+          } else if (brandRow.sharePercentage > 0) {
+            highlights.push(`${analysis.brand.label} holds ${brandRow.sharePercentage.toFixed(1)}% share of voice across demo prompts.`);
+          }
+        }
+
+        if (analysis.citations.length === 0) {
+          highlights.push('No citations captured yet—focus on landing authoritative sources in follow-up runs.');
         } else {
+          const citationLeader = analysis.citations[0];
           highlights.push(
-            `${analysis.brand.label} maintains ${positiveShare.toFixed(1)}% positive sentiment in captured answers.`,
+            `${citationLeader.domain} contributes the most references (${citationLeader.sharePercentage.toFixed(1)}% of citations).`,
           );
         }
       }
-    }
-
-    if (analysis.citations.length === 0) {
-      highlights.push('No citations captured yet—focus on landing authoritative sources in follow-up runs.');
-    } else {
-      const citationLeader = analysis.citations[0];
-      highlights.push(
-        `${citationLeader.domain} contributes the most references (${citationLeader.sharePercentage.toFixed(1)}% of citations).`,
-      );
-    }
-
-    const strugglingEngine = analysis.enginePerformance.find((engine) => engine.successRate < 70);
-    if (strugglingEngine) {
-      highlights.push(
-        `${strugglingEngine.engine} success rate is only ${strugglingEngine.successRate.toFixed(1)}%—consider more targeted prompts.`,
-      );
-    } else if (analysis.enginePerformance.length > 0) {
-      const topEngine = [...analysis.enginePerformance].sort((a, b) => b.successRate - a.successRate)[0];
-      highlights.push(`${topEngine.engine} is the most reliable engine so far (${topEngine.successRate.toFixed(1)}% success).`);
+    } catch (error) {
+      this.logger.warn(`Failed to generate diagnostic insights, using fallback: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Fallback to original logic
+      const brandRow = analysis.shareOfVoice.find((row) => row.entityKey === analysis.brand.key);
+      if (brandRow && brandRow.sharePercentage > 0) {
+        highlights.push(`${analysis.brand.label} holds ${brandRow.sharePercentage.toFixed(1)}% share of voice across demo prompts.`);
+      }
+      if (analysis.citations.length === 0) {
+        highlights.push('No citations captured yet—focus on landing authoritative sources in follow-up runs.');
+      }
     }
 
     const unique = Array.from(new Set(highlights));
-    return unique.slice(0, 5);
+    return unique.slice(0, 8); // Return top 8 insights
   }
 
-  private generateRecommendations(analysis: DemoAnalysisData): DemoRecommendationItem[] {
+  private async generateRecommendations(
+    analysis: DemoAnalysisData,
+    workspaceId: string,
+    brandName: string,
+    domain?: string | null,
+    competitors: string[] = []
+  ): Promise<DemoRecommendationItem[]> {
     const recommendations: DemoRecommendationItem[] = [];
     const { metrics, demoRun: demoRunRecord } = analysis;
+    
+    try {
+      // Use DiagnosticInsightsService for evidence-based recommendations
+      const diagnosticResult = await this.diagnosticInsights.generateInsights(
+        workspaceId,
+        brandName,
+        domain || undefined,
+        competitors
+      );
+
+      // Convert diagnostic insights to recommendations
+      for (const insight of diagnosticResult.insights.slice(0, 10)) {
+        const priorityMap: Record<string, 'high' | 'medium' | 'low'> = {
+          critical: 'high',
+          high: 'high',
+          medium: 'medium',
+          low: 'low',
+        };
+
+        const categoryMap: Record<string, 'visibility' | 'sentiment' | 'citations' | 'execution' | 'coverage'> = {
+          visibility_blocker: 'visibility',
+          trust_gap: 'citations',
+          schema_gap: 'visibility',
+          listing_inconsistency: 'citations',
+          reputation_weakness: 'sentiment',
+          content_gap: 'citations',
+          competitor_advantage: 'visibility',
+          hallucination_risk: 'citations',
+          missing_fact: 'visibility',
+        };
+
+        recommendations.push({
+          title: insight.title,
+          description: insight.description,
+          priority: priorityMap[insight.severity] || 'medium',
+          category: categoryMap[insight.type] || 'visibility',
+          relatedMetric: this.getRelatedMetric(insight.type),
+          actionItems: insight.recommendations.slice(0, 3),
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to generate diagnostic recommendations, using fallback: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Supplement with basic analysis if needed
     const brandRow = analysis.shareOfVoice.find((row) => row.entityKey === analysis.brand.key);
     const competitorRows = analysis.shareOfVoice
       .filter((row) => row.entityKey !== analysis.brand.key)
@@ -889,7 +979,33 @@ export class DemoService {
       });
     }
 
-    return recommendations.slice(0, 6);
+    // Sort by priority and impact
+    const priorityOrder = { high: 3, medium: 2, low: 1 };
+    recommendations.sort((a, b) => {
+      const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.title.localeCompare(b.title);
+    });
+
+    return recommendations.slice(0, 10); // Return top 10 recommendations
+  }
+
+  /**
+   * Get related metric for insight type
+   */
+  private getRelatedMetric(insightType: string): string {
+    const metricMap: Record<string, string> = {
+      visibility_blocker: 'shareOfVoice',
+      trust_gap: 'citations',
+      schema_gap: 'structuralScore',
+      listing_inconsistency: 'citations',
+      reputation_weakness: 'sentiment',
+      content_gap: 'citations',
+      competitor_advantage: 'shareOfVoice',
+      hallucination_risk: 'citations',
+      missing_fact: 'entityStrength',
+    };
+    return metricMap[insightType] || 'shareOfVoice';
   }
 
   private normalizeEntityKey(value: string | null | undefined): string {
@@ -1025,11 +1141,39 @@ export class DemoService {
     domain: string,
     brand: string,
     override?: string,
-  ): Promise<{ summary: string; source: 'user' | 'llm' | 'fallback' }> {
+  ): Promise<{ summary: string; source: 'user' | 'llm' | 'fallback'; entityData?: any }> {
     if (override && override.trim().length > 0) {
       return { summary: override.trim(), source: 'user' };
     }
 
+    try {
+      // Use EntityExtractorService for comprehensive entity-first extraction
+      const entityData = await this.entityExtractor.extractEntityFromDomain(workspaceId, domain);
+      
+      // Use the LLM-optimized summary from entity extraction
+      if (entityData.summary && entityData.summary.length > 0) {
+        return {
+          summary: entityData.summary,
+          source: 'llm',
+          entityData: {
+            businessName: entityData.businessName,
+            category: entityData.category,
+            vertical: entityData.vertical,
+            services: entityData.services,
+            geography: entityData.geography,
+            pricePositioning: entityData.pricePositioning,
+            valueProps: entityData.valueProps,
+            credibilityMarkers: entityData.credibilityMarkers,
+            structuredSummary: entityData.structuredSummary,
+            metadata: entityData.metadata,
+          },
+        };
+      }
+    } catch (error) {
+      this.logger.warn(`Entity extraction failed, falling back to simple summary: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Fallback to simple LLM generation if entity extraction fails
     const prompt = `Analyze the brand hosted at ${domain}.
 Provide a concise 2-3 sentence overview describing what ${brand} does, who it serves, and its value proposition.
 Keep the tone factual and neutral.`;
@@ -1150,7 +1294,63 @@ Keep the tone factual and neutral.`;
     brand: string,
     summary: string,
     seedPrompts: string[],
+    domain?: string | null,
   ): Promise<Array<{ text: string; source: 'llm' | 'seed' | 'user' }>> {
+    try {
+      // Get entity data if available for better context
+      let entityData: any = null;
+      if (domain) {
+        try {
+          const profile = await this.prisma.$queryRaw<{ businessName: string; description: string; services: any[] }>(
+            'SELECT "businessName", "description", "services" FROM "workspace_profiles" WHERE "workspaceId" = $1 LIMIT 1',
+            [workspaceId]
+          );
+          if (profile.length > 0) {
+            try {
+              entityData = await this.entityExtractor.extractEntityFromDomain(workspaceId, domain);
+            } catch (error) {
+              // Continue without entity data
+            }
+          }
+        } catch (error) {
+          // Continue without entity data
+        }
+      }
+
+      // Use IntentClustererService for intent-based prompt generation
+      const intentBasedPrompts = await this.intentClusterer.generateIntentBasedPrompts(
+        workspaceId,
+        {
+          brandName: brand,
+          category: entityData?.category || 'General Business',
+          vertical: entityData?.vertical || 'General',
+          summary: summary || entityData?.summary || '',
+          services: entityData?.services || [],
+          geography: entityData?.geography || undefined,
+        },
+        ['BEST', 'ALTERNATIVES', 'HOWTO', 'PRICING', 'COMPARISON'] // Target intents
+      );
+
+      // Convert to expected format
+      const suggestions = intentBasedPrompts.map(p => ({
+        text: p.text,
+        source: 'llm' as const,
+      }));
+
+      // Include seed prompts and merge
+      const allPrompts = this.mergePromptSources([
+        ...this.normalizePromptList(seedPrompts, 'seed'),
+        ...suggestions,
+      ]);
+
+      if (allPrompts.length > 0) {
+        return allPrompts;
+      }
+    } catch (error) {
+      this.logger.warn(`Intent-based prompt generation failed, falling back to simple generation: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Fallback to simple LLM generation
     const prompt = `You are helping an analyst evaluate ${brand}.
 Use the brand summary below and the provided seed prompts to suggest additional high-impact prompts that capture how AI search users or customers might research this brand.
 
@@ -1172,7 +1372,10 @@ Return a JSON array of 3 to 6 concise prompts (strings). Each prompt should be u
       const parsed = JSON.parse(raw) as string[];
       const suggestions = this.normalizePromptList(parsed, 'llm');
       if (suggestions.length > 0) {
-        return suggestions;
+        return this.mergePromptSources([
+          ...this.normalizePromptList(seedPrompts, 'seed'),
+          ...suggestions,
+        ]);
       }
     } catch (error) {
       this.logger.warn(`Prompt expansion failed, falling back to heuristics: ${error instanceof Error ? error.message : String(error)}`);
@@ -1366,6 +1569,65 @@ Return a JSON array of 3 to 6 concise prompts (strings). Each prompt should be u
     promptTexts: string[],
     domain?: string | null,
   ): Promise<string[]> {
+    try {
+      // Get entity data if available (from workspace profile or extract it)
+      let entityData: any = null;
+      try {
+        const profile = await this.prisma.$queryRaw<{ businessName: string; description: string; services: any[] }>(
+          'SELECT "businessName", "description", "services" FROM "workspace_profiles" WHERE "workspaceId" = $1 LIMIT 1',
+          [workspaceId]
+        );
+        if (profile.length > 0 && domain) {
+          // Try to extract entity data if we have domain
+          try {
+            entityData = await this.entityExtractor.extractEntityFromDomain(workspaceId, domain);
+          } catch (error) {
+            this.logger.warn('Entity extraction for competitor detection failed, using summary only');
+          }
+        }
+      } catch (error) {
+        // Continue without entity data
+      }
+
+      // Get existing mentions and citations from database (if any analysis has run)
+      const [existingMentions, citationDomains] = await Promise.all([
+        this.getExistingMentions(workspaceId, brand),
+        this.getCitationDomains(workspaceId),
+      ]);
+
+      // Build competitor detection context
+      const context = {
+        brandName: brand,
+        domain: domain || '',
+        category: entityData?.category || 'General Business',
+        vertical: entityData?.vertical || 'General',
+        geography: entityData?.geography || undefined,
+        services: entityData?.services || [],
+        pricePositioning: entityData?.pricePositioning || undefined,
+        summary: summary || entityData?.summary || '',
+        promptTexts: promptTexts || [],
+        existingMentions: existingMentions,
+        citationDomains: citationDomains,
+      };
+
+      // Use CompetitorDetectorService for comprehensive detection
+      const detectionResult = await this.competitorDetector.detectCompetitors(workspaceId, context);
+
+      // Combine all competitors and return domains
+      const allCompetitors = detectionResult.all;
+      const domains = allCompetitors
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 8) // Limit to top 8
+        .map(c => c.domain);
+
+      if (domains.length > 0) {
+        return this.normalizeDomainList(domains);
+      }
+    } catch (error) {
+      this.logger.warn(`Competitor detection failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Fallback to simple LLM-based detection
     const prompt = `You are analyzing competitors for ${brand}.
 Use the brand summary and prompts below to identify likely competitors.
 
@@ -1395,6 +1657,58 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
 
     const host = domain ? this.normalizeDomain(domain).host : undefined;
     return this.getDefaultCompetitors(brand, host);
+  }
+
+  /**
+   * Get existing mentions from database for competitor detection
+   */
+  private async getExistingMentions(
+    workspaceId: string,
+    brandName: string
+  ): Promise<Array<{ brand: string; domain?: string }>> {
+    try {
+      const mentions = await this.prisma.$queryRaw<{ brand: string }>(
+        `SELECT DISTINCT m."brand"
+         FROM "mentions" m
+         JOIN "answers" a ON a.id = m."answerId"
+         JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+         JOIN "prompts" p ON p.id = pr."promptId"
+         WHERE pr."workspaceId" = $1
+           AND LOWER(m."brand") != LOWER($2)
+           AND 'demo' = ANY(p."tags")
+         LIMIT 20`,
+        [workspaceId, brandName]
+      );
+
+      return mentions.map(m => ({ brand: m.brand }));
+    } catch (error) {
+      this.logger.warn('Failed to get existing mentions:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get citation domains from database
+   */
+  private async getCitationDomains(workspaceId: string): Promise<string[]> {
+    try {
+      const citations = await this.prisma.$queryRaw<{ domain: string }>(
+        `SELECT DISTINCT c."domain"
+         FROM "citations" c
+         JOIN "answers" a ON a.id = c."answerId"
+         JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+         JOIN "prompts" p ON p.id = pr."promptId"
+         WHERE pr."workspaceId" = $1
+           AND 'demo' = ANY(p."tags")
+         LIMIT 30`,
+        [workspaceId]
+      );
+
+      return citations.map(c => c.domain).filter(Boolean);
+    } catch (error) {
+      this.logger.warn('Failed to get citation domains:', error);
+      return [];
+    }
   }
 
   private getDefaultCompetitors(brand: string, host?: string): string[] {

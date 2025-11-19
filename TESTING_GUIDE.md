@@ -1,282 +1,386 @@
-# Testing Guide - Best-in-Market GEO Features
+# 🧪 Testing Guide - GEO Platform Quality Improvements
 
-This guide will help you test the newly implemented features:
-1. **E-E-A-T Scoring System**
-2. **Fact-Level Consensus Tracking**
-3. **Dashboard API Endpoints**
+## ✅ Pre-Flight Checklist
 
-## Prerequisites
-
-### 1. Run Database Migration
-
-First, you need to create the migration for the new `EEATScore` model:
-
-```bash
-# Navigate to the db package
-cd packages/db
-
-# Create migration for EEATScore
-pnpm prisma migrate dev --name add_eeat_score_model
-
-# Or if you prefer to push schema without migration history
-pnpm prisma db push
-```
-
-### 2. Verify Database Connection
-
-Make sure your `.env` file has:
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/ai_visibility?schema=public"
-```
-
-### 3. Check if Infrastructure is Running
-
-```bash
-# Start PostgreSQL and Redis
-docker compose -f infra/docker-compose.yml up -d
-
-# Check status
-docker compose -f infra/docker-compose.yml ps
-```
-
-### 4. Start the API Server
-
+### 1. Build All Packages
 ```bash
 # From project root
-pnpm --filter @apps/api dev
+pnpm install
+pnpm --filter @ai-visibility/geo build
+pnpm --filter @ai-visibility/prompts build
+pnpm --filter @ai-visibility/shared build
 ```
 
-The API should start on `http://localhost:8080` (or port 3000, check the console output).
+### 2. Verify Environment Variables
 
-## Testing Endpoints
+**Required for API Service:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `REDIS_URL` - Redis connection string
+- `PERPLEXITY_API_KEY` - For Perplexity search
+- `BRAVE_API_KEY` - For Brave search
+- `SERPAPI_KEY` - For Google AI Overviews (AIO)
+- `OPENAI_API_KEY` - For LLM requests (optional, for entity extraction)
+- `ANTHROPIC_API_KEY` - For LLM requests (optional)
+- `GOOGLE_AI_API_KEY` - For LLM requests (optional)
 
-### Setup Test Workspace
+**Required for Jobs Service:**
+- Same as API service (especially `SERPAPI_KEY` for AIO)
 
-You'll need a workspace ID to test. You can either:
-1. Use an existing workspace from your database
-2. Create a test workspace using the seed script
-3. Create one manually via the API
-
-#### Option 1: Create Test Workspace (Recommended)
-
+### 3. Database Migrations
 ```bash
-# First, seed the database if you haven't already
-pnpm --filter @ai-visibility-platform/db prisma db seed
-
-# Or create a workspace manually using Prisma Studio
-pnpm --filter @ai-visibility-platform/db prisma studio
+# Ensure database is migrated
+cd apps/api
+pnpm prisma migrate deploy
+# OR for development
+pnpm prisma migrate dev
 ```
 
-#### Option 2: Use Existing Workspace
+---
 
-Query your database:
-```sql
-SELECT id FROM "Workspace" LIMIT 1;
-```
+## 🧪 Testing Steps
 
-Also ensure you have a WorkspaceProfile:
-```sql
-SELECT "workspaceId" FROM "WorkspaceProfile" LIMIT 1;
-```
+### Test 1: Entity Extraction Service
 
-### Authentication
+**Endpoint:** `GET /v1/demo/instant-summary?domain=example.com`
 
-For local testing, check if `DEBUG_JWT_MODE` is enabled in your `.env`:
+**What it tests:**
+- EntityExtractorService integration
+- SchemaAuditorService usage
+- PageStructureAnalyzerService usage
+- FactExtractorService usage
+- Parallel execution of analysis services
+- LLM entity extraction
 
-```env
-DEBUG_JWT_MODE=true
-```
+**Expected behavior:**
+1. Fetches website HTML
+2. Runs schema audit, structure analysis, and fact extraction in parallel
+3. Generates comprehensive entity data
+4. Returns structured business entity information
 
-If not, you'll need a JWT token. You can:
-1. Check the auth endpoint to get a token
-2. Use the Swagger UI to authenticate
-
-### Test Script
-
-I'll create a test script for you that tests all endpoints. But first, let's test manually:
-
-## Manual Testing Steps
-
-### 1. Test E-E-A-T Scoring
-
+**Test command:**
 ```bash
-# Replace WORKSPACE_ID with your actual workspace ID
-curl -X GET "http://localhost:8080/v1/geo/eeat?workspaceId=YOUR_WORKSPACE_ID" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+curl -X GET "http://localhost:8080/v1/demo/instant-summary?domain=stripe.com" \
   -H "Content-Type: application/json"
 ```
 
-**Expected Response:**
-```json
-{
-  "ok": true,
-  "data": {
-    "experience": 65,
-    "expertise": 72,
-    "authoritativeness": 58,
-    "trustworthiness": 70,
-    "overallScore": 66,
-    "level": "high",
-    "breakdown": {
-      "experience": { "yearsInBusiness": 20, "caseStudies": 15, ... },
-      "expertise": { "certifications": 0, "awards": 0, ... },
-      ...
-    },
-    "createdAt": "2025-01-27T...",
-    "updatedAt": "2025-01-27T..."
-  }
-}
+**Success criteria:**
+- Returns 200 status
+- Response includes `summary`, `entityData`, `prompts`, `competitors`
+- Entity data includes: `businessName`, `category`, `vertical`, `services`, `geography`
+- No errors in logs
+
+---
+
+### Test 2: Competitor Detection Service
+
+**What it tests:**
+- CompetitorDetectorService multi-source detection
+- Direct, content, authority, and GEO competitor detection
+- Parallel execution of detection methods
+- Evidence tracking and confidence scoring
+
+**Expected behavior:**
+1. Detects competitors from 4 sources in parallel
+2. Combines and deduplicates results
+3. Returns competitors with confidence scores and evidence
+
+**Test via instant-summary endpoint:**
+```bash
+curl -X GET "http://localhost:8080/v1/demo/instant-summary?domain=stripe.com" \
+  -H "Content-Type: application/json" | jq '.competitors'
 ```
 
-### 2. Test Fact-Level Consensus
+**Success criteria:**
+- Returns 3-8 competitors
+- Each competitor has `domain`, `name`, `type`, `confidence`
+- Competitors are deduplicated
+- Evidence array is populated
+
+---
+
+### Test 3: Intent-Based Prompt Generation
+
+**What it tests:**
+- IntentClustererService
+- Intent-based prompt clustering (BEST, ALTERNATIVES, HOWTO, PRICING, COMPARISON)
+- LLM prompt generation with entity context
+
+**Expected behavior:**
+1. Generates prompts across multiple intent types
+2. Each prompt has intent classification
+3. Prompts are relevant to the business entity
+
+**Test via instant-summary endpoint:**
+```bash
+curl -X GET "http://localhost:8080/v1/demo/instant-summary?domain=stripe.com" \
+  -H "Content-Type: application/json" | jq '.prompts'
+```
+
+**Success criteria:**
+- Returns 3-8 prompts
+- Prompts cover different intent types
+- Prompts are relevant to the business
+
+---
+
+### Test 4: Diagnostic Insights Service
+
+**Endpoint:** `GET /v1/demo/insights/:demoRunId`
+
+**What it tests:**
+- DiagnosticInsightsService parallel execution
+- Visibility blocker detection
+- Trust gap detection
+- Schema gap detection
+- Competitor advantage detection
+- Evidence-backed insights
+
+**Prerequisites:**
+- Must have a completed demo run (from Test 1)
+
+**Test command:**
+```bash
+# First get a demo run ID from instant-summary
+DEMO_RUN_ID="<from-instant-summary-response>"
+
+curl -X GET "http://localhost:8080/v1/demo/insights/${DEMO_RUN_ID}" \
+  -H "Content-Type: application/json" | jq '.insightHighlights'
+```
+
+**Success criteria:**
+- Returns array of insight highlights
+- Insights are evidence-backed
+- Insights include impact scores
+- Insights are actionable
+
+---
+
+### Test 5: Enhanced Recommendations
+
+**Endpoint:** `GET /v1/demo/recommendations/:demoRunId`
+
+**What it tests:**
+- Evidence-based recommendation generation
+- Impact scoring
+- Engine mapping
+- Priority sorting
+
+**Test command:**
+```bash
+curl -X GET "http://localhost:8080/v1/demo/recommendations/${DEMO_RUN_ID}" \
+  -H "Content-Type: application/json" | jq '.recommendations'
+```
+
+**Success criteria:**
+- Returns 5-10 recommendations
+- Each recommendation has `title`, `description`, `priority`, `category`
+- Recommendations are sorted by priority
+- Action items are included
+
+---
+
+### Test 6: Engine Bias Simulation
+
+**What it tests:**
+- EngineBiasSimulatorService
+- Engine-specific scoring
+- Cross-engine comparison
+
+**Note:** This is used internally by other services. Test via:
+- GEO score calculation
+- Diagnostic insights (engine-specific recommendations)
+
+---
+
+### Test 7: Evidence Graph Builder
+
+**What it tests:**
+- Fact-level consensus tracking
+- Cross-engine consensus
+- Fact validation against profile
+
+**Note:** This is used internally. Test via:
+- Diagnostic insights (fact validation)
+- Share of voice calculations
+
+---
+
+### Test 8: Copilot Task Mapping
+
+**What it tests:**
+- InsightCopilotMapperService
+- Insight to Copilot action mapping
+- Weekly optimization plan generation
+
+**Note:** This is used internally. Test via:
+- Recommendations endpoint (should include Copilot-ready tasks)
+
+---
+
+## 🔍 Manual Testing Checklist
+
+### Local Development Testing
+
+1. **Start services:**
+   ```bash
+   # Terminal 1: API Service
+   cd apps/api
+   pnpm dev
+
+   # Terminal 2: Jobs Service (if testing job processing)
+   cd apps/jobs
+   pnpm dev
+   ```
+
+2. **Test instant summary flow:**
+   - Open frontend or use curl
+   - Enter a domain (e.g., `stripe.com`)
+   - Verify all sections populate:
+     - ✅ Business summary
+     - ✅ Auto-generated prompts (3-8)
+     - ✅ Competitors (3-8)
+     - ✅ Engine visibility status
+     - ✅ GEO score and insights
+
+3. **Check logs for:**
+   - No errors in EntityExtractorService
+   - Parallel execution messages
+   - Successful LLM calls
+   - Proper error handling
+
+---
+
+## 🚨 Common Issues & Fixes
+
+### Issue 1: "Cannot find module @ai-visibility/geo"
+**Fix:**
+```bash
+pnpm install
+pnpm --filter @ai-visibility/geo build
+```
+
+### Issue 2: "SchemaAuditorService is not defined"
+**Fix:** Ensure all dependencies are in DemoModule providers (already fixed)
+
+### Issue 3: "Missing API key for engine AIO"
+**Fix:** Set `SERPAPI_KEY` in environment variables (not `AIO_API_KEY`)
+
+### Issue 4: "Entity extraction failed"
+**Fix:** 
+- Check internet connectivity (needs to fetch website)
+- Verify domain is accessible
+- Check LLM API keys are set
+
+### Issue 5: "Competitor detection returns empty"
+**Fix:**
+- Ensure LLM API keys are set
+- Check logs for LLM errors
+- Verify domain is valid
+
+---
+
+## 📊 Success Metrics
+
+After testing, you should see:
+
+1. **Entity Extraction:**
+   - ✅ Comprehensive business entity data
+   - ✅ Schema types detected
+   - ✅ Structure analysis completed
+   - ✅ Facts extracted
+
+2. **Competitor Detection:**
+   - ✅ 4+ competitors detected
+   - ✅ Multiple competitor types (direct, content, authority, GEO)
+   - ✅ Confidence scores > 0.5
+   - ✅ Evidence provided
+
+3. **Prompt Generation:**
+   - ✅ 5+ prompts generated
+   - ✅ Multiple intent types covered
+   - ✅ Prompts are relevant
+
+4. **Insights:**
+   - ✅ 5+ diagnostic insights
+   - ✅ Evidence-backed
+   - ✅ Impact scores included
+
+5. **Recommendations:**
+   - ✅ 5+ recommendations
+   - ✅ Prioritized correctly
+   - ✅ Actionable items included
+
+---
+
+## 🚀 Production Readiness Checklist
+
+- [ ] All packages built successfully
+- [ ] Environment variables configured
+- [ ] Database migrations applied
+- [ ] API service starts without errors
+- [ ] Jobs service starts without errors
+- [ ] Instant summary endpoint returns data
+- [ ] Entity extraction works
+- [ ] Competitor detection works
+- [ ] Prompt generation works
+- [ ] Insights generation works
+- [ ] Recommendations generation works
+- [ ] No TypeScript errors
+- [ ] No runtime errors in logs
+
+---
+
+## 🎯 Quick Test Script
+
+Save this as `test-instant-summary.sh`:
 
 ```bash
-# Get consensus for all fact types
-curl -X GET "http://localhost:8080/v1/geo/evidence/consensus?workspaceId=YOUR_WORKSPACE_ID" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+#!/bin/bash
 
-# Get consensus for specific fact type (address)
-curl -X GET "http://localhost:8080/v1/geo/evidence/consensus?workspaceId=YOUR_WORKSPACE_ID&factType=address" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+API_URL="${1:-http://localhost:8080}"
+DOMAIN="${2:-stripe.com}"
+
+echo "Testing instant summary for ${DOMAIN}..."
+echo "API URL: ${API_URL}"
+echo ""
+
+RESPONSE=$(curl -s -X GET "${API_URL}/v1/demo/instant-summary?domain=${DOMAIN}" \
+  -H "Content-Type: application/json")
+
+echo "Status: $(echo $RESPONSE | jq -r '.ok // "error"')"
+echo ""
+echo "Summary: $(echo $RESPONSE | jq -r '.data.summary // "N/A"')"
+echo ""
+echo "Prompts: $(echo $RESPONSE | jq -r '.data.prompts | length // 0')"
+echo "Competitors: $(echo $RESPONSE | jq -r '.data.competitors | length // 0')"
+echo "Engines: $(echo $RESPONSE | jq -r '.data.engines | length // 0')"
+echo ""
+echo "Full response:"
+echo $RESPONSE | jq '.'
 ```
 
-**Expected Response:**
-```json
-{
-  "ok": true,
-  "data": [
-    {
-      "factType": "address",
-      "consensus": 85,
-      "agreementCount": 17,
-      "contradictionCount": 2,
-      "independentSources": 5,
-      "facts": [...],
-      "mostCommonValue": "123 Main St, San Francisco, CA 94102"
-    },
-    ...
-  ]
-}
-```
-
-### 3. Test Dashboard Overview
-
+Run with:
 ```bash
-curl -X GET "http://localhost:8080/v1/geo/dashboard/overview?workspaceId=YOUR_WORKSPACE_ID" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+chmod +x test-instant-summary.sh
+./test-instant-summary.sh http://localhost:8080 stripe.com
 ```
 
-**Expected Response:**
-```json
-{
-  "ok": true,
-  "data": {
-    "maturityScore": {
-      "entityStrength": 75,
-      "citationDepth": 68,
-      "structuralClarity": 72,
-      "updateCadence": 65,
-      "overallScore": 70,
-      "maturityLevel": "advanced",
-      "recommendations": []
-    },
-    "eeatScore": { ... },
-    "recommendations": [ ... ],
-    "engineComparison": [ ... ],
-    "progress": [ ... ],
-    "factConsensus": [ ... ],
-    "lastUpdated": "2025-01-27T..."
-  }
-}
-```
+---
 
-### 4. Test Other Dashboard Endpoints
+## 📝 Next Steps After Testing
 
-```bash
-# Maturity with trends
-curl -X GET "http://localhost:8080/v1/geo/dashboard/maturity?workspaceId=YOUR_WORKSPACE_ID" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+1. **If all tests pass:**
+   - Deploy to Railway
+   - Monitor logs for first real requests
+   - Verify production environment variables
 
-# Recommendations
-curl -X GET "http://localhost:8080/v1/geo/dashboard/recommendations?workspaceId=YOUR_WORKSPACE_ID" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+2. **If tests fail:**
+   - Check error logs
+   - Verify environment variables
+   - Ensure all packages are built
+   - Check database connectivity
 
-# Engine comparison
-curl -X GET "http://localhost:8080/v1/geo/dashboard/engines/comparison?workspaceId=YOUR_WORKSPACE_ID" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-
-# Progress history
-curl -X GET "http://localhost:8080/v1/geo/dashboard/progress?workspaceId=YOUR_WORKSPACE_ID&days=30" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-
-# Maturity history
-curl -X GET "http://localhost:8080/v1/geo/maturity/history?workspaceId=YOUR_WORKSPACE_ID&timeRange=30d" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-## Using Swagger UI
-
-The easiest way to test is via Swagger UI:
-
-1. **Start the API server**
-2. **Open**: `http://localhost:8080/v1/docs`
-3. **Click "Authorize"** and enter your JWT token (or use DEBUG_JWT_MODE)
-4. **Navigate to GEO endpoints**:
-   - GEO E-E-A-T → `GET /v1/geo/eeat`
-   - GEO Evidence → `GET /v1/geo/evidence/consensus`
-   - GEO Dashboard → All dashboard endpoints
-
-## Common Issues
-
-### Issue: "No workspace profile found"
-**Solution**: Create a WorkspaceProfile for your workspace:
-```sql
-INSERT INTO "WorkspaceProfile" ("id", "workspaceId", "businessName", "verified")
-VALUES ('test-profile-id', 'YOUR_WORKSPACE_ID', 'Test Business', false);
-```
-
-### Issue: "Migration not applied"
-**Solution**: Run the migration:
-```bash
-pnpm --filter @ai-visibility-platform/db prisma migrate dev
-```
-
-### Issue: "401 Unauthorized"
-**Solution**: 
-- Check if `DEBUG_JWT_MODE=true` in `.env`
-- Or get a valid JWT token from the auth endpoint
-
-### Issue: Empty responses or errors
-**Solution**: Ensure you have:
-- Citations data in the database
-- Mentions data
-- At least one WorkspaceProfile
-- Prompt runs linked to your workspace
-
-## Quick Test Checklist
-
-- [ ] Database migration run successfully
-- [ ] Infrastructure (PostgreSQL, Redis) running
-- [ ] API server started without errors
-- [ ] Workspace ID available
-- [ ] WorkspaceProfile exists for workspace
-- [ ] Authentication token/JWT available
-- [ ] Tested E-E-A-T endpoint
-- [ ] Tested Fact Consensus endpoint
-- [ ] Tested Dashboard Overview endpoint
-
-## Next Steps
-
-Once basic testing works, you can:
-1. Add real citation/mention data to test fact extraction
-2. Test with multiple workspaces
-3. Verify caching works (15-minute TTL on dashboard)
-4. Check progress tracking over time
-
-
-
-
-
-
-
-
+3. **Performance optimization:**
+   - Monitor parallel execution performance
+   - Check LLM API rate limits
+   - Optimize caching if needed

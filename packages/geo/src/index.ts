@@ -49,6 +49,24 @@ export * from './directory/directory-constants';
 // Dashboard services
 export * from './dashboard/dashboard-aggregator.service';
 
+// Entity extraction services
+export * from './entity/entity-extractor.service';
+
+// Competitor detection services
+export * from './competitors/competitor-detector.service';
+
+// Share of voice services
+export * from './sov/share-of-voice-calculator.service';
+
+// Diagnostic insights services
+export * from './insights/diagnostic-insights.service';
+
+// Engine bias simulation services
+export * from './scoring/engine-bias-simulator.service';
+
+// Copilot mapping services
+export * from './copilot/insight-copilot-mapper.service';
+
 // Validation services (exported as primary names for alerts module)
 export {
   HallucinationDetectorService,
