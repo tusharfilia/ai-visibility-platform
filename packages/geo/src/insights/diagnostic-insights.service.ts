@@ -366,10 +366,10 @@ export class DiagnosticInsightsService {
 
       // Check for specific missing schema types
       const missingTypes: string[] = [];
-      if (!schemaAudit.schemas.find((s: any) => s.type?.includes('Organization'))) {
+      if (!schemaAudit.schemaTypes.find((s: any) => s.type?.includes('Organization'))) {
         missingTypes.push('Organization');
       }
-      if (!schemaAudit.schemas.find((s: any) => s.type?.includes('LocalBusiness'))) {
+      if (!schemaAudit.schemaTypes.find((s: any) => s.type?.includes('LocalBusiness'))) {
         missingTypes.push('LocalBusiness');
       }
 
