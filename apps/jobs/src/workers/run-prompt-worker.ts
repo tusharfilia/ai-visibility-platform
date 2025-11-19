@@ -271,7 +271,7 @@ export class RunPromptWorker {
           status: 'SUCCESS',
           finishedAt: new Date(),
           costCents: result.costCents || 0,
-          avgLatencyMs: executionTime,
+          // Note: avgLatencyMs is stored on Engine, not PromptRun
         },
       });
 
