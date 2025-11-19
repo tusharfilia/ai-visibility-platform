@@ -34,9 +34,9 @@ export class RunPromptWorker {
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     });
     
-    // Initialize hallucination detector
-    // @ts-ignore - Service initialization needs proper dependencies
-    this.hallucinationDetector = new HallucinationDetectorService();
+    // Initialize hallucination detector (optional - will gracefully fail if dependencies missing)
+    // Note: Jobs service is not NestJS, so we can't use DI. Hallucination detection will be skipped.
+    this.hallucinationDetector = null as any; // Disabled for now - requires NestJS DI
     
     this.worker = new Worker(
       'runPrompt',
@@ -443,6 +443,12 @@ export class RunPromptWorker {
       }
       
       const profile = profileResult.rows[0];
+      
+      // Skip hallucination detection if detector is not available (jobs service doesn't have NestJS DI)
+      if (!this.hallucinationDetector) {
+        console.warn('Hallucination detection skipped - detector not available in jobs service');
+        return;
+      }
       
       // Detect hallucinations
       const alerts = await this.hallucinationDetector.detectHallucinations(

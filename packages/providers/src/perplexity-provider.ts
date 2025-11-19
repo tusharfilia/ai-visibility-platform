@@ -53,7 +53,7 @@ export class PerplexityProvider extends BaseProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: options?.model || 'sonar-large-online',
+          model: options?.model || 'llama-3.1-sonar-large-128k-online',
           messages: [
             {
               role: 'user',
