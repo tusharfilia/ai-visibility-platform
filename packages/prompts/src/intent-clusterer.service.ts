@@ -16,7 +16,7 @@ export interface ClusteredPrompt {
   }[];
 }
 
-export interface PromptCluster {
+export interface IntentPromptCluster {
   intent: PromptIntent;
   prompts: ClusteredPrompt[];
   description: string;
