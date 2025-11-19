@@ -24,7 +24,7 @@ export interface PromptCluster {
 }
 
 export interface IntentClusteringResult {
-  clusters: PromptCluster[];
+  clusters: IntentPromptCluster[];
   allPrompts: ClusteredPrompt[];
   coverage: {
     intent: PromptIntent;
@@ -66,7 +66,7 @@ export class IntentClustererService {
     }
 
     // Create clusters
-    const clusters: PromptCluster[] = [];
+    const clusters: IntentPromptCluster[] = [];
     for (const [intent, promptList] of intentMap.entries()) {
       clusters.push({
         intent,
