@@ -22,13 +22,12 @@ import {
   EEATCalculatorService,
   FactExtractorService as EvidenceFactExtractorService,
   DashboardAggregatorService,
+  EVIDENCE_FACT_EXTRACTOR_TOKEN,
 } from '@ai-visibility/geo';
 import { PrismaService } from '../database/prisma.service';
 import { EventsModule } from '../events/events.module';
 import { BullModule } from '@nestjs/bullmq';
 import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
-// Import the token and class from evidence package
-import { EVIDENCE_FACT_EXTRACTOR_TOKEN, EvidenceFactExtractorService } from '@ai-visibility/geo';
 
 @Module({
   imports: [
