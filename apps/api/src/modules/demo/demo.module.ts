@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { LLMConfigService, LLMRouterService } from '@ai-visibility/shared';
 import { 
@@ -24,8 +24,8 @@ import { DemoService } from './demo.service';
   controllers: [DemoController],
   providers: [
     // Core services (order matters - dependencies first)
-    ConfigService,      // Explicitly provide ConfigService (though it's global, this ensures it's available)
-    LLMConfigService,  // Must be before LLMRouterService, depends on ConfigService
+    // ConfigService is global (from ConfigModule.forRoot), so we don't need to provide it
+    LLMConfigService,  // Depends on ConfigService (global)
     LLMRouterService,  // Depends on LLMConfigService
     PrismaService,     // Needed by ShareOfVoiceCalculatorService
     
