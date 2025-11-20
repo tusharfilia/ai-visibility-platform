@@ -134,27 +134,44 @@ export class IntentClustererService {
   ): Promise<ClusteredPrompt[]> {
     const intentTemplates = this.getIntentTemplates(intent, context);
     
+    // Determine if we should focus on industry or brand based on intent
+    const focusOnIndustry = intent === 'BEST' || intent === 'COMPARISON' || intent === 'ALTERNATIVES';
+    const industryFocus = context.vertical || context.category;
+    
     const prompt = `Generate 2-3 high-quality search queries for the "${intent}" intent category.
 
 Business Context:
-- Brand: ${context.brandName}
+- Brand: ${context.brandName} (for reference only - ${focusOnIndustry ? 'focus on industry, not brand' : 'can be included naturally'})
 - Category: ${context.category}
-- Vertical: ${context.vertical || 'General'}
+- Industry/Vertical: ${industryFocus}
 - Summary: ${context.summary || 'Not available'}
 - Services: ${context.services?.join(', ') || 'Not specified'}
 - Geography: ${context.geography?.primary || 'Not specified'}
 
 Intent Category: ${this.getIntentDescription(intent)}
 
+${focusOnIndustry ? `
+IMPORTANT: For this intent, generate INDUSTRY-FOCUSED queries that enable competitive benchmarking.
+- Focus on the ${industryFocus} industry/category, NOT the specific brand
+- These queries should surface multiple competitors in the space
+- Examples: "best ${industryFocus} platforms", "top ${industryFocus} solutions", "${industryFocus} comparison"
+- Avoid brand-specific queries like "${context.brandName} alternatives" - instead use industry terms
+` : `
+For this intent, queries can naturally include the brand or focus on industry.
+- Make queries specific and actionable
+- Include brand name only if it's natural for the intent (e.g., HOWTO, PRICING)
+`}
+
 Template Examples:
 ${intentTemplates.join('\n')}
 
 Requirements:
 - Each query should be natural and how real users would search
-- Focus on queries that would trigger AI-powered search results
-- Include the brand name or category naturally
+- Focus on queries that would trigger AI-powered search results with competitive data
+- ${focusOnIndustry ? `Use industry/category terms (${industryFocus}) rather than brand name` : 'Include brand or category naturally'}
 - Make queries specific and actionable
 - For LOCAL intent, include location if geography is available
+- Queries should enable competitive benchmarking and industry analysis
 
 Return a JSON array of query strings:
 ["query 1", "query 2", "query 3"]`;
@@ -284,50 +301,51 @@ Return a JSON array of query strings:
    */
   private getIntentTemplates(
     intent: PromptIntent,
-    context: { brandName: string; category: string; geography?: { primary: string } }
+    context: { brandName: string; category: string; vertical?: string; geography?: { primary: string } }
   ): string[] {
     const brand = context.brandName;
     const category = context.category;
+    const industry = context.vertical || category;
     const location = context.geography?.primary;
 
     const templates: Record<PromptIntent, string[]> = {
       BEST: [
-        `Best ${category} solutions`,
-        `Top ${category} options`,
-        `Best ${brand} alternatives`,
+        `Best ${industry} solutions`,
+        `Top ${industry} platforms`,
+        `Best ${category} options`,
       ],
       ALTERNATIVES: [
-        `${brand} alternatives`,
-        `Similar to ${brand}`,
-        `Replace ${brand} with`,
+        `Best ${industry} alternatives`,
+        `Top ${category} alternatives`,
+        `Similar ${industry} platforms`,
       ],
       HOWTO: [
-        `How to use ${brand}`,
-        `How does ${brand} work`,
-        `${brand} tutorial`,
+        `How to choose ${industry} platform`,
+        `How does ${category} work`,
+        `${industry} selection guide`,
       ],
       PRICING: [
-        `${brand} pricing`,
-        `How much does ${brand} cost`,
-        `${brand} vs competitors pricing`,
+        `${industry} pricing comparison`,
+        `How much do ${category} services cost`,
+        `${industry} platform costs`,
       ],
       COMPARISON: [
-        `${brand} vs competitors`,
-        `Compare ${brand} with alternatives`,
-        `${brand} comparison`,
+        `Compare ${industry} platforms`,
+        `${category} services comparison`,
+        `Best ${industry} vs alternatives`,
       ],
       LOCAL: location ? [
-        `Best ${category} in ${location}`,
-        `${brand} near me`,
-        `${category} services ${location}`,
+        `Best ${industry} in ${location}`,
+        `Top ${category} services ${location}`,
+        `${industry} platforms near me`,
       ] : [
-        `${brand} near me`,
-        `Best ${category} local`,
+        `Best ${industry} near me`,
+        `Top ${category} local services`,
       ],
       REVIEWS: [
-        `${brand} reviews`,
-        `${brand} ratings`,
-        `Is ${brand} good`,
+        `Best ${industry} reviews`,
+        `${category} platform ratings`,
+        `Top rated ${industry} solutions`,
       ],
     };
 

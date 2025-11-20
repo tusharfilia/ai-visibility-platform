@@ -1318,17 +1318,21 @@ Keep the tone factual and neutral.`;
       }
 
       // Use IntentClustererService for intent-based prompt generation
+      // Focus on industry/category for competitive benchmarking
+      const category = entityData?.category || 'business services';
+      const industry = entityData?.vertical || category;
+      
       const intentBasedPrompts = await this.intentClusterer.generateIntentBasedPrompts(
         workspaceId,
         {
-          brandName: brand,
-          category: entityData?.category || 'General Business',
-          vertical: entityData?.vertical || 'General',
+          brandName: brand, // For reference only - prompts should focus on industry
+          category: category,
+          vertical: industry, // This is the key field for industry-focused prompts
           summary: summary || entityData?.summary || '',
           services: entityData?.services || [],
           geography: entityData?.geography || undefined,
         },
-        ['BEST', 'ALTERNATIVES', 'HOWTO', 'PRICING', 'COMPARISON'] // Target intents
+        ['BEST', 'ALTERNATIVES', 'HOWTO', 'PRICING', 'COMPARISON'] // Target intents - these will be industry-focused
       );
 
       // Convert to expected format
@@ -1350,17 +1354,29 @@ Keep the tone factual and neutral.`;
       this.logger.warn(`Intent-based prompt generation failed, falling back to simple generation: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    // Fallback to simple LLM generation
-    const prompt = `You are helping an analyst evaluate ${brand}.
-Use the brand summary below and the provided seed prompts to suggest additional high-impact prompts that capture how AI search users or customers might research this brand.
+    // Fallback to simple LLM generation - industry-focused
+    const category = entityData?.category || 'business services';
+    const industry = entityData?.vertical || category;
+    
+    const prompt = `You are helping an analyst evaluate businesses in the ${industry} industry.
+Use the business summary below and the provided seed prompts to suggest additional high-impact prompts that capture how AI search users might research this industry and compare options.
 
-Brand summary:
-${summary || 'No summary available.'}
+Business Context:
+- Industry: ${industry}
+- Category: ${category}
+- Brand: ${brand} (for reference, but focus on industry-level queries)
+- Summary: ${summary || 'No summary available.'}
 
 Seed prompts:
 ${seedPrompts.map((p, idx) => `${idx + 1}. ${p}`).join('\n')}
 
-Return a JSON array of 3 to 6 concise prompts (strings). Each prompt should be unique and focus on comparisons, benefits, challenges, or alternatives related to ${brand}.`;
+IMPORTANT: Generate INDUSTRY-FOCUSED prompts that enable competitive benchmarking:
+- Focus on the ${industry} industry/category, NOT the specific brand
+- These queries should surface multiple competitors and enable comparison
+- Examples: "best ${industry} platforms", "top ${industry} solutions", "${industry} comparison"
+- Avoid brand-specific queries - use industry terms instead
+
+Return a JSON array of 3 to 6 concise prompts (strings). Each prompt should be unique and focus on industry-level comparisons, alternatives, pricing, or how-to guides for ${industry}.`;
 
     try {
       const response = await this.llmRouter.routeLLMRequest(workspaceId, prompt, {
@@ -1385,13 +1401,17 @@ Return a JSON array of 3 to 6 concise prompts (strings). Each prompt should be u
   }
 
   private buildPromptFallbacks(brand: string, seedPrompts: string[]): string[] {
+    // Extract industry from seed prompts if possible
+    const industryMatch = seedPrompts[0]?.match(/best\s+(\w+)/i) || seedPrompts[0]?.match(/top\s+(\w+)/i);
+    const industry = industryMatch ? industryMatch[1] : 'business services';
+    
     const base = seedPrompts.slice(0, 2);
     const variations = [
-      `Why choose ${brand} over other competitors?`,
-      `Strengths and weaknesses of ${brand} in 2025`,
-      `Customer reviews and sentiment about ${brand}`,
-      `How does ${brand} pricing compare to alternatives?`,
-      `Top use cases for ${brand}`,
+      `Best ${industry} platforms`,
+      `Top ${industry} solutions comparison`,
+      `${industry} pricing guide`,
+      `How to choose ${industry} platform`,
+      `Compare ${industry} services`,
     ];
     return [...base, ...variations];
   }
@@ -1735,8 +1755,25 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
       const summary = summaryResult.data.summary;
       const brand = summaryResult.data.brand;
 
-      // Step 2: Auto-generate prompts (use brand name as seed)
-      const seedPrompts = [`Best ${brand} alternatives`, `Compare ${brand} with competitors`];
+      // Step 2: Auto-generate prompts (industry-focused, not brand-specific)
+      // Get entity data to understand industry/category
+      let entityData: any = null;
+      try {
+        entityData = await this.entityExtractor.extractEntityFromDomain(workspaceId, summaryResult.data.domain);
+      } catch (error) {
+        this.logger.warn(`Failed to extract entity data for prompt generation: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      const category = entityData?.category || 'business services';
+      const industry = entityData?.vertical || category;
+      
+      // Generate industry-focused seed prompts that enable competitive benchmarking
+      const seedPrompts = [
+        `Best ${category} solutions`,
+        `Top ${industry} platforms`,
+        `Compare ${industry} services`,
+      ];
+      
       const promptsResult = await this.preparePrompts({
         demoRunId,
         seedPrompts,
