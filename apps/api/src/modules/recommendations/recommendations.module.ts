@@ -14,9 +14,6 @@ import {
 import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
 import { EventEmitterService } from '../events/event-emitter.service';
 import { BullModule } from '@nestjs/bullmq';
-// Import FactExtractorService directly from evidence package (the one EvidenceGraphBuilderService uses)
-// This avoids naming conflict with validation FactExtractorService
-import { FactExtractorService } from '@ai-visibility/geo/src/evidence/fact-extractor.service';
 
 @Module({
   imports: [
@@ -32,9 +29,9 @@ import { FactExtractorService } from '@ai-visibility/geo/src/evidence/fact-extra
     PageStructureAnalyzerService,
     // Dependencies for EvidenceGraphBuilderService
     CitationClassifierService,
-    // Provide FactExtractorService from evidence package (the one EvidenceGraphBuilderService expects)
-    // Use the actual class name to match what EvidenceGraphBuilderService imports
-    FactExtractorService,
+    // EvidenceFactExtractorService is the alias for FactExtractorService from evidence package
+    // NestJS will resolve it correctly because the class name is FactExtractorService internally
+    EvidenceFactExtractorService,
     // Main services
     PrescriptiveRecommendationEngine,
     GEOMaturityCalculatorService,
