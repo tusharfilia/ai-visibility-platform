@@ -9,18 +9,21 @@ import {
   FreshnessAnalyzerService,
   PageStructureAnalyzerService,
   CitationClassifierService,
-  FactExtractorService as EvidenceFactExtractorService,
+  EvidenceFactExtractorService,
 } from '@ai-visibility/geo';
 import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
 import { EventEmitterService } from '../events/event-emitter.service';
 import { BullModule } from '@nestjs/bullmq';
+// Import FactExtractorService directly from evidence package (the one EvidenceGraphBuilderService uses)
+// This avoids naming conflict with validation FactExtractorService
+import { FactExtractorService } from '@ai-visibility/geo/src/evidence/fact-extractor.service';
 
 @Module({
   imports: [
     BullModule.registerQueue({ name: 'recommendationRefresh' }),
   ],
   providers: [
-    // Core LLM services (needed by FactExtractorService from validation)
+    // Core LLM services (needed by FactExtractorService from validation package if it's used)
     LLMConfigService,
     LLMRouterService,
     // Dependencies for StructuralScoringService
@@ -29,7 +32,9 @@ import { BullModule } from '@nestjs/bullmq';
     PageStructureAnalyzerService,
     // Dependencies for EvidenceGraphBuilderService
     CitationClassifierService,
-    EvidenceFactExtractorService,
+    // Provide FactExtractorService from evidence package (the one EvidenceGraphBuilderService expects)
+    // Use the actual class name to match what EvidenceGraphBuilderService imports
+    FactExtractorService,
     // Main services
     PrescriptiveRecommendationEngine,
     GEOMaturityCalculatorService,
