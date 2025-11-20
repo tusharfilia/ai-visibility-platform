@@ -20,7 +20,7 @@ import {
   CitationAuthorityService,
   DirectoryPresenceAnalyzerService,
   EEATCalculatorService,
-  FactExtractorService,
+  FactExtractorService as EvidenceFactExtractorService,
   DashboardAggregatorService,
 } from '@ai-visibility/geo';
 import { PrismaService } from '../database/prisma.service';
@@ -51,7 +51,7 @@ import { BullModule } from '@nestjs/bullmq';
     CitationAuthorityService,
     DirectoryPresenceAnalyzerService,
     EEATCalculatorService,
-    FactExtractorService,
+    EvidenceFactExtractorService,
     DashboardAggregatorService,
     PrismaService,
   ],
