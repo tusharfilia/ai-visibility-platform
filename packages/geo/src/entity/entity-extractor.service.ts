@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { LLMRouterService } from '@ai-visibility/shared';
 import { SchemaAuditorService } from '../structural/schema-auditor';
 import { PageStructureAnalyzerService } from '../structural/page-structure-analyzer';
 import { FactExtractorService } from '../evidence/fact-extractor.service';
+import { EVIDENCE_FACT_EXTRACTOR_TOKEN } from '../evidence/evidence-graph.builder';
 
 export interface BusinessEntity {
   businessName: string;
@@ -86,7 +87,7 @@ export class EntityExtractorService {
     private readonly llmRouter: LLMRouterService,
     private readonly schemaAuditor: SchemaAuditorService,
     private readonly pageStructureAnalyzer: PageStructureAnalyzerService,
-    private readonly factExtractor: FactExtractorService,
+    @Inject(EVIDENCE_FACT_EXTRACTOR_TOKEN) private readonly factExtractor: FactExtractorService,
   ) {}
 
   /**

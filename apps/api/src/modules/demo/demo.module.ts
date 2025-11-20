@@ -13,6 +13,7 @@ import {
   FreshnessAnalyzerService,
   TrustSignalAggregator,
   ShareOfVoiceCalculatorService,
+  EVIDENCE_FACT_EXTRACTOR_TOKEN,
 } from '@ai-visibility/geo';
 import { IntentClustererService } from '@ai-visibility/prompts';
 import { PrismaService } from '../database/prisma.service';
@@ -32,7 +33,13 @@ import { DemoService } from './demo.service';
     // GEO services dependencies (no constructor dependencies)
     SchemaAuditorService,
     PageStructureAnalyzerService,
-    EvidenceFactExtractorService,
+    // Provide FactExtractorService from evidence package using custom token
+    // EntityExtractorService and EvidenceGraphBuilderService use @Inject(EVIDENCE_FACT_EXTRACTOR_TOKEN)
+    // to avoid conflicts with the validation package's FactExtractorService
+    {
+      provide: EVIDENCE_FACT_EXTRACTOR_TOKEN,
+      useClass: EvidenceFactExtractorService,
+    },
     FreshnessAnalyzerService,  // Needed by StructuralScoringService
     StructuralScoringService,  // Depends on SchemaAuditorService, FreshnessAnalyzerService, PageStructureAnalyzerService
     TrustSignalAggregator,
