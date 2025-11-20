@@ -27,7 +27,8 @@ import { PrismaService } from '../database/prisma.service';
 import { EventsModule } from '../events/events.module';
 import { BullModule } from '@nestjs/bullmq';
 import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
-// Import the actual FactExtractorService class from evidence package to use as token
+// Import the actual FactExtractorService class from evidence package
+// We need the actual class reference (not the alias) to use as the provider token
 import { FactExtractorService as EvidenceFactExtractorServiceClass } from '@ai-visibility/geo/src/evidence/fact-extractor.service';
 
 @Module({
@@ -45,9 +46,10 @@ import { FactExtractorService as EvidenceFactExtractorServiceClass } from '@ai-v
     // Dependencies for EvidenceGraphBuilderService
     CitationClassifierService,
     // Provide FactExtractorService from evidence package explicitly
-    // EvidenceGraphBuilderService uses @Inject(FactExtractorService), so we need to provide
-    // the evidence package's FactExtractorService with the class name as the token
-    // We use the actual class reference from the evidence package to avoid conflicts
+    // EvidenceGraphBuilderService uses @Inject(FactExtractorService) where FactExtractorService
+    // is imported from './fact-extractor.service' (the evidence package). We need to provide
+    // the evidence package's FactExtractorService with the class reference as the token.
+    // Using the actual class reference ensures NestJS resolves to the correct implementation.
     {
       provide: EvidenceFactExtractorServiceClass, // Use the actual class from evidence package as token
       useClass: EvidenceFactExtractorServiceClass, // Provide the evidence package's FactExtractorService
