@@ -1885,9 +1885,9 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
                    LOWER(m."brand") AS "entityKey",
                    MIN(m."brand") AS "entityLabel",
                    COUNT(*)::int AS "mentions",
-                   COUNT(*) FILTER (WHERE m."sentiment" = 'positive')::int AS "positiveMentions",
-                   COUNT(*) FILTER (WHERE m."sentiment" = 'neutral')::int AS "neutralMentions",
-                   COUNT(*) FILTER (WHERE m."sentiment" = 'negative')::int AS "negativeMentions"
+                   COUNT(*) FILTER (WHERE m."sentiment" = 'POS')::int AS "positiveMentions",
+                   COUNT(*) FILTER (WHERE m."sentiment" = 'NEU')::int AS "neutralMentions",
+                   COUNT(*) FILTER (WHERE m."sentiment" = 'NEG')::int AS "negativeMentions"
                  FROM "mentions" m
                  JOIN "answers" a ON a.id = m."answerId"
                  JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
