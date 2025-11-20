@@ -26,6 +26,7 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { EventsModule } from '../events/events.module';
 import { BullModule } from '@nestjs/bullmq';
+import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
 
 @Module({
   imports: [
@@ -36,10 +37,9 @@ import { BullModule } from '@nestjs/bullmq';
     EventsModule,
   ],
   providers: [
-    GEODataService,
-    EnhancedGEOScoringService,
-    KnowledgeGraphBuilder,
-    TrustSignalAggregator,
+    // Core LLM services (needed if FactExtractorService from validation package is resolved)
+    LLMConfigService,
+    LLMRouterService,
     // Dependencies for EvidenceGraphBuilderService
     CitationClassifierService,
     // Provide FactExtractorService from evidence package (the one EvidenceGraphBuilderService expects)
@@ -47,6 +47,10 @@ import { BullModule } from '@nestjs/bullmq';
     // NestJS resolves by class name, so this should work
     EvidenceFactExtractorService,
     // Main services (depend on above)
+    GEODataService,
+    EnhancedGEOScoringService,
+    KnowledgeGraphBuilder,
+    TrustSignalAggregator,
     EvidenceGraphBuilderService,
     GEOMaturityCalculatorService,
     StructuralScoringService,
