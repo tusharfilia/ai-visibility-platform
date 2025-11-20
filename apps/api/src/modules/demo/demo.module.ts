@@ -10,6 +10,7 @@ import {
   PageStructureAnalyzerService,
   FactExtractorService as EvidenceFactExtractorService,
   StructuralScoringService,
+  FreshnessAnalyzerService,
   TrustSignalAggregator,
   ShareOfVoiceCalculatorService,
 } from '@ai-visibility/geo';
@@ -31,7 +32,8 @@ import { DemoService } from './demo.service';
     SchemaAuditorService,
     PageStructureAnalyzerService,
     EvidenceFactExtractorService,
-    StructuralScoringService,
+    FreshnessAnalyzerService,  // Needed by StructuralScoringService
+    StructuralScoringService,  // Depends on SchemaAuditorService, FreshnessAnalyzerService, PageStructureAnalyzerService
     TrustSignalAggregator,
     ShareOfVoiceCalculatorService,  // Depends on PrismaService
     
