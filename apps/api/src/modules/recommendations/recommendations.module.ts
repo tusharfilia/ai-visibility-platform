@@ -8,6 +8,8 @@ import {
   SchemaAuditorService,
   FreshnessAnalyzerService,
   PageStructureAnalyzerService,
+  CitationClassifierService,
+  FactExtractorService as EvidenceFactExtractorService,
 } from '@ai-visibility/geo';
 import { EventEmitterService } from '../events/event-emitter.service';
 import { BullModule } from '@nestjs/bullmq';
@@ -21,6 +23,9 @@ import { BullModule } from '@nestjs/bullmq';
     SchemaAuditorService,
     FreshnessAnalyzerService,
     PageStructureAnalyzerService,
+    // Dependencies for EvidenceGraphBuilderService
+    CitationClassifierService,
+    EvidenceFactExtractorService,
     // Main services
     PrescriptiveRecommendationEngine,
     GEOMaturityCalculatorService,
