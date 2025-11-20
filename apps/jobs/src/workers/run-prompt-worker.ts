@@ -220,8 +220,38 @@ export class RunPromptWorker {
       const result = await provider.ask(prompt.text);
       const executionTime = Date.now() - startTime;
 
-      // Parse results
-      const mentions = extractMentions(result.answerText, [], {});
+      // Get brand/domain from demo run if this is a demo job
+      let brandsToSearch: string[] = [];
+      if (demoRunId) {
+        try {
+          const demoRunResult = await this.dbPool.query(
+            'SELECT "brand", "domain" FROM "demo_runs" WHERE id = $1',
+            [demoRunId]
+          );
+          if (demoRunResult.rows.length > 0) {
+            const demoRun = demoRunResult.rows[0];
+            // Add brand and domain (without protocol) to search list
+            if (demoRun.brand) {
+              brandsToSearch.push(demoRun.brand);
+            }
+            if (demoRun.domain) {
+              // Extract domain without protocol (e.g., "airbnb.com" from "https://airbnb.com")
+              const domain = demoRun.domain.replace(/^https?:\/\//, '').replace(/^www\./, '');
+              brandsToSearch.push(domain);
+              // Also add the brand name if domain contains it (e.g., "airbnb" from "airbnb.com")
+              const domainParts = domain.split('.');
+              if (domainParts.length > 0) {
+                brandsToSearch.push(domainParts[0]);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to get demo run info for mention extraction: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+
+      // Parse results - pass brands to extractMentions so it can find them
+      const mentions = extractMentions(result.answerText, brandsToSearch, {});
       const citations = extractCitations(result.answerText, {});
       const sentiment = classifySentiment(result.answerText);
 
