@@ -27,6 +27,8 @@ import { PrismaService } from '../database/prisma.service';
 import { EventsModule } from '../events/events.module';
 import { BullModule } from '@nestjs/bullmq';
 import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
+// Import the actual FactExtractorService class from evidence package to use as token
+import { FactExtractorService as EvidenceFactExtractorServiceClass } from '@ai-visibility/geo/src/evidence/fact-extractor.service';
 
 @Module({
   imports: [
@@ -42,18 +44,14 @@ import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
     LLMRouterService,
     // Dependencies for EvidenceGraphBuilderService
     CitationClassifierService,
-    // Provide FactExtractorService from evidence package (the one EvidenceGraphBuilderService expects)
-    // EvidenceFactExtractorService is an alias for FactExtractorService from evidence package
-    // Since EvidenceGraphBuilderService uses @Inject(FactExtractorService), we need to provide it
-    // with the class name as the token. EvidenceFactExtractorService has the class name FactExtractorService,
-    // so providing it should work, but we use a custom provider to be explicit.
+    // Provide FactExtractorService from evidence package explicitly
+    // EvidenceGraphBuilderService uses @Inject(FactExtractorService), so we need to provide
+    // the evidence package's FactExtractorService with the class name as the token
+    // We use the actual class reference from the evidence package to avoid conflicts
     {
-      provide: EvidenceFactExtractorService, // Use the alias class as the token
-      useClass: EvidenceFactExtractorService, // Provide the evidence package's FactExtractorService
+      provide: EvidenceFactExtractorServiceClass, // Use the actual class from evidence package as token
+      useClass: EvidenceFactExtractorServiceClass, // Provide the evidence package's FactExtractorService
     },
-    // Also provide it with the actual class name (FactExtractorService) so @Inject(FactExtractorService) works
-    // EvidenceFactExtractorService is just an alias, the actual class name is FactExtractorService
-    EvidenceFactExtractorService,
     // Main services (depend on above)
     GEODataService,
     EnhancedGEOScoringService,
