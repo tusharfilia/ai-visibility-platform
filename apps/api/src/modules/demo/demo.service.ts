@@ -1357,9 +1357,7 @@ Keep the tone factual and neutral.`;
     }
 
     // Fallback to simple LLM generation - industry-focused
-    const category = entityData?.category || 'business services';
-    const industry = entityData?.vertical || category;
-    
+    // category and industry are already declared above, reuse them
     const prompt = `You are helping an analyst evaluate businesses in the ${industry} industry.
 Use the business summary below and the provided seed prompts to suggest additional high-impact prompts that capture how AI search users might research this industry and compare options.
 
