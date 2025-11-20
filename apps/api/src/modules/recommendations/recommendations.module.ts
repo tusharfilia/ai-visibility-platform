@@ -11,6 +11,7 @@ import {
   CitationClassifierService,
   FactExtractorService as EvidenceFactExtractorService,
 } from '@ai-visibility/geo';
+import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
 import { EventEmitterService } from '../events/event-emitter.service';
 import { BullModule } from '@nestjs/bullmq';
 
@@ -19,6 +20,9 @@ import { BullModule } from '@nestjs/bullmq';
     BullModule.registerQueue({ name: 'recommendationRefresh' }),
   ],
   providers: [
+    // Core LLM services (needed by FactExtractorService from validation)
+    LLMConfigService,
+    LLMRouterService,
     // Dependencies for StructuralScoringService
     SchemaAuditorService,
     FreshnessAnalyzerService,
