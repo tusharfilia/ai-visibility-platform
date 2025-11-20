@@ -53,7 +53,7 @@ export class PerplexityProvider extends BaseProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: options?.model || 'sonar-large-online',
+          model: options?.model || 'llama-3.1-sonar-pro-128k-online',
           messages: [
             {
               role: 'user',
@@ -99,7 +99,7 @@ export class PerplexityProvider extends BaseProvider {
         mentions,
         citations,
         {
-          model: data.model || 'sonar-large-online',
+          model: data.model || 'llama-3.1-sonar-pro-128k-online',
           tokens: usage.total_tokens || 0,
           latency,
           cost: this.calculateCostFromTokens(usage.total_tokens || 0),
@@ -172,7 +172,7 @@ export class PerplexityProvider extends BaseProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'sonar-small-online',
+          model: 'llama-3.1-sonar-small-128k-online',
           messages: [{ role: 'user', content: 'test' }],
           max_tokens: 10,
         }),
@@ -261,7 +261,7 @@ export class PerplexityProvider extends BaseProvider {
       response.mentions,
       response.citations,
       {
-        model: 'sonar-large-online',
+        model: 'llama-3.1-sonar-pro-128k-online',
         tokens: Math.floor(Math.random() * 1000) + 500,
         latency: Math.random() * 500 + 200,
       }
