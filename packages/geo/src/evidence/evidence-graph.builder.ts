@@ -3,7 +3,7 @@
  * Aggregates citations and mentions into an entity evidence graph with credibility, freshness, and verification
  */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { CitationClassifierService, CitationSourceType } from '../citations/citation-classifier.service';
 import { FactExtractorService, ExtractedFact } from './fact-extractor.service';
 import { Pool } from 'pg';
@@ -75,7 +75,7 @@ export class EvidenceGraphBuilderService {
   constructor(
     private classifier: CitationClassifierService,
     private factExtractor: FactExtractorService,
-    private dbPool?: Pool
+    @Optional() private dbPool?: Pool
   ) {
     if (!this.dbPool) {
       this.dbPool = new Pool({
