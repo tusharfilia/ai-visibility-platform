@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Provider } from '@nestjs/common';
 import { GEOOptimizationController } from './geo-optimization.controller';
 import { EvidenceController } from './evidence.controller';
 import { MaturityController } from './maturity.controller';
@@ -40,6 +40,12 @@ import { BullModule } from '@nestjs/bullmq';
     EnhancedGEOScoringService,
     KnowledgeGraphBuilder,
     TrustSignalAggregator,
+    // Dependencies for EvidenceGraphBuilderService
+    CitationClassifierService,
+    // Provide FactExtractorService from evidence package (the one EvidenceGraphBuilderService expects)
+    // Use EvidenceFactExtractorService which is the alias for FactExtractorService from evidence package
+    EvidenceFactExtractorService,
+    // Main services (depend on above)
     EvidenceGraphBuilderService,
     GEOMaturityCalculatorService,
     StructuralScoringService,
@@ -47,11 +53,9 @@ import { BullModule } from '@nestjs/bullmq';
     SchemaAuditorService,
     FreshnessAnalyzerService,
     PageStructureAnalyzerService,
-    CitationClassifierService,
     CitationAuthorityService,
     DirectoryPresenceAnalyzerService,
     EEATCalculatorService,
-    EvidenceFactExtractorService,
     DashboardAggregatorService,
     PrismaService,
   ],
