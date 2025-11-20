@@ -8,6 +8,9 @@ import { CitationClassifierService, CitationSourceType } from '../citations/cita
 import { FactExtractorService, ExtractedFact } from './fact-extractor.service';
 import { Pool } from 'pg';
 
+// Token to distinguish evidence package's FactExtractorService from validation package's
+export const EVIDENCE_FACT_EXTRACTOR_TOKEN = Symbol('EvidenceFactExtractorService');
+
 export interface EvidenceNode {
   id: string;
   type: 'citation' | 'reddit_mention' | 'directory_listing' | 'licensed_content' | 'curated_content';
@@ -74,7 +77,7 @@ export interface FactConsensusScore {
 export class EvidenceGraphBuilderService {
   constructor(
     private classifier: CitationClassifierService,
-    @Inject(FactExtractorService) private factExtractor: FactExtractorService,
+    @Inject(EVIDENCE_FACT_EXTRACTOR_TOKEN) private factExtractor: FactExtractorService,
     @Optional() private dbPool?: Pool
   ) {
     if (!this.dbPool) {

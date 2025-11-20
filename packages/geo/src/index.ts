@@ -28,6 +28,7 @@ export {
   FactExtractorService as EvidenceFactExtractorService,
   type ExtractedFact as EvidenceExtractedFact
 } from './evidence/fact-extractor.service';
+export { EVIDENCE_FACT_EXTRACTOR_TOKEN } from './evidence/evidence-graph.builder';
 export type { EntityEvidenceGraph, FactConsensusScore } from './evidence/evidence-graph.builder';
 
 // Structural services

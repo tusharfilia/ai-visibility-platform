@@ -27,9 +27,8 @@ import { PrismaService } from '../database/prisma.service';
 import { EventsModule } from '../events/events.module';
 import { BullModule } from '@nestjs/bullmq';
 import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
-// Import the actual FactExtractorService class from evidence package
-// We need the actual class reference (not the alias) to use as the provider token
-import { FactExtractorService as EvidenceFactExtractorServiceClass } from '@ai-visibility/geo/src/evidence/fact-extractor.service';
+// Import the token and class from evidence package
+import { EVIDENCE_FACT_EXTRACTOR_TOKEN, EvidenceFactExtractorService } from '@ai-visibility/geo';
 
 @Module({
   imports: [
@@ -45,14 +44,12 @@ import { FactExtractorService as EvidenceFactExtractorServiceClass } from '@ai-v
     LLMRouterService,
     // Dependencies for EvidenceGraphBuilderService
     CitationClassifierService,
-    // Provide FactExtractorService from evidence package explicitly
-    // EvidenceGraphBuilderService uses @Inject(FactExtractorService) where FactExtractorService
-    // is imported from './fact-extractor.service' (the evidence package). We need to provide
-    // the evidence package's FactExtractorService with the class reference as the token.
-    // Using the actual class reference ensures NestJS resolves to the correct implementation.
+    // Provide FactExtractorService from evidence package using custom token
+    // EvidenceGraphBuilderService uses @Inject(EVIDENCE_FACT_EXTRACTOR_TOKEN) to avoid conflicts
+    // with the validation package's FactExtractorService
     {
-      provide: EvidenceFactExtractorServiceClass, // Use the actual class from evidence package as token
-      useClass: EvidenceFactExtractorServiceClass, // Provide the evidence package's FactExtractorService
+      provide: EVIDENCE_FACT_EXTRACTOR_TOKEN, // Use the symbol token
+      useClass: EvidenceFactExtractorService, // Provide the evidence package's FactExtractorService
     },
     // Main services (depend on above)
     GEODataService,
