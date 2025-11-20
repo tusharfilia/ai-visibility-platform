@@ -10,6 +10,7 @@ import {
   PageStructureAnalyzerService,
   CitationClassifierService,
   EvidenceFactExtractorService,
+  EVIDENCE_FACT_EXTRACTOR_TOKEN,
 } from '@ai-visibility/geo';
 import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
 import { EventEmitterService } from '../events/event-emitter.service';
@@ -29,9 +30,13 @@ import { BullModule } from '@nestjs/bullmq';
     PageStructureAnalyzerService,
     // Dependencies for EvidenceGraphBuilderService
     CitationClassifierService,
-    // EvidenceFactExtractorService is the alias for FactExtractorService from evidence package
-    // NestJS will resolve it correctly because the class name is FactExtractorService internally
-    EvidenceFactExtractorService,
+    // Provide FactExtractorService from evidence package using custom token
+    // EvidenceGraphBuilderService uses @Inject(EVIDENCE_FACT_EXTRACTOR_TOKEN) to avoid conflicts
+    // with the validation package's FactExtractorService
+    {
+      provide: EVIDENCE_FACT_EXTRACTOR_TOKEN, // Use the symbol token
+      useClass: EvidenceFactExtractorService, // Provide the evidence package's FactExtractorService
+    },
     // Main services
     PrescriptiveRecommendationEngine,
     GEOMaturityCalculatorService,
