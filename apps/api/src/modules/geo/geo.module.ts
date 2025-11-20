@@ -43,7 +43,8 @@ import { BullModule } from '@nestjs/bullmq';
     // Dependencies for EvidenceGraphBuilderService
     CitationClassifierService,
     // Provide FactExtractorService from evidence package (the one EvidenceGraphBuilderService expects)
-    // Use EvidenceFactExtractorService which is the alias for FactExtractorService from evidence package
+    // EvidenceFactExtractorService is an alias for FactExtractorService from evidence package
+    // NestJS resolves by class name, so this should work
     EvidenceFactExtractorService,
     // Main services (depend on above)
     EvidenceGraphBuilderService,
