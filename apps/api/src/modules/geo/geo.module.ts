@@ -44,7 +44,15 @@ import { LLMRouterService, LLMConfigService } from '@ai-visibility/shared';
     CitationClassifierService,
     // Provide FactExtractorService from evidence package (the one EvidenceGraphBuilderService expects)
     // EvidenceFactExtractorService is an alias for FactExtractorService from evidence package
-    // NestJS resolves by class name, so this should work
+    // Since EvidenceGraphBuilderService uses @Inject(FactExtractorService), we need to provide it
+    // with the class name as the token. EvidenceFactExtractorService has the class name FactExtractorService,
+    // so providing it should work, but we use a custom provider to be explicit.
+    {
+      provide: EvidenceFactExtractorService, // Use the alias class as the token
+      useClass: EvidenceFactExtractorService, // Provide the evidence package's FactExtractorService
+    },
+    // Also provide it with the actual class name (FactExtractorService) so @Inject(FactExtractorService) works
+    // EvidenceFactExtractorService is just an alias, the actual class name is FactExtractorService
     EvidenceFactExtractorService,
     // Main services (depend on above)
     GEODataService,

@@ -3,7 +3,7 @@
  * Aggregates citations and mentions into an entity evidence graph with credibility, freshness, and verification
  */
 
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Optional, Inject } from '@nestjs/common';
 import { CitationClassifierService, CitationSourceType } from '../citations/citation-classifier.service';
 import { FactExtractorService, ExtractedFact } from './fact-extractor.service';
 import { Pool } from 'pg';
@@ -74,7 +74,7 @@ export interface FactConsensusScore {
 export class EvidenceGraphBuilderService {
   constructor(
     private classifier: CitationClassifierService,
-    private factExtractor: FactExtractorService,
+    @Inject(FactExtractorService) private factExtractor: FactExtractorService,
     @Optional() private dbPool?: Pool
   ) {
     if (!this.dbPool) {
