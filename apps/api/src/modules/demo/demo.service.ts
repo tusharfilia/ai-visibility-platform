@@ -1296,31 +1296,33 @@ Keep the tone factual and neutral.`;
     seedPrompts: string[],
     domain?: string | null,
   ): Promise<Array<{ text: string; source: 'llm' | 'seed' | 'user' }>> {
-    try {
-      // Get entity data if available for better context
-      let entityData: any = null;
-      if (domain) {
-        try {
-          const profile = await this.prisma.$queryRaw<{ businessName: string; description: string; services: any[] }>(
-            'SELECT "businessName", "description", "services" FROM "workspace_profiles" WHERE "workspaceId" = $1 LIMIT 1',
-            [workspaceId]
-          );
-          if (profile.length > 0) {
-            try {
-              entityData = await this.entityExtractor.extractEntityFromDomain(workspaceId, domain);
-            } catch (error) {
-              // Continue without entity data
-            }
+    // Get entity data if available for better context (declare outside try block for fallback use)
+    let entityData: any = null;
+    if (domain) {
+      try {
+        const profile = await this.prisma.$queryRaw<{ businessName: string; description: string; services: any[] }>(
+          'SELECT "businessName", "description", "services" FROM "workspace_profiles" WHERE "workspaceId" = $1 LIMIT 1',
+          [workspaceId]
+        );
+        if (profile.length > 0) {
+          try {
+            entityData = await this.entityExtractor.extractEntityFromDomain(workspaceId, domain);
+          } catch (error) {
+            // Continue without entity data
           }
-        } catch (error) {
-          // Continue without entity data
         }
+      } catch (error) {
+        // Continue without entity data
       }
+    }
 
+    // Extract category and industry for use throughout the function
+    const category = entityData?.category || 'business services';
+    const industry = entityData?.vertical || category;
+
+    try {
       // Use IntentClustererService for intent-based prompt generation
       // Focus on industry/category for competitive benchmarking
-      const category = entityData?.category || 'business services';
-      const industry = entityData?.vertical || category;
       
       const intentBasedPrompts = await this.intentClusterer.generateIntentBasedPrompts(
         workspaceId,
