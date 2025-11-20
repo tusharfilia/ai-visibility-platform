@@ -1776,12 +1776,192 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
         visible: false, // Will be true once jobs complete
       }));
 
-      // Step 6: Calculate initial GEO score (0 until analysis completes)
-      const geoScore = 0;
-      const insights: string[] = [];
-
-      // Get current status
+      // Step 6: Get current status
       const statusResult = await this.getStatus(demoRunId);
+      const currentStatus = statusResult.data.status;
+      const currentProgress = statusResult.data.progress;
+
+      // Step 7: Try to get insights data if analysis is complete or partially complete
+      let shareOfVoice: any[] = [];
+      let topCitations: any[] = [];
+      let enginePerformance: any[] = [];
+      let geoScore = 0;
+      let insights: string[] = [];
+      let citationFrequency: Record<string, number> = {};
+      let recommendationFrequency: Record<string, number> = {};
+
+      // If analysis is complete, get full insights
+      if (currentStatus === 'analysis_complete') {
+        try {
+          const insightsResult = await this.getInsights(demoRunId);
+          if (insightsResult.ok && insightsResult.data) {
+            shareOfVoice = insightsResult.data.shareOfVoice || [];
+            topCitations = insightsResult.data.topCitations || [];
+            enginePerformance = insightsResult.data.enginePerformance || [];
+            insights = insightsResult.data.insightHighlights || [];
+
+            // Calculate citation frequency
+            topCitations.forEach(citation => {
+              citationFrequency[citation.domain] = citation.references || 0;
+            });
+
+            // Calculate GEO score from share of voice
+            if (shareOfVoice.length > 0) {
+              const mainEntity = shareOfVoice[0];
+              if (mainEntity) {
+                // GEO score based on mentions, sentiment, and engine coverage
+                const mentionScore = Math.min(100, (mainEntity.mentions || 0) * 10);
+                const sentimentScore = mainEntity.positiveMentions > 0 
+                  ? Math.min(30, (mainEntity.positiveMentions / (mainEntity.mentions || 1)) * 30)
+                  : 0;
+                const engineCoverageScore = engines.filter(e => e.visible).length * 20;
+                geoScore = Math.min(100, Math.round(mentionScore * 0.5 + sentimentScore * 0.2 + engineCoverageScore * 0.3));
+              }
+            }
+
+            // Calculate recommendation frequency (how often each competitor is mentioned)
+            shareOfVoice.forEach(entity => {
+              if (entity.entity !== brand) {
+                recommendationFrequency[entity.entity] = entity.mentions || 0;
+              }
+            });
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to get insights for instant summary: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } else if (currentProgress > 0) {
+        // Analysis is running - try to get partial data
+        try {
+          const demoRun = await this.loadDemoRun(demoRunId);
+          if (demoRun.workspaceId) {
+            // Get partial share of voice from completed jobs
+            try {
+              const mentionRows = await this.prisma.$queryRaw<{
+                entityKey: string;
+                entityLabel: string;
+                mentions: number;
+                positiveMentions: number;
+                neutralMentions: number;
+                negativeMentions: number;
+              }>(
+                `SELECT
+                   LOWER(m."brand") AS "entityKey",
+                   MIN(m."brand") AS "entityLabel",
+                   COUNT(*)::int AS "mentions",
+                   COUNT(*) FILTER (WHERE m."sentiment" = 'positive')::int AS "positiveMentions",
+                   COUNT(*) FILTER (WHERE m."sentiment" = 'neutral')::int AS "neutralMentions",
+                   COUNT(*) FILTER (WHERE m."sentiment" = 'negative')::int AS "negativeMentions"
+                 FROM "mentions" m
+                 JOIN "answers" a ON a.id = m."answerId"
+                 JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+                 JOIN "prompts" p ON p.id = pr."promptId"
+                 WHERE pr."workspaceId" = $1
+                   AND pr."status" = 'SUCCESS'
+                   AND 'demo' = ANY(p."tags")
+                 GROUP BY LOWER(m."brand")
+                 ORDER BY COUNT(*) DESC
+                 LIMIT 10`,
+                [demoRun.workspaceId],
+              );
+
+              const totalMentions = mentionRows.reduce((sum, row) => sum + (row.mentions || 0), 0);
+              shareOfVoice = mentionRows.map(row => ({
+                entity: row.entityLabel || row.entityKey,
+                mentions: row.mentions || 0,
+                positiveMentions: row.positiveMentions || 0,
+                neutralMentions: row.neutralMentions || 0,
+                negativeMentions: row.negativeMentions || 0,
+                sharePercentage: totalMentions > 0 ? Math.round((row.mentions / totalMentions) * 100) : 0,
+              }));
+
+              // Calculate partial GEO score
+              if (shareOfVoice.length > 0) {
+                const mainEntity = shareOfVoice[0];
+                if (mainEntity) {
+                  const mentionScore = Math.min(100, (mainEntity.mentions || 0) * 10);
+                  const sentimentScore = mainEntity.positiveMentions > 0 
+                    ? Math.min(30, (mainEntity.positiveMentions / (mainEntity.mentions || 1)) * 30)
+                    : 0;
+                  const engineCoverageScore = engines.filter(e => e.visible).length * 20;
+                  geoScore = Math.min(100, Math.round(mentionScore * 0.5 + sentimentScore * 0.2 + engineCoverageScore * 0.3));
+                }
+              }
+            } catch (error) {
+              this.logger.warn(`Failed to get partial share of voice: ${error instanceof Error ? error.message : String(error)}`);
+            }
+
+            // Get partial citations
+            try {
+              const citationRows = await this.prisma.$queryRaw<{
+                domain: string | null;
+                references: number;
+              }>(
+                `SELECT
+                   LOWER(c."domain") AS "domain",
+                   COUNT(*)::int AS "references"
+                 FROM "citations" c
+                 JOIN "answers" a ON a.id = c."answerId"
+                 JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+                 JOIN "prompts" p ON p.id = pr."promptId"
+                 WHERE pr."workspaceId" = $1
+                   AND 'demo' = ANY(p."tags")
+                 GROUP BY LOWER(c."domain")
+                 ORDER BY COUNT(*) DESC
+                 LIMIT 10`,
+                [demoRun.workspaceId],
+              );
+
+              topCitations = citationRows.map(row => ({
+                domain: row.domain || 'Unknown',
+                references: row.references || 0,
+              }));
+
+              // Calculate citation frequency
+              topCitations.forEach(citation => {
+                citationFrequency[citation.domain] = citation.references || 0;
+              });
+            } catch (error) {
+              this.logger.warn(`Failed to get partial citations: ${error instanceof Error ? error.message : String(error)}`);
+            }
+
+            // Get engine performance
+            try {
+              const engineRows = await this.prisma.$queryRaw<{
+                engine: string;
+                totalRuns: number;
+                successfulRuns: number;
+                failedRuns: number;
+              }>(
+                `SELECT
+                   e."key" AS "engine",
+                   COUNT(*)::int AS "totalRuns",
+                   COUNT(*) FILTER (WHERE pr."status" = 'SUCCESS')::int AS "successfulRuns",
+                   COUNT(*) FILTER (WHERE pr."status" = 'FAILED')::int AS "failedRuns"
+                 FROM "prompt_runs" pr
+                 JOIN "engines" e ON e.id = pr."engineId"
+                 JOIN "prompts" p ON p.id = pr."promptId"
+                 WHERE pr."workspaceId" = $1
+                   AND 'demo' = ANY(p."tags")
+                 GROUP BY e."key"`,
+                [demoRun.workspaceId],
+              );
+
+              enginePerformance = engineRows.map(row => ({
+                engine: row.engine,
+                totalRuns: row.totalRuns || 0,
+                successfulRuns: row.successfulRuns || 0,
+                failedRuns: row.failedRuns || 0,
+                successRate: row.totalRuns > 0 ? Math.round((row.successfulRuns / row.totalRuns) * 100) : 0,
+                totalCostCents: 0, // Not calculated in partial data
+              }));
+            } catch (error) {
+              this.logger.warn(`Failed to get engine performance: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to get partial insights: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
 
       return {
         ok: true,
@@ -1796,10 +1976,16 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
           engines,
           geoScore,
           insights,
-          status: statusResult.data.status,
-          progress: statusResult.data.progress,
+          status: currentStatus,
+          progress: currentProgress,
           totalJobs: statusResult.data.totalJobs,
           completedJobs: statusResult.data.completedJobs,
+          // Include detailed analytics
+          shareOfVoice,
+          topCitations,
+          enginePerformance,
+          citationFrequency,
+          recommendationFrequency,
         },
       };
     } catch (error) {
