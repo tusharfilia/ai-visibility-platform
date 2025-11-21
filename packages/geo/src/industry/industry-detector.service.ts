@@ -193,13 +193,8 @@ Be specific and accurate. Use industry-standard terminology.`;
       missingData.push('LLM classification unavailable');
     }
 
-    // 5. Metadata-based detection
-    if (websiteContent?.title) {
-      evidence.metadataSignals.push(`Title: ${websiteContent.title}`);
-    }
-    if (websiteContent?.metaDescription) {
-      evidence.metadataSignals.push(`Meta: ${websiteContent.metaDescription}`);
-    }
+    // 5. Metadata-based detection (skip for now - can be enhanced later)
+    // Metadata detection can be added later by fetching page metadata
 
     // Determine final industry
     let primaryIndustry = llmClassification;

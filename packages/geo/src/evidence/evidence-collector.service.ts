@@ -222,6 +222,7 @@ export class EvidenceCollectorService {
         [workspaceId, entityName]
       );
 
+      const mentions = mentionsResult.rows;
       for (const mention of mentions) {
         const appeared = true; // If we found a mention, it appeared
         const rawExcerpt = this.extractContext(mention.answerText, entityName);
