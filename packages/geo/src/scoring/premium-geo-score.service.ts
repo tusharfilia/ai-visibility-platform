@@ -1,0 +1,615 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { LLMRouterService } from '@ai-visibility/shared';
+import { EEATCalculatorService, EEATScore } from '../trust/eeat-calculator.service';
+import { EvidenceBackedShareOfVoiceService } from '../sov/evidence-backed-sov.service';
+import { EvidenceCollectorService } from '../evidence/evidence-collector.service';
+import { SchemaAuditorService } from '../structural/schema-auditor';
+import { StructuralScoringService } from '../structural/structural-scoring.service';
+import { PrismaClient } from '@prisma/client';
+
+export interface PremiumGEOScore {
+  total: number; // 0-100
+  breakdown: {
+    aiVisibility: {
+      score: number; // 0-100
+      weight: number; // 35%
+      points: number; // score * weight
+      details: {
+        perEngine: {
+          engine: string;
+          coverage: number; // % of prompts where visible
+          promptsTested: number;
+          promptsVisible: number;
+        }[];
+        perPrompt: {
+          prompt: string;
+          enginesVisible: number;
+          totalEngines: number;
+        }[];
+      };
+      evidence: string[];
+      missing: string[];
+    };
+    eeat: {
+      score: number; // 0-100 (normalized from 0-400)
+      weight: number; // 25%
+      points: number;
+      breakdown: {
+        expertise: number;
+        authoritativeness: number;
+        trustworthiness: number;
+        experience: number;
+      };
+      evidence: string[];
+      missing: string[];
+    };
+    citations: {
+      score: number; // 0-100
+      weight: number; // 15%
+      points: number;
+      details: {
+        totalCitations: number;
+        licensedPublisherCitations: number;
+        averageAuthority: number;
+        citationCategories: Record<string, number>;
+      };
+      evidence: string[];
+      missing: string[];
+    };
+    competitorComparison: {
+      score: number; // 0-100
+      weight: number; // 15%
+      points: number;
+      details: {
+        shareOfVoice: number;
+        competitorCount: number;
+        relativePosition: number; // 1 = leader, 0.5 = middle, 0 = trailing
+      };
+      evidence: string[];
+      missing: string[];
+    };
+    schemaTechnical: {
+      score: number; // 0-100
+      weight: number; // 10%
+      points: number;
+      details: {
+        schemaTypes: string[];
+        schemaCompleteness: number;
+        structuredDataQuality: number;
+      };
+      evidence: string[];
+      missing: string[];
+    };
+  };
+  confidence: number; // 0-1
+  warnings: string[];
+  recommendations: string[];
+}
+
+@Injectable()
+export class PremiumGEOScoreService {
+  private readonly logger = new Logger(PremiumGEOScoreService.name);
+  private prisma: PrismaClient;
+
+  constructor(
+    private readonly llmRouter: LLMRouterService,
+    private readonly eeatCalculator: EEATCalculatorService,
+    private readonly evidenceBackedSOV: EvidenceBackedShareOfVoiceService,
+    private readonly evidenceCollector: EvidenceCollectorService,
+    private readonly schemaAuditor: SchemaAuditorService,
+    private readonly structuralScoring: StructuralScoringService,
+  ) {
+    this.prisma = new PrismaClient();
+  }
+
+  /**
+   * Calculate comprehensive, evidence-backed GEO Score
+   */
+  async calculatePremiumGEOScore(
+    workspaceId: string,
+    domain: string,
+    brandName: string,
+    competitorNames: string[] = []
+  ): Promise<PremiumGEOScore> {
+    const breakdown = {
+      aiVisibility: { score: 0, weight: 0.35, points: 0, details: { perEngine: [], perPrompt: [] }, evidence: [] as string[], missing: [] as string[] },
+      eeat: { score: 0, weight: 0.25, points: 0, breakdown: { expertise: 0, authoritativeness: 0, trustworthiness: 0, experience: 0 }, evidence: [] as string[], missing: [] as string[] },
+      citations: { score: 0, weight: 0.15, points: 0, details: { totalCitations: 0, licensedPublisherCitations: 0, averageAuthority: 0, citationCategories: {} }, evidence: [] as string[], missing: [] as string[] },
+      competitorComparison: { score: 0, weight: 0.15, points: 0, details: { shareOfVoice: 0, competitorCount: 0, relativePosition: 0 }, evidence: [] as string[], missing: [] as string[] },
+      schemaTechnical: { score: 0, weight: 0.10, points: 0, details: { schemaTypes: [], schemaCompleteness: 0, structuredDataQuality: 0 }, evidence: [] as string[], missing: [] as string[] },
+    };
+
+    const warnings: string[] = [];
+    const recommendations: string[] = [];
+
+    // 1. AI Visibility (35%)
+    breakdown.aiVisibility = await this.calculateAIVisibilityScore(workspaceId, brandName);
+
+    // 2. EEAT (25%)
+    breakdown.eeat = await this.calculateEEATScore(workspaceId, domain, brandName);
+
+    // 3. Citations (15%)
+    breakdown.citations = await this.calculateCitationsScore(workspaceId, domain);
+
+    // 4. Competitor Comparison (15%)
+    breakdown.competitorComparison = await this.calculateCompetitorComparisonScore(workspaceId, brandName, competitorNames);
+
+    // 5. Schema/Technical (10%)
+    breakdown.schemaTechnical = await this.calculateSchemaTechnicalScore(workspaceId, domain);
+
+    // Calculate total score
+    const total = breakdown.aiVisibility.points +
+                  breakdown.eeat.points +
+                  breakdown.citations.points +
+                  breakdown.competitorComparison.points +
+                  breakdown.schemaTechnical.points;
+
+    // Calculate confidence
+    const dataPoints = [
+      breakdown.aiVisibility.details.perEngine.length,
+      breakdown.eeat.breakdown.expertise > 0 ? 1 : 0,
+      breakdown.citations.details.totalCitations,
+      breakdown.competitorComparison.details.competitorCount,
+      breakdown.schemaTechnical.details.schemaTypes.length,
+    ];
+    const avgDataPoints = dataPoints.reduce((a, b) => a + b, 0) / dataPoints.length;
+    const confidence = Math.min(1.0, avgDataPoints / 10);
+
+    // Generate recommendations
+    if (breakdown.aiVisibility.score < 50) {
+      recommendations.push(`Improve AI visibility: Currently visible in ${breakdown.aiVisibility.details.perEngine.filter(e => e.coverage > 0).length} of ${breakdown.aiVisibility.details.perEngine.length} engines`);
+    }
+    if (breakdown.eeat.score < 50) {
+      recommendations.push(`Improve EEAT score: Focus on ${breakdown.eeat.missing.slice(0, 2).join(' and ')}`);
+    }
+    if (breakdown.citations.details.totalCitations < 10) {
+      recommendations.push(`Increase citations: Only ${breakdown.citations.details.totalCitations} citations found`);
+    }
+    if (breakdown.schemaTechnical.score < 50) {
+      recommendations.push(`Add schema markup: ${breakdown.schemaTechnical.missing.join(', ')}`);
+    }
+
+    return {
+      total: Math.round(total),
+      breakdown,
+      confidence,
+      warnings,
+      recommendations,
+    };
+  }
+
+  /**
+   * Calculate AI Visibility score (35% weight)
+   */
+  private async calculateAIVisibilityScore(
+    workspaceId: string,
+    brandName: string
+  ): Promise<PremiumGEOScore['breakdown']['aiVisibility']> {
+    const details = {
+      perEngine: [] as Array<{ engine: string; coverage: number; promptsTested: number; promptsVisible: number }>,
+      perPrompt: [] as Array<{ prompt: string; enginesVisible: number; totalEngines: number }>,
+    };
+
+    const evidence: string[] = [];
+    const missing: string[] = [];
+
+    try {
+      // Get all prompts tested
+      const prompts = await this.prisma.$queryRaw<{ promptText: string; promptId: string }>(
+        `SELECT DISTINCT p."text" AS "promptText", p.id AS "promptId"
+         FROM "prompts" p
+         JOIN "prompt_runs" pr ON pr."promptId" = p.id
+         WHERE pr."workspaceId" = $1
+           AND 'demo' = ANY(p."tags")
+         ORDER BY p."text"`,
+        [workspaceId]
+      );
+
+      // Get engine visibility per prompt
+      const engines = ['PERPLEXITY', 'AIO', 'BRAVE'];
+      let totalPrompts = 0;
+      let totalVisible = 0;
+
+      for (const engine of engines) {
+        let promptsVisible = 0;
+        let promptsTested = 0;
+
+        for (const prompt of prompts) {
+          const mentionCount = await this.prisma.$queryRaw<{ count: number }>(
+            `SELECT COUNT(*)::int AS count
+             FROM "mentions" m
+             JOIN "answers" a ON a.id = m."answerId"
+             JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+             JOIN "engines" e ON e.id = pr."engineId"
+             WHERE pr."workspaceId" = $1
+               AND pr."promptId" = $2
+               AND e."key" = $3
+               AND LOWER(m."brand") = LOWER($4)
+               AND pr."status" = 'SUCCESS'`,
+            [workspaceId, prompt.promptId, engine, brandName]
+          );
+
+          promptsTested += 1;
+          if (mentionCount[0]?.count > 0) {
+            promptsVisible += 1;
+            totalVisible += 1;
+          }
+        }
+
+        totalPrompts += promptsTested;
+        const coverage = promptsTested > 0 ? (promptsVisible / promptsTested) * 100 : 0;
+
+        details.perEngine.push({
+          engine,
+          coverage: Math.round(coverage),
+          promptsTested,
+          promptsVisible,
+        });
+
+        evidence.push(`${engine}: Visible in ${promptsVisible}/${promptsTested} prompts (${Math.round(coverage)}% coverage)`);
+      }
+
+      // Get per-prompt breakdown
+      for (const prompt of prompts) {
+        let enginesVisible = 0;
+
+        for (const engine of engines) {
+          const mentionCount = await this.prisma.$queryRaw<{ count: number }>(
+            `SELECT COUNT(*)::int AS count
+             FROM "mentions" m
+             JOIN "answers" a ON a.id = m."answerId"
+             JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+             JOIN "engines" e ON e.id = pr."engineId"
+             WHERE pr."workspaceId" = $1
+               AND pr."promptId" = $2
+               AND e."key" = $3
+               AND LOWER(m."brand") = LOWER($4)
+               AND pr."status" = 'SUCCESS'`,
+            [workspaceId, prompt.promptId, engine, brandName]
+          );
+
+          if (mentionCount[0]?.count > 0) {
+            enginesVisible += 1;
+          }
+        }
+
+        details.perPrompt.push({
+          prompt: prompt.promptText,
+          enginesVisible,
+          totalEngines: engines.length,
+        });
+      }
+
+      // Calculate score: average coverage across all engines
+      const avgCoverage = details.perEngine.reduce((sum, e) => sum + e.coverage, 0) / details.perEngine.length;
+      const score = Math.round(avgCoverage);
+
+      if (score < 50) {
+        missing.push(`Low visibility: Only ${Math.round(avgCoverage)}% average coverage across engines`);
+      }
+
+      return {
+        score,
+        weight: 0.35,
+        points: score * 0.35,
+        details,
+        evidence,
+        missing,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to calculate AI visibility score: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        score: 0,
+        weight: 0.35,
+        points: 0,
+        details,
+        evidence: [],
+        missing: ['AI visibility calculation failed'],
+      };
+    }
+  }
+
+  /**
+   * Calculate EEAT score (25% weight)
+   */
+  private async calculateEEATScore(
+    workspaceId: string,
+    domain: string,
+    brandName: string
+  ): Promise<PremiumGEOScore['breakdown']['eeat']> {
+    try {
+      const eeatScore = await this.eeatCalculator.calculateEEAT(workspaceId, domain, brandName);
+
+      const evidence: string[] = [];
+      const missing: string[] = [];
+
+      evidence.push(`Expertise: ${eeatScore.expertise}/100 (${eeatScore.breakdown.expertise.signals.length} signals)`);
+      evidence.push(`Authoritativeness: ${eeatScore.authoritativeness}/100 (${eeatScore.breakdown.authoritativeness.signals.length} signals)`);
+      evidence.push(`Trustworthiness: ${eeatScore.trustworthiness}/100 (${eeatScore.breakdown.trustworthiness.signals.length} signals)`);
+      evidence.push(`Experience: ${eeatScore.experience}/100 (${eeatScore.breakdown.experience.signals.length} signals)`);
+
+      if (eeatScore.warnings.length > 0) {
+        missing.push(...eeatScore.warnings);
+      }
+
+      return {
+        score: eeatScore.normalized,
+        weight: 0.25,
+        points: eeatScore.normalized * 0.25,
+        breakdown: {
+          expertise: eeatScore.expertise,
+          authoritativeness: eeatScore.authoritativeness,
+          trustworthiness: eeatScore.trustworthiness,
+          experience: eeatScore.experience,
+        },
+        evidence,
+        missing,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to calculate EEAT score: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        score: 0,
+        weight: 0.25,
+        points: 0,
+        breakdown: { expertise: 0, authoritativeness: 0, trustworthiness: 0, experience: 0 },
+        evidence: [],
+        missing: ['EEAT calculation failed'],
+      };
+    }
+  }
+
+  /**
+   * Calculate Citations score (15% weight)
+   */
+  private async calculateCitationsScore(
+    workspaceId: string,
+    domain: string
+  ): Promise<PremiumGEOScore['breakdown']['citations']> {
+    const evidence: string[] = [];
+    const missing: string[] = [];
+
+    try {
+      // Get total citations
+      const totalCitations = await this.prisma.$queryRaw<{ count: number }>(
+        `SELECT COUNT(*)::int AS count
+         FROM "citations" c
+         JOIN "answers" a ON a.id = c."answerId"
+         JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+         WHERE pr."workspaceId" = $1
+           AND c."domain" LIKE $2`,
+        [workspaceId, `%${domain}%`]
+      );
+
+      const total = totalCitations[0]?.count || 0;
+
+      // Get licensed publisher citations
+      const licensedCitations = await this.prisma.$queryRaw<{ count: number }>(
+        `SELECT COUNT(*)::int AS count
+         FROM "citations" c
+         JOIN "answers" a ON a.id = c."answerId"
+         JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+         WHERE pr."workspaceId" = $1
+           AND c."domain" IN (
+             'nytimes.com', 'wsj.com', 'ft.com', 'reuters.com', 'bloomberg.com',
+             'forbes.com', 'techcrunch.com', 'wired.com', 'bbc.com', 'cnn.com'
+           )`,
+        [workspaceId]
+      );
+
+      const licensed = licensedCitations[0]?.count || 0;
+
+      // Get citation categories
+      const citationCategories = await this.prisma.$queryRaw<{ domain: string; count: number }>(
+        `SELECT
+           c."domain",
+           COUNT(*)::int AS count
+         FROM "citations" c
+         JOIN "answers" a ON a.id = c."answerId"
+         JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+         WHERE pr."workspaceId" = $1
+         GROUP BY c."domain"
+         ORDER BY COUNT(*) DESC
+         LIMIT 10`,
+        [workspaceId]
+      );
+
+      const categories: Record<string, number> = {};
+      for (const cat of citationCategories) {
+        const category = this.categorizeDomain(cat.domain);
+        categories[category] = (categories[category] || 0) + cat.count;
+      }
+
+      // Calculate score: 0-100 based on citation count and quality
+      let score = 0;
+      if (total > 0) {
+        score += Math.min(40, total * 2); // Base score from quantity
+      }
+      if (licensed > 0) {
+        score += Math.min(40, licensed * 10); // Bonus for licensed publishers
+      }
+      score += Math.min(20, Object.keys(categories).length * 5); // Diversity bonus
+
+      score = Math.min(100, score);
+
+      evidence.push(`Total citations: ${total}`);
+      evidence.push(`Licensed publisher citations: ${licensed}`);
+      evidence.push(`Citation categories: ${Object.keys(categories).join(', ')}`);
+
+      if (total < 5) {
+        missing.push('Very few citations found');
+      }
+      if (licensed === 0) {
+        missing.push('No licensed publisher citations');
+      }
+
+      return {
+        score,
+        weight: 0.15,
+        points: score * 0.15,
+        details: {
+          totalCitations: total,
+          licensedPublisherCitations: licensed,
+          averageAuthority: 0, // Would require external API
+          citationCategories: categories,
+        },
+        evidence,
+        missing,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to calculate citations score: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        score: 0,
+        weight: 0.15,
+        points: 0,
+        details: { totalCitations: 0, licensedPublisherCitations: 0, averageAuthority: 0, citationCategories: {} },
+        evidence: [],
+        missing: ['Citations calculation failed'],
+      };
+    }
+  }
+
+  /**
+   * Calculate Competitor Comparison score (15% weight)
+   */
+  private async calculateCompetitorComparisonScore(
+    workspaceId: string,
+    brandName: string,
+    competitorNames: string[]
+  ): Promise<PremiumGEOScore['breakdown']['competitorComparison']> {
+    const evidence: string[] = [];
+    const missing: string[] = [];
+
+    try {
+      // Get Share of Voice
+      const allEntities = [brandName, ...competitorNames];
+      const sov = await this.evidenceBackedSOV.calculateEvidenceBackedSOV(workspaceId, allEntities);
+
+      const brandSOV = sov.find(s => s.entity.toLowerCase() === brandName.toLowerCase());
+      const shareOfVoice = brandSOV?.sharePercentage || 0;
+
+      // Calculate relative position
+      const sortedSOV = sov.sort((a, b) => b.sharePercentage - a.sharePercentage);
+      const brandPosition = sortedSOV.findIndex(s => s.entity.toLowerCase() === brandName.toLowerCase());
+      const relativePosition = brandPosition >= 0
+        ? (sov.length - brandPosition) / sov.length // 1.0 = leader, 0.0 = last
+        : 0;
+
+      // Calculate score: based on share of voice and relative position
+      let score = shareOfVoice * 0.6; // 60% from share
+      score += relativePosition * 100 * 0.4; // 40% from position
+
+      score = Math.min(100, score);
+
+      evidence.push(`Share of Voice: ${shareOfVoice}%`);
+      evidence.push(`Position: ${brandPosition >= 0 ? brandPosition + 1 : 'N/A'} of ${sov.length}`);
+      evidence.push(`Competitors analyzed: ${competitorNames.length}`);
+
+      if (competitorNames.length === 0) {
+        missing.push('No competitors provided for comparison');
+      }
+      if (shareOfVoice < 20) {
+        missing.push(`Low share of voice: ${shareOfVoice}%`);
+      }
+
+      return {
+        score: Math.round(score),
+        weight: 0.15,
+        points: score * 0.15,
+        details: {
+          shareOfVoice,
+          competitorCount: competitorNames.length,
+          relativePosition,
+        },
+        evidence,
+        missing,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to calculate competitor comparison score: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        score: 0,
+        weight: 0.15,
+        points: 0,
+        details: { shareOfVoice: 0, competitorCount: 0, relativePosition: 0 },
+        evidence: [],
+        missing: ['Competitor comparison calculation failed'],
+      };
+    }
+  }
+
+  /**
+   * Calculate Schema/Technical score (10% weight)
+   */
+  private async calculateSchemaTechnicalScore(
+    workspaceId: string,
+    domain: string
+  ): Promise<PremiumGEOScore['breakdown']['schemaTechnical']> {
+    const evidence: string[] = [];
+    const missing: string[] = [];
+
+    try {
+      const schemaAudit = await this.schemaAuditor.auditPage(workspaceId, domain);
+      const structuralScore = await this.structuralScoring.calculateStructuralScore(workspaceId, domain);
+
+      const schemaTypes = schemaAudit.schemaTypes || [];
+      const schemaCompleteness = schemaTypes.length > 0 ? (schemaTypes.length / 5) * 100 : 0; // Max 5 schema types
+      const structuredDataQuality = structuralScore.totalScore || 0;
+
+      // Calculate score
+      let score = schemaCompleteness * 0.5; // 50% from schema completeness
+      score += structuredDataQuality * 0.5; // 50% from structural quality
+
+      score = Math.min(100, score);
+
+      if (schemaTypes.length > 0) {
+        evidence.push(`Schema types found: ${schemaTypes.join(', ')}`);
+      } else {
+        missing.push('No schema.org markup found');
+      }
+
+      evidence.push(`Schema completeness: ${Math.round(schemaCompleteness)}%`);
+      evidence.push(`Structural quality: ${Math.round(structuredDataQuality)}%`);
+
+      if (schemaCompleteness < 50) {
+        missing.push('Incomplete schema markup');
+      }
+
+      return {
+        score: Math.round(score),
+        weight: 0.10,
+        points: score * 0.10,
+        details: {
+          schemaTypes,
+          schemaCompleteness: Math.round(schemaCompleteness),
+          structuredDataQuality: Math.round(structuredDataQuality),
+        },
+        evidence,
+        missing,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to calculate schema technical score: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        score: 0,
+        weight: 0.10,
+        points: 0,
+        details: { schemaTypes: [], schemaCompleteness: 0, structuredDataQuality: 0 },
+        evidence: [],
+        missing: ['Schema technical calculation failed'],
+      };
+    }
+  }
+
+  /**
+   * Categorize domain for citation analysis
+   */
+  private categorizeDomain(domain: string): string {
+    const domainLower = domain.toLowerCase();
+    if (domainLower.includes('reddit.com')) return 'social';
+    if (domainLower.includes('yelp.com') || domainLower.includes('tripadvisor.com')) return 'review';
+    if (domainLower.includes('google.com') || domainLower.includes('bing.com')) return 'directory';
+    if (domainLower.includes('nytimes.com') || domainLower.includes('wsj.com') || 
+        domainLower.includes('reuters.com') || domainLower.includes('bbc.com')) return 'news';
+    if (domainLower.includes('blog') || domainLower.includes('medium.com')) return 'blog';
+    return 'other';
+  }
+}
+

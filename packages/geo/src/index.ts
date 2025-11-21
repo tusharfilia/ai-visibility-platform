@@ -68,6 +68,20 @@ export * from './scoring/engine-bias-simulator.service';
 // Copilot mapping services
 export * from './copilot/insight-copilot-mapper.service';
 
+// Industry detection services
+export * from './industry/industry-detector.service';
+
+// Evidence-backed services
+export * from './evidence/evidence-collector.service';
+export * from './prompts/evidence-backed-prompt-generator.service';
+export * from './sov/evidence-backed-sov.service';
+
+// Premium services
+export * from './summary/premium-business-summary.service';
+export * from './competitors/premium-competitor-detector.service';
+export * from './citations/premium-citation-service';
+export * from './scoring/premium-geo-score.service';
+
 // Validation services (exported as primary names for alerts module)
 export {
   HallucinationDetectorService,
