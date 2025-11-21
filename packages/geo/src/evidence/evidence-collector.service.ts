@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
 
 export interface PromptEvidence {
   prompt: string;
@@ -43,10 +43,13 @@ export interface ShareOfVoiceEvidence {
 export class EvidenceCollectorService {
   private readonly logger = new Logger(EvidenceCollectorService.name);
 
-  private prisma: PrismaClient;
+  private dbPool: Pool;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
   }
 
   /**
@@ -59,7 +62,7 @@ export class EvidenceCollectorService {
     const evidence: PromptEvidence[] = [];
 
     try {
-      const promptRuns = await this.prisma.$queryRaw<{
+      const promptRunsResult = await this.dbPool.query<{
         promptRunId: string;
         answerId: string;
         engine: string;
@@ -83,6 +86,7 @@ export class EvidenceCollectorService {
         [workspaceId, promptText]
       );
 
+      const promptRuns = promptRunsResult.rows;
       for (const run of promptRuns) {
         // Extract brands from answer
         const brands = await this.extractBrandsFromAnswer(run.answerId);
@@ -123,7 +127,7 @@ export class EvidenceCollectorService {
     const evidence: CitationEvidence[] = [];
 
     try {
-      const citations = await this.prisma.$queryRaw<{
+      const citationsResult = await this.dbPool.query<{
         citationId: string;
         domain: string;
         url: string;
@@ -247,14 +251,14 @@ export class EvidenceCollectorService {
    */
   private async extractBrandsFromAnswer(answerId: string): Promise<string[]> {
     try {
-      const mentions = await this.prisma.$queryRaw<{ brand: string }>(
+      const mentionsResult = await this.dbPool.query<{ brand: string }>(
         `SELECT DISTINCT m."brand"
          FROM "mentions" m
          WHERE m."answerId" = $1`,
         [answerId]
       );
 
-      return mentions.map(m => m.brand);
+      return mentionsResult.rows.map(m => m.brand);
     } catch (error) {
       return [];
     }

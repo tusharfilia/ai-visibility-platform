@@ -2,48 +2,23 @@ import { Injectable, Logger } from '@nestjs/common';
 import { LLMRouterService } from '@ai-visibility/shared';
 import { IndustryDetectorService } from '../industry/industry-detector.service';
 import { EvidenceCollectorService } from '../evidence/evidence-collector.service';
-import { PrismaClient } from '@prisma/client';
-
-export interface PremiumCompetitor {
-  domain: string;
-  brandName: string;
-  type: 'direct' | 'content' | 'authority' | 'geo' | 'category';
-  confidence: number; // 0-1
-  reasoning: string;
-  evidence: {
-    foundInPrompts: string[];
-    foundInEngines: string[];
-    citationCount: number;
-    mentionFrequency: number;
-    coOccurrenceCount: number; // How often mentioned together
-  };
-  visibility: {
-    perEngine: {
-      engine: string;
-      visible: boolean;
-      promptsVisible: number;
-      promptsTested: number;
-    }[];
-    overallVisibility: number; // 0-100
-  };
-  ranking: {
-    averagePosition: number; // When mentioned, average position
-    bestPosition: number;
-    worstPosition: number;
-  };
-}
+import { Pool } from 'pg';
+import { PremiumCompetitor } from '../types/premium-response.types';
 
 @Injectable()
 export class PremiumCompetitorDetectorService {
   private readonly logger = new Logger(PremiumCompetitorDetectorService.name);
-  private prisma: PrismaClient;
+  private dbPool: Pool;
 
   constructor(
     private readonly llmRouter: LLMRouterService,
     private readonly industryDetector: IndustryDetectorService,
     private readonly evidenceCollector: EvidenceCollectorService,
   ) {
-    this.prisma = new PrismaClient();
+    this.dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
   }
 
   /**
@@ -219,7 +194,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
 
     try {
       // Find domains that are frequently mentioned in the same answers as the brand
-      const coOccurrences = await this.prisma.$queryRaw<{
+      const coOccurrencesResult = await this.dbPool.query<{
         competitorBrand: string;
         competitorDomain: string;
         coOccurrenceCount: number;
@@ -246,6 +221,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
         [workspaceId, brandName]
       );
 
+      const coOccurrences = coOccurrencesResult.rows;
       for (const co of coOccurrences) {
         competitors.push({
           domain: co.competitorDomain || co.competitorBrand,
@@ -289,7 +265,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
 
     try {
       // Find domains that are frequently cited in the same contexts
-      const citationPatterns = await this.prisma.$queryRaw<{
+      const citationPatternsResult = await this.dbPool.query<{
         competitorDomain: string;
         citationCount: number;
       }>(
@@ -311,6 +287,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
         [workspaceId, domain]
       );
 
+      const citationPatterns = citationPatternsResult.rows;
       for (const pattern of citationPatterns) {
         // Extract brand name from domain
         const brandName = pattern.competitorDomain.split('.')[0];
@@ -358,7 +335,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
     const engines = ['PERPLEXITY', 'AIO', 'BRAVE'];
 
     for (const engine of engines) {
-      const visibility = await this.prisma.$queryRaw<{
+      const visibilityResult = await this.dbPool.query<{
         promptsVisible: number;
         promptsTested: number;
       }>(
@@ -377,7 +354,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
         [workspaceId, competitorBrand, engine]
       );
 
-      const data = visibility[0];
+      const data = visibilityResult.rows[0];
       const visible = (data?.promptsVisible || 0) > 0;
       const coverage = data?.promptsTested > 0
         ? ((data.promptsVisible || 0) / data.promptsTested) * 100
@@ -410,7 +387,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
     competitorBrand: string
   ): Promise<PremiumCompetitor['ranking']> {
     try {
-      const rankings = await this.prisma.$queryRaw<{
+      const rankingsResult = await this.dbPool.query<{
         position: number;
       }>(
         `SELECT
@@ -426,6 +403,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
         [workspaceId, competitorBrand]
       );
 
+      const rankings = rankingsResult.rows;
       if (rankings.length > 0) {
         const positions = rankings.map(r => r.position);
         return {

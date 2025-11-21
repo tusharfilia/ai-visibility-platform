@@ -1,41 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
 import { CitationClassifierService } from './citation-classifier.service';
-
-export interface PremiumCitation {
-  id: string;
-  domain: string;
-  url: string;
-  snippet: string; // Quote where business appears
-  context: string; // Why it counts as citation
-  category: 'news' | 'blog' | 'review' | 'directory' | 'social' | 'other';
-  sourcePage: string; // Full URL
-  domainAuthority?: number;
-  foundInPrompt: string;
-  foundInEngine: string;
-  timestamp: Date;
-  classification: {
-    sourceType: string;
-    isLicensed?: boolean;
-    publisherName?: string;
-    directoryType?: string;
-  };
-  evidence: {
-    rawOutputExcerpt: string; // Context from AI answer
-    whyItCounts: string; // Explanation
-    confidence: number;
-  };
-}
+import { PremiumCitation } from '../types/premium-response.types';
 
 @Injectable()
 export class PremiumCitationService {
   private readonly logger = new Logger(PremiumCitationService.name);
-  private prisma: PrismaClient;
+  private dbPool: Pool;
 
   constructor(
     private readonly citationClassifier: CitationClassifierService,
   ) {
-    this.prisma = new PrismaClient();
+    this.dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
   }
 
   /**
@@ -49,7 +28,7 @@ export class PremiumCitationService {
     const citations: PremiumCitation[] = [];
 
     try {
-      const citationData = await this.prisma.$queryRaw<{
+      const citationData = await this.dbPool.query<{
         citationId: string;
         domain: string;
         url: string;
@@ -79,8 +58,10 @@ export class PremiumCitationService {
          LIMIT $3`,
         domain ? [workspaceId, `%${domain}%`, limit] : [workspaceId, limit]
       );
+      
+      const rows = citationData.rows;
 
-      for (const citation of citationData) {
+      for (const citation of rows) {
         // Extract snippet
         const snippet = this.extractSnippet(citation.answerText, citation.domain);
         

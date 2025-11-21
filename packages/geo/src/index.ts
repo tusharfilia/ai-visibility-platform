@@ -76,11 +76,11 @@ export * from './evidence/evidence-collector.service';
 export * from './prompts/evidence-backed-prompt-generator.service';
 export * from './sov/evidence-backed-sov.service';
 
-// Premium services
-export * from './summary/premium-business-summary.service';
-export * from './competitors/premium-competitor-detector.service';
-export * from './citations/premium-citation-service';
-export * from './scoring/premium-geo-score.service';
+// Premium services (export classes only, types are in types/premium-response.types.ts)
+export { PremiumBusinessSummaryService } from './summary/premium-business-summary.service';
+export { PremiumCompetitorDetectorService } from './competitors/premium-competitor-detector.service';
+export { PremiumCitationService } from './citations/premium-citation-service';
+export { PremiumGEOScoreService } from './scoring/premium-geo-score.service';
 
 // Premium types
 export * from './types/premium-response.types';

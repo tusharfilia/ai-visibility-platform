@@ -5,7 +5,7 @@ import { EvidenceBackedShareOfVoiceService } from '../sov/evidence-backed-sov.se
 import { EvidenceCollectorService } from '../evidence/evidence-collector.service';
 import { SchemaAuditorService } from '../structural/schema-auditor';
 import { StructuralScoringService } from '../structural/structural-scoring.service';
-import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
 import { PremiumGEOScore } from '../types/premium-response.types';
 import { applyIndustryWeights } from '../config/industry-weights.config';
 
@@ -14,7 +14,7 @@ import { applyIndustryWeights } from '../config/industry-weights.config';
 @Injectable()
 export class PremiumGEOScoreService {
   private readonly logger = new Logger(PremiumGEOScoreService.name);
-  private prisma: PrismaClient;
+  private dbPool: Pool;
 
   constructor(
     private readonly llmRouter: LLMRouterService,
@@ -24,7 +24,10 @@ export class PremiumGEOScoreService {
     private readonly schemaAuditor: SchemaAuditorService,
     private readonly structuralScoring: StructuralScoringService,
   ) {
-    this.prisma = new PrismaClient();
+    this.dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
   }
 
   /**
@@ -134,7 +137,7 @@ export class PremiumGEOScoreService {
 
     try {
       // Get all prompts tested
-      const prompts = await this.prisma.$queryRaw<{ promptText: string; promptId: string }>(
+      const promptsResult = await this.dbPool.query<{ promptText: string; promptId: string }>(
         `SELECT DISTINCT p."text" AS "promptText", p.id AS "promptId"
          FROM "prompts" p
          JOIN "prompt_runs" pr ON pr."promptId" = p.id
@@ -143,6 +146,7 @@ export class PremiumGEOScoreService {
          ORDER BY p."text"`,
         [workspaceId]
       );
+      const prompts = promptsResult.rows;
 
       // Get engine visibility per prompt
       const engines = ['PERPLEXITY', 'AIO', 'BRAVE'];
@@ -154,7 +158,7 @@ export class PremiumGEOScoreService {
         let promptsTested = 0;
 
         for (const prompt of prompts) {
-          const mentionCount = await this.prisma.$queryRaw<{ count: number }>(
+          const mentionCountResult = await this.dbPool.query<{ count: number }>(
             `SELECT COUNT(*)::int AS count
              FROM "mentions" m
              JOIN "answers" a ON a.id = m."answerId"
@@ -169,7 +173,7 @@ export class PremiumGEOScoreService {
           );
 
           promptsTested += 1;
-          if (mentionCount[0]?.count > 0) {
+          if (mentionCountResult.rows[0]?.count > 0) {
             promptsVisible += 1;
             totalVisible += 1;
           }
@@ -193,7 +197,7 @@ export class PremiumGEOScoreService {
         let enginesVisible = 0;
 
         for (const engine of engines) {
-          const mentionCount = await this.prisma.$queryRaw<{ count: number }>(
+          const mentionCountResult = await this.dbPool.query<{ count: number }>(
             `SELECT COUNT(*)::int AS count
              FROM "mentions" m
              JOIN "answers" a ON a.id = m."answerId"
@@ -207,7 +211,7 @@ export class PremiumGEOScoreService {
             [workspaceId, prompt.promptId, engine, brandName]
           );
 
-          if (mentionCount[0]?.count > 0) {
+          if (mentionCountResult.rows[0]?.count > 0) {
             enginesVisible += 1;
           }
         }
@@ -263,29 +267,27 @@ export class PremiumGEOScoreService {
     weight: number
   ): Promise<PremiumGEOScore['breakdown']['eeat']> {
     try {
-      const eeatScore = await this.eeatCalculator.calculateEEAT(workspaceId, domain, brandName);
+      const eeatScore = await this.eeatCalculator.calculateEEATScore(workspaceId);
 
       const evidence: string[] = [];
       const missing: string[] = [];
 
-      evidence.push(`Expertise: ${eeatScore.expertise}/100 (${eeatScore.breakdown.expertise.signals.length} signals)`);
-      evidence.push(`Authoritativeness: ${eeatScore.authoritativeness}/100 (${eeatScore.breakdown.authoritativeness.signals.length} signals)`);
-      evidence.push(`Trustworthiness: ${eeatScore.trustworthiness}/100 (${eeatScore.breakdown.trustworthiness.signals.length} signals)`);
-      evidence.push(`Experience: ${eeatScore.experience}/100 (${eeatScore.breakdown.experience.signals.length} signals)`);
+      // EEATCalculatorService returns different structure
+      const normalized = (eeatScore.experience + eeatScore.expertise + eeatScore.authoritativeness + eeatScore.trustworthiness) / 4;
+      
+      evidence.push(`Expertise: ${eeatScore.expertise}/100`);
+      evidence.push(`Authoritativeness: ${eeatScore.authoritativeness}/100`);
+      evidence.push(`Trustworthiness: ${eeatScore.trustworthiness}/100`);
+      evidence.push(`Experience: ${eeatScore.experience}/100`);
 
-      if (eeatScore.warnings.length > 0) {
-        missing.push(...eeatScore.warnings);
-      }
-
-      const explanation = `EEAT score of ${eeatScore.normalized}/100 (${eeatScore.total}/400 total). ` +
+      const explanation = `EEAT score of ${Math.round(normalized)}/100. ` +
         `Breakdown: Expertise ${eeatScore.expertise}/100, Authoritativeness ${eeatScore.authoritativeness}/100, ` +
-        `Trustworthiness ${eeatScore.trustworthiness}/100, Experience ${eeatScore.experience}/100. ` +
-        `${eeatScore.breakdown.expertise.signals.length + eeatScore.breakdown.authoritativeness.signals.length + eeatScore.breakdown.trustworthiness.signals.length + eeatScore.breakdown.experience.signals.length} trust signals detected.`;
+        `Trustworthiness ${eeatScore.trustworthiness}/100, Experience ${eeatScore.experience}/100.`;
 
       return {
-        score: eeatScore.normalized,
+        score: Math.round(normalized),
         weight,
-        points: eeatScore.normalized * weight,
+        points: normalized * weight,
         breakdown: {
           expertise: eeatScore.expertise,
           authoritativeness: eeatScore.authoritativeness,
@@ -366,6 +368,7 @@ export class PremiumGEOScoreService {
         [workspaceId]
       );
 
+      const citationCategories = citationCategoriesResult.rows;
       const categories: Record<string, number> = {};
       for (const cat of citationCategories) {
         const category = this.categorizeDomain(cat.domain);
@@ -515,8 +518,8 @@ export class PremiumGEOScoreService {
     const missing: string[] = [];
 
     try {
-      const schemaAudit = await this.schemaAuditor.auditPage(workspaceId, domain);
-      const structuralScore = await this.structuralScoring.calculateStructuralScore(workspaceId, domain);
+      const schemaAudit = await this.schemaAuditor.auditPage(domain);
+      const structuralScore = await this.structuralScoring.calculateStructuralScore(workspaceId);
 
       const schemaTypes = schemaAudit.schemaTypes || [];
       const schemaCompleteness = schemaTypes.length > 0 ? (schemaTypes.length / 5) * 100 : 0; // Max 5 schema types
@@ -551,7 +554,7 @@ export class PremiumGEOScoreService {
         weight,
         points: score * weight,
         details: {
-          schemaTypes,
+          schemaTypes: schemaTypeNames,
           schemaCompleteness: Math.round(schemaCompleteness),
           structuredDataQuality: Math.round(structuredDataQuality),
         },

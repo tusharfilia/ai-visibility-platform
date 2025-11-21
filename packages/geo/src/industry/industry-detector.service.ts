@@ -97,15 +97,7 @@ export class IndustryDetectorService {
    */
   async detectIndustry(
     workspaceId: string,
-    domain: string,
-    websiteContent?: {
-      html?: string;
-      title?: string;
-      metaDescription?: string;
-      headings?: string[];
-      bodyText?: string;
-    },
-    competitorDomains?: string[]
+    domain: string
   ): Promise<IndustryClassification> {
     const evidence = {
       schemaSignals: [] as string[],
@@ -119,24 +111,21 @@ export class IndustryDetectorService {
 
     // 1. Schema-based detection
     try {
-      const schemaAudit = await this.schemaAuditor.auditPage(workspaceId, domain);
+      const schemaAudit = await this.schemaAuditor.auditPage(domain);
       if (schemaAudit.schemaTypes && schemaAudit.schemaTypes.length > 0) {
         for (const schemaType of schemaAudit.schemaTypes) {
-          if (schemaType === 'LocalBusiness') {
+          if (schemaType.type === 'LocalBusiness') {
             evidence.schemaSignals.push('LocalBusiness schema found');
-            // Try to extract business type from schema
-            if (schemaAudit.schemas?.localBusiness) {
-              const businessType = schemaAudit.schemas.localBusiness['@type'];
+            if (schemaType.jsonLd) {
+              const businessType = schemaType.jsonLd['@type'];
               if (businessType) {
                 evidence.schemaSignals.push(`Business type: ${businessType}`);
               }
             }
-          } else if (schemaType === 'Organization') {
+          } else if (schemaType.type === 'Organization') {
             evidence.schemaSignals.push('Organization schema found');
-          } else if (schemaType === 'Product') {
+          } else if (schemaType.type === 'Product') {
             evidence.schemaSignals.push('Product schema found');
-          } else if (schemaType === 'Service') {
-            evidence.schemaSignals.push('Service schema found');
           }
         }
       } else {

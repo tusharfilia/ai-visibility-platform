@@ -1902,7 +1902,7 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
         
         // Calculate EEAT Score
         try {
-          eeatScore = await this.eeatCalculator.calculateEEAT(workspaceId, normalized.href, brand);
+          eeatScore = await this.eeatCalculator.calculateEEATScore(workspaceId);
         } catch (error) {
           this.logger.warn(`EEAT calculation failed: ${error instanceof Error ? error.message : String(error)}`);
         }

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
 import { EvidenceCollectorService, ShareOfVoiceEvidence } from '../evidence/evidence-collector.service';
 
 export interface EvidenceBackedShareOfVoice {
@@ -35,12 +35,15 @@ export interface EvidenceBackedShareOfVoice {
 export class EvidenceBackedShareOfVoiceService {
   private readonly logger = new Logger(EvidenceBackedShareOfVoiceService.name);
 
-  private prisma: PrismaClient;
+  private dbPool: Pool;
 
   constructor(
     private readonly evidenceCollector: EvidenceCollectorService,
   ) {
-    this.prisma = new PrismaClient();
+    this.dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
   }
 
   /**
@@ -54,7 +57,7 @@ export class EvidenceBackedShareOfVoiceService {
 
     for (const entity of entities) {
       // Get all mentions for this entity
-      const mentions = await this.prisma.$queryRaw<{
+      const mentionsResult = await this.dbPool.query<{
         promptText: string;
         engine: string;
         sentiment: string;
@@ -76,6 +79,8 @@ export class EvidenceBackedShareOfVoiceService {
            AND 'demo' = ANY(p."tags")`,
         [workspaceId, entity]
       );
+
+      const mentions = mentionsResult.rows;
 
       // Collect evidence
       const evidence = await this.evidenceCollector.collectShareOfVoiceEvidence(workspaceId, entity);
@@ -149,7 +154,7 @@ export class EvidenceBackedShareOfVoiceService {
       }));
 
       // Calculate share percentage (need total mentions across all entities)
-      const allMentions = await this.prisma.$queryRaw<{ count: number }>(
+      const allMentionsResult = await this.dbPool.query<{ count: number }>(
         `SELECT COUNT(*)::int AS count
          FROM "mentions" m
          JOIN "answers" a ON a.id = m."answerId"
@@ -161,12 +166,12 @@ export class EvidenceBackedShareOfVoiceService {
         [workspaceId]
       );
 
-      const totalMentionsAll = allMentions[0]?.count || 1;
+      const totalMentionsAll = allMentionsResult.rows[0]?.count || 1;
       const sharePercentage = totalMentions > 0 ? Math.round((totalMentions / totalMentionsAll) * 100) : 0;
 
       // Calculate per-engine share percentages
       for (const engineData of perEngine) {
-        const engineTotal = await this.prisma.$queryRaw<{ count: number }>(
+        const engineTotalResult = await this.dbPool.query<{ count: number }>(
           `SELECT COUNT(*)::int AS count
            FROM "mentions" m
            JOIN "answers" a ON a.id = m."answerId"
@@ -180,7 +185,7 @@ export class EvidenceBackedShareOfVoiceService {
           [workspaceId, engineData.engine]
         );
 
-        const engineTotalMentions = engineTotal[0]?.count || 1;
+        const engineTotalMentions = engineTotalResult.rows[0]?.count || 1;
         engineData.sharePercentage = engineData.mentions > 0
           ? Math.round((engineData.mentions / engineTotalMentions) * 100)
           : 0;

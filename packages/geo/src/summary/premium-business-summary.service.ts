@@ -77,9 +77,10 @@ export class PremiumBusinessSummaryService {
     // 3. Audit schema
     let schemaAudit: any = null;
     try {
-      schemaAudit = await this.schemaAuditor.auditPage(workspaceId, domain);
+      schemaAudit = await this.schemaAuditor.auditPage(domain);
       if (schemaAudit.schemaTypes && schemaAudit.schemaTypes.length > 0) {
-        evidence.push(`Schema markup found: ${schemaAudit.schemaTypes.join(', ')}`);
+        const schemaTypeNames = schemaAudit.schemaTypes.map((st: any) => typeof st === 'string' ? st : st.type).filter(Boolean);
+        evidence.push(`Schema markup found: ${schemaTypeNames.join(', ')}`);
       } else {
         missingData.push('No schema.org markup found');
       }
@@ -104,7 +105,7 @@ Entity Data:
 - Value Props: ${entityData?.valueProps?.join(', ') || 'Not available'}
 - Credibility: ${entityData?.credibilityMarkers?.join(', ') || 'Not available'}
 
-Schema Signals: ${schemaAudit?.schemaTypes?.join(', ') || 'None'}
+Schema Signals: ${schemaAudit?.schemaTypes?.map((st: any) => typeof st === 'string' ? st : st.type).join(', ') || 'None'}
 
 Generate a JSON response with:
 {
