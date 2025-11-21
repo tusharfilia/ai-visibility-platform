@@ -157,6 +157,7 @@ export class EvidenceCollectorService {
         domain ? [workspaceId, `%${domain}%`] : [workspaceId]
       );
 
+      const citations = citationsResult.rows;
       for (const citation of citations) {
         // Extract snippet where domain appears
         const snippet = this.extractSnippet(citation.answerText, citation.domain);
@@ -196,7 +197,7 @@ export class EvidenceCollectorService {
     const evidence: ShareOfVoiceEvidence[] = [];
 
     try {
-      const mentions = await this.prisma.$queryRaw<{
+      const mentionsResult = await this.dbPool.query<{
         promptText: string;
         engine: string;
         answerText: string;

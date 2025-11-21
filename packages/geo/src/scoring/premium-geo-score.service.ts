@@ -325,7 +325,7 @@ export class PremiumGEOScoreService {
 
     try {
       // Get total citations
-      const totalCitations = await this.prisma.$queryRaw<{ count: number }>(
+      const totalCitationsResult = await this.dbPool.query<{ count: number }>(
         `SELECT COUNT(*)::int AS count
          FROM "citations" c
          JOIN "answers" a ON a.id = c."answerId"
@@ -335,10 +335,10 @@ export class PremiumGEOScoreService {
         [workspaceId, `%${domain}%`]
       );
 
-      const total = totalCitations[0]?.count || 0;
+      const total = totalCitationsResult.rows[0]?.count || 0;
 
       // Get licensed publisher citations
-      const licensedCitations = await this.prisma.$queryRaw<{ count: number }>(
+      const licensedCitationsResult = await this.dbPool.query<{ count: number }>(
         `SELECT COUNT(*)::int AS count
          FROM "citations" c
          JOIN "answers" a ON a.id = c."answerId"
@@ -351,10 +351,10 @@ export class PremiumGEOScoreService {
         [workspaceId]
       );
 
-      const licensed = licensedCitations[0]?.count || 0;
+      const licensed = licensedCitationsResult.rows[0]?.count || 0;
 
       // Get citation categories
-      const citationCategories = await this.prisma.$queryRaw<{ domain: string; count: number }>(
+      const citationCategoriesResult = await this.dbPool.query<{ domain: string; count: number }>(
         `SELECT
            c."domain",
            COUNT(*)::int AS count
@@ -531,8 +531,8 @@ export class PremiumGEOScoreService {
 
       score = Math.min(100, score);
 
-      if (schemaTypes.length > 0) {
-        evidence.push(`Schema types found: ${schemaTypes.join(', ')}`);
+      if (schemaTypeNames.length > 0) {
+        evidence.push(`Schema types found: ${schemaTypeNames.join(', ')}`);
       } else {
         missing.push('No schema.org markup found');
       }
@@ -545,7 +545,7 @@ export class PremiumGEOScoreService {
       }
 
       const explanation = `Schema/Technical score of ${Math.round(score)}/100. ` +
-        `${schemaTypes.length} schema types found: ${schemaTypes.join(', ')}. ` +
+        `${schemaTypeNames.length} schema types found: ${schemaTypeNames.join(', ')}. ` +
         `Schema completeness: ${Math.round(schemaCompleteness)}%, ` +
         `Structural quality: ${Math.round(structuredDataQuality)}%.`;
 

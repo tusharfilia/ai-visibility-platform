@@ -136,38 +136,13 @@ export class IndustryDetectorService {
       missingData.push('Schema audit unavailable');
     }
 
-    // 2. Content-based keyword detection
-    const allText = [
-      websiteContent?.title || '',
-      websiteContent?.metaDescription || '',
-      ...(websiteContent?.headings || []),
-      websiteContent?.bodyText || '',
-    ].join(' ').toLowerCase();
-
+    // 2. Content-based keyword detection (skip for now - can be enhanced later)
+    // We'll rely on schema and LLM classification primarily
     const industryScores: Record<string, number> = {};
-    for (const [industry, keywords] of Object.entries(this.industryKeywords)) {
-      let score = 0;
-      for (const keyword of keywords) {
-        if (allText.includes(keyword.toLowerCase())) {
-          score += 1;
-          evidence.contentSignals.push(`Found keyword "${keyword}" for ${industry}`);
-        }
-      }
-      if (score > 0) {
-        industryScores[industry] = score / keywords.length; // Normalize by keyword count
-      }
-    }
+    // Content-based detection can be added later by fetching website content
 
-    // 3. Competitor-based detection
-    if (competitorDomains && competitorDomains.length > 0) {
-      // Analyze competitor domains for industry patterns
-      for (const competitor of competitorDomains) {
-        const competitorIndustry = await this.inferIndustryFromDomain(competitor);
-        if (competitorIndustry) {
-          evidence.competitorSignals.push(`${competitor} suggests ${competitorIndustry}`);
-        }
-      }
-    }
+    // 3. Competitor-based detection (skip if not provided)
+    // This can be enhanced later to fetch competitors automatically
 
     // 4. LLM-based classification (most reliable)
     let llmClassification = '';
@@ -176,10 +151,7 @@ export class IndustryDetectorService {
       const classificationPrompt = `You are an expert business classifier. Analyze the following business information and determine its PRIMARY industry.
 
 Domain: ${domain}
-Title: ${websiteContent?.title || 'Not available'}
-Meta Description: ${websiteContent?.metaDescription || 'Not available'}
-Key Headings: ${websiteContent?.headings?.slice(0, 10).join(', ') || 'Not available'}
-Content Excerpt: ${websiteContent?.bodyText?.substring(0, 500) || 'Not available'}
+Schema Signals: ${evidence.schemaSignals.join(', ') || 'None'}
 
 Schema Signals: ${evidence.schemaSignals.join(', ') || 'None'}
 Content Keywords Found: ${Object.keys(industryScores).join(', ') || 'None'}
@@ -300,16 +272,9 @@ Be specific and accurate. Use industry-standard terminology.`;
    */
   async getIndustryContext(
     workspaceId: string,
-    domain: string,
-    websiteContent?: {
-      html?: string;
-      title?: string;
-      metaDescription?: string;
-      headings?: string[];
-      bodyText?: string;
-    }
+    domain: string
   ): Promise<IndustryContext> {
-    const classification = await this.detectIndustry(workspaceId, domain, websiteContent);
+    const classification = await this.detectIndustry(workspaceId, domain);
 
     // Parse the primary industry to extract components
     const parts = classification.primaryIndustry.split(' / ');
