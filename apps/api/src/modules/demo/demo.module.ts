@@ -14,6 +14,17 @@ import {
   TrustSignalAggregator,
   ShareOfVoiceCalculatorService,
   EVIDENCE_FACT_EXTRACTOR_TOKEN,
+  CitationClassifierService,
+  // Premium services
+  IndustryDetectorService,
+  PremiumBusinessSummaryService,
+  EvidenceBackedPromptGeneratorService,
+  PremiumCompetitorDetectorService,
+  EvidenceBackedShareOfVoiceService,
+  PremiumCitationService,
+  PremiumGEOScoreService,
+  EvidenceCollectorService,
+  EEATCalculatorService,
 } from '@ai-visibility/geo';
 import { IntentClustererService } from '@ai-visibility/prompts';
 import { PrismaService } from '../database/prisma.service';
@@ -44,12 +55,24 @@ import { DemoService } from './demo.service';
     StructuralScoringService,  // Depends on SchemaAuditorService, FreshnessAnalyzerService, PageStructureAnalyzerService
     TrustSignalAggregator,
     ShareOfVoiceCalculatorService,  // Depends on PrismaService
+    CitationClassifierService,  // Needed by PremiumCitationService
     
     // Main services (depend on LLMRouterService and other services)
     EntityExtractorService,  // Depends on LLMRouterService, SchemaAuditorService, PageStructureAnalyzerService, EvidenceFactExtractorService
     CompetitorDetectorService,  // Depends on LLMRouterService
     IntentClustererService,  // Depends on LLMRouterService
     DiagnosticInsightsService,  // Depends on SchemaAuditorService, StructuralScoringService, TrustSignalAggregator, ShareOfVoiceCalculatorService
+    
+    // Premium services
+    IndustryDetectorService,  // Depends on LLMRouterService, SchemaAuditorService, PageStructureAnalyzerService
+    PremiumBusinessSummaryService,  // Depends on LLMRouterService, IndustryDetectorService, EntityExtractorService, SchemaAuditorService
+    EvidenceBackedPromptGeneratorService,  // Depends on LLMRouterService, IndustryDetectorService, EvidenceCollectorService
+    PremiumCompetitorDetectorService,  // Depends on LLMRouterService, IndustryDetectorService, EvidenceCollectorService
+    EvidenceBackedShareOfVoiceService,  // Depends on PrismaService, EvidenceCollectorService
+    PremiumCitationService,  // Depends on CitationClassifierService
+    EEATCalculatorService,  // Depends on LLMRouterService, SchemaAuditorService, TrustSignalAggregator, PrismaService
+    PremiumGEOScoreService,  // Depends on LLMRouterService, EEATCalculatorService, EvidenceBackedShareOfVoiceService, EvidenceCollectorService, SchemaAuditorService, StructuralScoringService
+    EvidenceCollectorService,  // Depends on PrismaService (via constructor)
     
     // Demo service (depends on all above)
     DemoService,

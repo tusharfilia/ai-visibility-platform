@@ -6,85 +6,10 @@ import { EvidenceCollectorService } from '../evidence/evidence-collector.service
 import { SchemaAuditorService } from '../structural/schema-auditor';
 import { StructuralScoringService } from '../structural/structural-scoring.service';
 import { PrismaClient } from '@prisma/client';
+import { PremiumGEOScore } from '../types/premium-response.types';
+import { applyIndustryWeights } from '../config/industry-weights.config';
 
-export interface PremiumGEOScore {
-  total: number; // 0-100
-  breakdown: {
-    aiVisibility: {
-      score: number; // 0-100
-      weight: number; // 35%
-      points: number; // score * weight
-      details: {
-        perEngine: {
-          engine: string;
-          coverage: number; // % of prompts where visible
-          promptsTested: number;
-          promptsVisible: number;
-        }[];
-        perPrompt: {
-          prompt: string;
-          enginesVisible: number;
-          totalEngines: number;
-        }[];
-      };
-      evidence: string[];
-      missing: string[];
-    };
-    eeat: {
-      score: number; // 0-100 (normalized from 0-400)
-      weight: number; // 25%
-      points: number;
-      breakdown: {
-        expertise: number;
-        authoritativeness: number;
-        trustworthiness: number;
-        experience: number;
-      };
-      evidence: string[];
-      missing: string[];
-    };
-    citations: {
-      score: number; // 0-100
-      weight: number; // 15%
-      points: number;
-      details: {
-        totalCitations: number;
-        licensedPublisherCitations: number;
-        averageAuthority: number;
-        citationCategories: Record<string, number>;
-      };
-      evidence: string[];
-      missing: string[];
-    };
-    competitorComparison: {
-      score: number; // 0-100
-      weight: number; // 15%
-      points: number;
-      details: {
-        shareOfVoice: number;
-        competitorCount: number;
-        relativePosition: number; // 1 = leader, 0.5 = middle, 0 = trailing
-      };
-      evidence: string[];
-      missing: string[];
-    };
-    schemaTechnical: {
-      score: number; // 0-100
-      weight: number; // 10%
-      points: number;
-      details: {
-        schemaTypes: string[];
-        schemaCompleteness: number;
-        structuredDataQuality: number;
-      };
-      evidence: string[];
-      missing: string[];
-    };
-  };
-  confidence: number; // 0-1
-  warnings: string[];
-  recommendations: string[];
-}
+// Types moved to premium-response.types.ts
 
 @Injectable()
 export class PremiumGEOScoreService {
@@ -109,33 +34,46 @@ export class PremiumGEOScoreService {
     workspaceId: string,
     domain: string,
     brandName: string,
-    competitorNames: string[] = []
+    competitorNames: string[] = [],
+    industry?: string
   ): Promise<PremiumGEOScore> {
+    // Apply industry-specific weights
+    const baseWeights = {
+      visibility: 0.35,
+      eeat: 0.25,
+      citations: 0.15,
+      competitors: 0.15,
+      technical: 0.10,
+    };
+    
+    const weights = industry
+      ? applyIndustryWeights(baseWeights, industry)
+      : baseWeights;
     const breakdown = {
-      aiVisibility: { score: 0, weight: 0.35, points: 0, details: { perEngine: [], perPrompt: [] }, evidence: [] as string[], missing: [] as string[] },
-      eeat: { score: 0, weight: 0.25, points: 0, breakdown: { expertise: 0, authoritativeness: 0, trustworthiness: 0, experience: 0 }, evidence: [] as string[], missing: [] as string[] },
-      citations: { score: 0, weight: 0.15, points: 0, details: { totalCitations: 0, licensedPublisherCitations: 0, averageAuthority: 0, citationCategories: {} }, evidence: [] as string[], missing: [] as string[] },
-      competitorComparison: { score: 0, weight: 0.15, points: 0, details: { shareOfVoice: 0, competitorCount: 0, relativePosition: 0 }, evidence: [] as string[], missing: [] as string[] },
-      schemaTechnical: { score: 0, weight: 0.10, points: 0, details: { schemaTypes: [], schemaCompleteness: 0, structuredDataQuality: 0 }, evidence: [] as string[], missing: [] as string[] },
+      aiVisibility: { score: 0, weight: weights.visibility, points: 0, details: { perEngine: [], perPrompt: [] }, evidence: [] as string[], explanation: '', missing: [] as string[] },
+      eeat: { score: 0, weight: weights.eeat, points: 0, breakdown: { expertise: 0, authoritativeness: 0, trustworthiness: 0, experience: 0 }, evidence: [] as string[], explanation: '', missing: [] as string[] },
+      citations: { score: 0, weight: weights.citations, points: 0, details: { totalCitations: 0, licensedPublisherCitations: 0, averageAuthority: 0, citationCategories: {} }, evidence: [] as string[], explanation: '', missing: [] as string[] },
+      competitorComparison: { score: 0, weight: weights.competitors, points: 0, details: { shareOfVoice: 0, competitorCount: 0, relativePosition: 0 }, evidence: [] as string[], explanation: '', missing: [] as string[] },
+      schemaTechnical: { score: 0, weight: weights.technical, points: 0, details: { schemaTypes: [], schemaCompleteness: 0, structuredDataQuality: 0 }, evidence: [] as string[], explanation: '', missing: [] as string[] },
     };
 
     const warnings: string[] = [];
     const recommendations: string[] = [];
 
     // 1. AI Visibility (35%)
-    breakdown.aiVisibility = await this.calculateAIVisibilityScore(workspaceId, brandName);
+    breakdown.aiVisibility = await this.calculateAIVisibilityScore(workspaceId, brandName, weights.visibility);
 
     // 2. EEAT (25%)
-    breakdown.eeat = await this.calculateEEATScore(workspaceId, domain, brandName);
+    breakdown.eeat = await this.calculateEEATScore(workspaceId, domain, brandName, weights.eeat);
 
     // 3. Citations (15%)
-    breakdown.citations = await this.calculateCitationsScore(workspaceId, domain);
+    breakdown.citations = await this.calculateCitationsScore(workspaceId, domain, weights.citations);
 
     // 4. Competitor Comparison (15%)
-    breakdown.competitorComparison = await this.calculateCompetitorComparisonScore(workspaceId, brandName, competitorNames);
+    breakdown.competitorComparison = await this.calculateCompetitorComparisonScore(workspaceId, brandName, competitorNames, weights.competitors);
 
     // 5. Schema/Technical (10%)
-    breakdown.schemaTechnical = await this.calculateSchemaTechnicalScore(workspaceId, domain);
+    breakdown.schemaTechnical = await this.calculateSchemaTechnicalScore(workspaceId, domain, weights.technical);
 
     // Calculate total score
     const total = breakdown.aiVisibility.points +
@@ -183,7 +121,8 @@ export class PremiumGEOScoreService {
    */
   private async calculateAIVisibilityScore(
     workspaceId: string,
-    brandName: string
+    brandName: string,
+    weight: number
   ): Promise<PremiumGEOScore['breakdown']['aiVisibility']> {
     const details = {
       perEngine: [] as Array<{ engine: string; coverage: number; promptsTested: number; promptsVisible: number }>,
@@ -288,22 +227,27 @@ export class PremiumGEOScoreService {
         missing.push(`Low visibility: Only ${Math.round(avgCoverage)}% average coverage across engines`);
       }
 
+      const explanation = `AI Visibility score of ${score}/100 based on average coverage across ${details.perEngine.length} engines. ` +
+        `${details.perEngine.filter(e => e.coverage > 0).length} engines show visibility, with an average of ${Math.round(details.perEngine.reduce((sum, e) => sum + e.coverage, 0) / details.perEngine.length)}% prompt coverage.`;
+
       return {
         score,
-        weight: 0.35,
-        points: score * 0.35,
+        weight,
+        points: score * weight,
         details,
         evidence,
+        explanation,
         missing,
       };
     } catch (error) {
       this.logger.error(`Failed to calculate AI visibility score: ${error instanceof Error ? error.message : String(error)}`);
       return {
         score: 0,
-        weight: 0.35,
+        weight,
         points: 0,
         details,
         evidence: [],
+        explanation: 'AI visibility calculation failed',
         missing: ['AI visibility calculation failed'],
       };
     }
@@ -315,7 +259,8 @@ export class PremiumGEOScoreService {
   private async calculateEEATScore(
     workspaceId: string,
     domain: string,
-    brandName: string
+    brandName: string,
+    weight: number
   ): Promise<PremiumGEOScore['breakdown']['eeat']> {
     try {
       const eeatScore = await this.eeatCalculator.calculateEEAT(workspaceId, domain, brandName);
@@ -332,10 +277,15 @@ export class PremiumGEOScoreService {
         missing.push(...eeatScore.warnings);
       }
 
+      const explanation = `EEAT score of ${eeatScore.normalized}/100 (${eeatScore.total}/400 total). ` +
+        `Breakdown: Expertise ${eeatScore.expertise}/100, Authoritativeness ${eeatScore.authoritativeness}/100, ` +
+        `Trustworthiness ${eeatScore.trustworthiness}/100, Experience ${eeatScore.experience}/100. ` +
+        `${eeatScore.breakdown.expertise.signals.length + eeatScore.breakdown.authoritativeness.signals.length + eeatScore.breakdown.trustworthiness.signals.length + eeatScore.breakdown.experience.signals.length} trust signals detected.`;
+
       return {
         score: eeatScore.normalized,
-        weight: 0.25,
-        points: eeatScore.normalized * 0.25,
+        weight,
+        points: eeatScore.normalized * weight,
         breakdown: {
           expertise: eeatScore.expertise,
           authoritativeness: eeatScore.authoritativeness,
@@ -343,16 +293,18 @@ export class PremiumGEOScoreService {
           experience: eeatScore.experience,
         },
         evidence,
+        explanation,
         missing,
       };
     } catch (error) {
       this.logger.error(`Failed to calculate EEAT score: ${error instanceof Error ? error.message : String(error)}`);
       return {
         score: 0,
-        weight: 0.25,
+        weight,
         points: 0,
         breakdown: { expertise: 0, authoritativeness: 0, trustworthiness: 0, experience: 0 },
         evidence: [],
+        explanation: 'EEAT calculation failed',
         missing: ['EEAT calculation failed'],
       };
     }
@@ -363,7 +315,8 @@ export class PremiumGEOScoreService {
    */
   private async calculateCitationsScore(
     workspaceId: string,
-    domain: string
+    domain: string,
+    weight: number
   ): Promise<PremiumGEOScore['breakdown']['citations']> {
     const evidence: string[] = [];
     const missing: string[] = [];
@@ -442,10 +395,14 @@ export class PremiumGEOScoreService {
         missing.push('No licensed publisher citations');
       }
 
+      const explanation = `Citations score of ${score}/100 based on ${total} total citations. ` +
+        `${licensed} citations from licensed publishers (${licensed > 0 ? Math.round((licensed / total) * 100) : 0}% of total). ` +
+        `Citations span ${Object.keys(categories).length} categories: ${Object.keys(categories).join(', ')}.`;
+
       return {
         score,
-        weight: 0.15,
-        points: score * 0.15,
+        weight,
+        points: score * weight,
         details: {
           totalCitations: total,
           licensedPublisherCitations: licensed,
@@ -453,16 +410,18 @@ export class PremiumGEOScoreService {
           citationCategories: categories,
         },
         evidence,
+        explanation,
         missing,
       };
     } catch (error) {
       this.logger.error(`Failed to calculate citations score: ${error instanceof Error ? error.message : String(error)}`);
       return {
         score: 0,
-        weight: 0.15,
+        weight,
         points: 0,
         details: { totalCitations: 0, licensedPublisherCitations: 0, averageAuthority: 0, citationCategories: {} },
         evidence: [],
+        explanation: 'Citations calculation failed',
         missing: ['Citations calculation failed'],
       };
     }
@@ -474,7 +433,8 @@ export class PremiumGEOScoreService {
   private async calculateCompetitorComparisonScore(
     workspaceId: string,
     brandName: string,
-    competitorNames: string[]
+    competitorNames: string[],
+    weight: number
   ): Promise<PremiumGEOScore['breakdown']['competitorComparison']> {
     const evidence: string[] = [];
     const missing: string[] = [];
@@ -511,26 +471,33 @@ export class PremiumGEOScoreService {
         missing.push(`Low share of voice: ${shareOfVoice}%`);
       }
 
+      const explanation = `Competitor comparison score of ${Math.round(score)}/100. ` +
+        `Share of Voice: ${shareOfVoice}% (${brandPosition >= 0 ? `ranked #${brandPosition + 1}` : 'not ranked'} of ${sov.length} entities). ` +
+        `Compared against ${competitorNames.length} competitors. ` +
+        `Relative position: ${Math.round(relativePosition * 100)}% (${relativePosition >= 0.7 ? 'leader' : relativePosition >= 0.4 ? 'middle' : 'trailing'}).`;
+
       return {
         score: Math.round(score),
-        weight: 0.15,
-        points: score * 0.15,
+        weight,
+        points: score * weight,
         details: {
           shareOfVoice,
           competitorCount: competitorNames.length,
           relativePosition,
         },
         evidence,
+        explanation,
         missing,
       };
     } catch (error) {
       this.logger.error(`Failed to calculate competitor comparison score: ${error instanceof Error ? error.message : String(error)}`);
       return {
         score: 0,
-        weight: 0.15,
+        weight,
         points: 0,
         details: { shareOfVoice: 0, competitorCount: 0, relativePosition: 0 },
         evidence: [],
+        explanation: 'Competitor comparison calculation failed',
         missing: ['Competitor comparison calculation failed'],
       };
     }
@@ -541,7 +508,8 @@ export class PremiumGEOScoreService {
    */
   private async calculateSchemaTechnicalScore(
     workspaceId: string,
-    domain: string
+    domain: string,
+    weight: number
   ): Promise<PremiumGEOScore['breakdown']['schemaTechnical']> {
     const evidence: string[] = [];
     const missing: string[] = [];
@@ -573,26 +541,33 @@ export class PremiumGEOScoreService {
         missing.push('Incomplete schema markup');
       }
 
+      const explanation = `Schema/Technical score of ${Math.round(score)}/100. ` +
+        `${schemaTypes.length} schema types found: ${schemaTypes.join(', ')}. ` +
+        `Schema completeness: ${Math.round(schemaCompleteness)}%, ` +
+        `Structural quality: ${Math.round(structuredDataQuality)}%.`;
+
       return {
         score: Math.round(score),
-        weight: 0.10,
-        points: score * 0.10,
+        weight,
+        points: score * weight,
         details: {
           schemaTypes,
           schemaCompleteness: Math.round(schemaCompleteness),
           structuredDataQuality: Math.round(structuredDataQuality),
         },
         evidence,
+        explanation,
         missing,
       };
     } catch (error) {
       this.logger.error(`Failed to calculate schema technical score: ${error instanceof Error ? error.message : String(error)}`);
       return {
         score: 0,
-        weight: 0.10,
+        weight,
         points: 0,
         details: { schemaTypes: [], schemaCompleteness: 0, structuredDataQuality: 0 },
         evidence: [],
+        explanation: 'Schema technical calculation failed',
         missing: ['Schema technical calculation failed'],
       };
     }

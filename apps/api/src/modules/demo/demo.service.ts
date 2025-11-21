@@ -4,7 +4,29 @@ import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { URL } from 'url';
 import { LLMRouterService } from '@ai-visibility/shared';
-import { EntityExtractorService, CompetitorDetectorService, DiagnosticInsightsService } from '@ai-visibility/geo';
+import { 
+  EntityExtractorService, 
+  CompetitorDetectorService, 
+  DiagnosticInsightsService,
+  // Premium services
+  IndustryDetectorService,
+  PremiumBusinessSummaryService,
+  EvidenceBackedPromptGeneratorService,
+  PremiumCompetitorDetectorService,
+  EvidenceBackedShareOfVoiceService,
+  PremiumCitationService,
+  PremiumGEOScoreService,
+  EvidenceCollectorService,
+  EEATCalculatorService,
+  // Types
+  PremiumResponse,
+  PremiumBusinessSummary,
+  PremiumPrompt,
+  PremiumCompetitor,
+  PremiumShareOfVoice,
+  PremiumCitation,
+  PremiumGEOScore,
+} from '@ai-visibility/geo';
 import { IntentClustererService } from '@ai-visibility/prompts';
 import { PrismaService } from '../database/prisma.service';
 import { DemoCompetitorsRequestDto, DemoPromptsRequestDto, DemoRunRequestDto, DemoSummaryRequestDto } from './dto/demo.dto';
@@ -115,6 +137,16 @@ export class DemoService {
     private readonly competitorDetector: CompetitorDetectorService,
     private readonly intentClusterer: IntentClustererService,
     private readonly diagnosticInsights: DiagnosticInsightsService,
+    // Premium services
+    private readonly industryDetector: IndustryDetectorService,
+    private readonly premiumSummary: PremiumBusinessSummaryService,
+    private readonly evidenceBackedPrompts: EvidenceBackedPromptGeneratorService,
+    private readonly premiumCompetitors: PremiumCompetitorDetectorService,
+    private readonly evidenceBackedSOV: EvidenceBackedShareOfVoiceService,
+    private readonly premiumCitations: PremiumCitationService,
+    private readonly premiumGEOScore: PremiumGEOScoreService,
+    private readonly evidenceCollector: EvidenceCollectorService,
+    private readonly eeatCalculator: EEATCalculatorService,
     @InjectQueue('runPrompt') private readonly runPromptQueue: Queue,
   ) {}
 
@@ -1739,21 +1771,223 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
   }
 
   /**
-   * Orchestrates all demo steps automatically for instant summary
-   * Returns summary, prompts, competitors, and starts analysis in background
+   * Premium instant summary using new quality layer services
+   * Pipeline: Industry Detection → Business Summary → Prompts → Competitors → Analysis → Evidence Collection
    */
   async getInstantSummary(domain: string): Promise<{ ok: boolean; data: any }> {
+    const normalized = this.normalizeDomain(domain);
+    const brand = this.deriveBrandFromHost(normalized.host);
+    const workspaceId = this.generateWorkspaceId(normalized.host);
+    
+    await this.ensureWorkspace(workspaceId, brand);
+
+    const allEvidence: any[] = [];
+    const allWarnings: string[] = [];
+    let overallConfidence = 1.0;
+
     try {
-      // Step 1: Generate summary
-      const summaryResult = await this.prepareSummary({ domain });
-      if (!summaryResult.ok || !summaryResult.data.demoRunId) {
-        throw new BadRequestException('Failed to generate summary');
+      // STEP 1: Detect Industry (CRITICAL - foundation for all analysis)
+      this.logger.log(`[Premium] Step 1: Detecting industry for ${domain}`);
+      const industryClassification = await this.industryDetector.detectIndustry(
+        workspaceId,
+        normalized.href
+      );
+      
+      const industry = industryClassification.primaryIndustry;
+      const industryContext = await this.industryDetector.getIndustryContext(workspaceId, normalized.href);
+      
+      if (industryClassification.confidence < 0.5) {
+        allWarnings.push(`Low confidence industry detection (${Math.round(industryClassification.confidence * 100)}%)`);
+        overallConfidence *= 0.8;
+      }
+      if (industryClassification.missingData.length > 0) {
+        allWarnings.push(`Industry detection missing: ${industryClassification.missingData.join(', ')}`);
       }
 
-      const demoRunId = summaryResult.data.demoRunId;
-      const workspaceId = summaryResult.data.workspaceId;
-      const summary = summaryResult.data.summary;
-      const brand = summaryResult.data.brand;
+      // STEP 2: Generate Premium Business Summary
+      this.logger.log(`[Premium] Step 2: Generating premium business summary`);
+      const premiumSummary = await this.premiumSummary.generatePremiumSummary(
+        workspaceId,
+        normalized.href,
+        brand
+      );
+      
+      allEvidence.push(...premiumSummary.evidence.map(e => ({
+        type: 'summary' as const,
+        confidence: premiumSummary.confidence,
+        reasoning: e,
+      })));
+      allWarnings.push(...premiumSummary.missingData);
+      overallConfidence = Math.min(overallConfidence, premiumSummary.confidence);
+
+      // STEP 3: Generate Industry-Specific, Evidence-Backed Prompts
+      this.logger.log(`[Premium] Step 3: Generating industry-specific prompts`);
+      const promptContext = {
+        industry: industryContext.industry,
+        category: industryContext.category,
+        vertical: industryContext.vertical,
+        brandName: brand,
+        services: premiumSummary.structuredSummary.valueProps || [],
+        geography: { primary: premiumSummary.structuredSummary.where },
+        marketType: industryContext.marketType,
+        serviceType: industryContext.serviceType,
+      };
+      
+      const premiumPrompts = await this.evidenceBackedPrompts.generateEvidenceBackedPrompts(
+        workspaceId,
+        promptContext,
+        false // Don't test prompts yet (will test after analysis)
+      );
+      
+      const promptTexts = premiumPrompts.map(p => p.text);
+      
+      // Create demo run
+      const demoRun = await this.createDemoRun({
+        workspaceId,
+        domain: normalized.href,
+        brand,
+        summary: premiumSummary.summary,
+        status: 'summary_ready',
+        progress: 20,
+      });
+      
+      const demoRunId = demoRun.id;
+
+      // Save prompts to database
+      await this.replaceWorkspacePrompts(
+        workspaceId,
+        promptTexts.map(text => ({ text, source: 'llm' as const }))
+      );
+
+      // STEP 4: Detect Premium Competitors
+      this.logger.log(`[Premium] Step 4: Detecting premium competitors`);
+      const premiumCompetitors = await this.premiumCompetitors.detectPremiumCompetitors(
+        workspaceId,
+        normalized.href,
+        brand,
+        industry
+      );
+      
+      const competitorDomains = premiumCompetitors.map(c => c.domain);
+      await this.updateDemoRun(demoRunId, {
+        competitors: competitorDomains,
+        status: 'competitors_ready',
+      });
+
+      // STEP 5: Start Analysis in Background
+      this.logger.log(`[Premium] Step 5: Starting analysis`);
+      const runResult = await this.runDemo({
+        demoRunId,
+        engines: undefined,
+      });
+
+      // STEP 6: Get Current Status
+      const statusResult = await this.getStatus(demoRunId);
+      const currentStatus = statusResult.data.status;
+      const engines = statusResult.data.engines || this.defaultEngines.map(key => ({ key, visible: false }));
+
+      // STEP 7: Collect Evidence & Calculate Premium Metrics
+      let premiumSOV: PremiumShareOfVoice[] = [];
+      let premiumCitations: PremiumCitation[] = [];
+      let premiumGEOScore: PremiumGEOScore | null = null;
+      let eeatScore: any = null;
+
+      if (currentStatus === 'analysis_complete' || statusResult.data.completedJobs > 0) {
+        // Calculate Share of Voice with Evidence
+        const allEntities = [brand, ...premiumCompetitors.map(c => c.brandName)];
+        premiumSOV = await this.evidenceBackedSOV.calculateEvidenceBackedSOV(workspaceId, allEntities);
+        
+        // Get Premium Citations
+        premiumCitations = await this.premiumCitations.getPremiumCitations(workspaceId, normalized.href);
+        
+        // Calculate EEAT Score
+        try {
+          eeatScore = await this.eeatCalculator.calculateEEAT(workspaceId, normalized.href, brand);
+        } catch (error) {
+          this.logger.warn(`EEAT calculation failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        
+        // Calculate Premium GEO Score
+        premiumGEOScore = await this.premiumGEOScore.calculatePremiumGEOScore(
+          workspaceId,
+          normalized.href,
+          brand,
+          premiumCompetitors.map(c => c.brandName),
+          industry
+        );
+        
+        overallConfidence = Math.min(overallConfidence, premiumGEOScore.confidence);
+        allWarnings.push(...premiumGEOScore.warnings);
+      }
+
+      // Build premium response
+      const response: PremiumResponse<any> = {
+        data: {
+          demoRunId,
+          workspaceId,
+          domain: normalized.href,
+          brand,
+          industry: {
+            primary: industry,
+            category: industryContext.category,
+            vertical: industryContext.vertical,
+            confidence: industryClassification.confidence,
+            reasoning: industryClassification.reasoning,
+          },
+          summary: premiumSummary,
+          prompts: premiumPrompts.map(p => ({
+            text: p.text,
+            intent: p.intent,
+            industryRelevance: p.industryRelevance,
+            commercialIntent: p.commercialIntent,
+            reasoning: p.reasoning,
+            evidence: p.evidence,
+          })),
+          competitors: premiumCompetitors.map(c => ({
+            domain: c.domain,
+            brandName: c.brandName,
+            type: c.type,
+            confidence: c.confidence,
+            reasoning: c.reasoning,
+            visibility: c.visibility,
+            ranking: c.ranking,
+          })),
+          shareOfVoice: premiumSOV,
+          citations: premiumCitations,
+          geoScore: premiumGEOScore,
+          eeatScore,
+          engines,
+          status: currentStatus,
+          progress: statusResult.data.progress || 0,
+          totalJobs: statusResult.data.totalJobs || 0,
+          completedJobs: statusResult.data.completedJobs || 0,
+        },
+        evidence: allEvidence,
+        confidence: overallConfidence,
+        warnings: allWarnings,
+        explanation: `Premium analysis for ${brand} in the ${industry} industry. ` +
+          `Industry detected with ${Math.round(industryClassification.confidence * 100)}% confidence. ` +
+          `${premiumPrompts.length} industry-specific prompts generated. ` +
+          `${premiumCompetitors.length} competitors detected. ` +
+          (premiumGEOScore ? `GEO Score: ${premiumGEOScore.total}/100. ` : 'Analysis in progress. '),
+        metadata: {
+          generatedAt: new Date(),
+          industry,
+          missingData: allWarnings.filter(w => w.includes('missing') || w.includes('Missing')),
+        },
+      };
+
+      return {
+        ok: true,
+        data: response,
+      };
+    } catch (error) {
+      this.logger.error(`Premium instant summary failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error instanceof BadRequestException
+        ? error
+        : new BadRequestException(`Failed to generate premium instant summary: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
       // Step 2: Auto-generate prompts (industry-focused, not brand-specific)
       // Get entity data to understand industry/category

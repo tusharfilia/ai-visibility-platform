@@ -82,6 +82,12 @@ export * from './competitors/premium-competitor-detector.service';
 export * from './citations/premium-citation-service';
 export * from './scoring/premium-geo-score.service';
 
+// Premium types
+export * from './types/premium-response.types';
+
+// Industry weights config
+export * from './config/industry-weights.config';
+
 // Validation services (exported as primary names for alerts module)
 export {
   HallucinationDetectorService,
