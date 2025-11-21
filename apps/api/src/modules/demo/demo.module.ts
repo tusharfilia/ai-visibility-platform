@@ -56,9 +56,9 @@ import { DemoService } from './demo.service';
     StructuralScoringService,  // Depends on SchemaAuditorService, FreshnessAnalyzerService, PageStructureAnalyzerService
     TrustSignalAggregator,
     ShareOfVoiceCalculatorService,  // Depends on PrismaService
-  CitationClassifierService,  // Needed by PremiumCitationService
+    CitationClassifierService,  // Needed by PremiumCitationService and EvidenceGraphBuilderService
     EvidenceGraphBuilderService,  // Depends on CitationClassifierService, EvidenceFactExtractorService (via token), optional dbPool
-  
+    
     // Main services (depend on LLMRouterService and other services)
     EntityExtractorService,  // Depends on LLMRouterService, SchemaAuditorService, PageStructureAnalyzerService, EvidenceFactExtractorService
     CompetitorDetectorService,  // Depends on LLMRouterService
