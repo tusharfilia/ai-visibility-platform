@@ -1989,30 +1989,6 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
     }
   }
 
-      // Step 2: Auto-generate prompts (industry-focused, not brand-specific)
-      // Get entity data to understand industry/category
-      let entityData: any = null;
-      try {
-        entityData = await this.entityExtractor.extractEntityFromDomain(workspaceId, summaryResult.data.domain);
-      } catch (error) {
-        this.logger.warn(`Failed to extract entity data for prompt generation: ${error instanceof Error ? error.message : String(error)}`);
-      }
-
-      const category = entityData?.category || 'business services';
-      const industry = entityData?.vertical || category;
-      
-      // Generate industry-focused seed prompts that enable competitive benchmarking
-      const seedPrompts = [
-        `Best ${category} solutions`,
-        `Top ${industry} platforms`,
-        `Compare ${industry} services`,
-      ];
-      
-      const promptsResult = await this.preparePrompts({
-        demoRunId,
-        seedPrompts,
-      });
-
       if (!promptsResult.ok) {
         throw new BadRequestException('Failed to generate prompts');
       }
