@@ -391,7 +391,7 @@ Focus on REAL competitors that would appear in AI search results for industry qu
         position: number;
       }>(
         `SELECT
-           ROW_NUMBER() OVER (PARTITION BY pr.id ORDER BY m."createdAt") AS "position"
+           ROW_NUMBER() OVER (PARTITION BY pr.id ORDER BY a."createdAt", m."position") AS "position"
          FROM "mentions" m
          JOIN "answers" a ON a.id = m."answerId"
          JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
