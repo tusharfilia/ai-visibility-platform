@@ -15,6 +15,7 @@ import {
   ShareOfVoiceCalculatorService,
   EVIDENCE_FACT_EXTRACTOR_TOKEN,
   CitationClassifierService,
+  EvidenceGraphBuilderService,
   // Premium services
   IndustryDetectorService,
   PremiumBusinessSummaryService,
@@ -55,8 +56,9 @@ import { DemoService } from './demo.service';
     StructuralScoringService,  // Depends on SchemaAuditorService, FreshnessAnalyzerService, PageStructureAnalyzerService
     TrustSignalAggregator,
     ShareOfVoiceCalculatorService,  // Depends on PrismaService
-    CitationClassifierService,  // Needed by PremiumCitationService
-    
+  CitationClassifierService,  // Needed by PremiumCitationService
+    EvidenceGraphBuilderService,  // Depends on CitationClassifierService, EvidenceFactExtractorService (via token), optional dbPool
+  
     // Main services (depend on LLMRouterService and other services)
     EntityExtractorService,  // Depends on LLMRouterService, SchemaAuditorService, PageStructureAnalyzerService, EvidenceFactExtractorService
     CompetitorDetectorService,  // Depends on LLMRouterService
@@ -70,7 +72,7 @@ import { DemoService } from './demo.service';
     PremiumCompetitorDetectorService,  // Depends on LLMRouterService, IndustryDetectorService, EvidenceCollectorService
     EvidenceBackedShareOfVoiceService,  // Depends on PrismaService, EvidenceCollectorService
     PremiumCitationService,  // Depends on CitationClassifierService
-    EEATCalculatorService,  // Depends on LLMRouterService, SchemaAuditorService, TrustSignalAggregator, PrismaService
+    EEATCalculatorService,  // Depends on EvidenceGraphBuilderService
     PremiumGEOScoreService,  // Depends on LLMRouterService, EEATCalculatorService, EvidenceBackedShareOfVoiceService, EvidenceCollectorService, SchemaAuditorService, StructuralScoringService
     EvidenceCollectorService,  // Depends on PrismaService (via constructor)
     
