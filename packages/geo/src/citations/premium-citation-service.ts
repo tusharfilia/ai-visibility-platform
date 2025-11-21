@@ -28,6 +28,45 @@ export class PremiumCitationService {
     const citations: PremiumCitation[] = [];
 
     try {
+      const query = domain
+        ? `SELECT
+             c.id AS "citationId",
+             c."domain",
+             c."url",
+             p."text" AS "promptText",
+             e."key" AS "engine",
+             a."answerText",
+             c."createdAt"
+           FROM "citations" c
+           JOIN "answers" a ON a.id = c."answerId"
+           JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+           JOIN "prompts" p ON p.id = pr."promptId"
+           JOIN "engines" e ON e.id = pr."engineId"
+           WHERE pr."workspaceId" = $1
+             AND c."domain" LIKE $2
+             AND pr."status" = 'SUCCESS'
+             AND 'demo' = ANY(p."tags")
+           ORDER BY c."createdAt" DESC
+           LIMIT $3`
+        : `SELECT
+             c.id AS "citationId",
+             c."domain",
+             c."url",
+             p."text" AS "promptText",
+             e."key" AS "engine",
+             a."answerText",
+             c."createdAt"
+           FROM "citations" c
+           JOIN "answers" a ON a.id = c."answerId"
+           JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
+           JOIN "prompts" p ON p.id = pr."promptId"
+           JOIN "engines" e ON e.id = pr."engineId"
+           WHERE pr."workspaceId" = $1
+             AND pr."status" = 'SUCCESS'
+             AND 'demo' = ANY(p."tags")
+           ORDER BY c."createdAt" DESC
+           LIMIT $2`;
+
       const citationData = await this.dbPool.query<{
         citationId: string;
         domain: string;
@@ -37,25 +76,7 @@ export class PremiumCitationService {
         answerText: string;
         createdAt: Date;
       }>(
-        `SELECT
-           c.id AS "citationId",
-           c."domain",
-           c."url",
-           p."text" AS "promptText",
-           e."key" AS "engine",
-           a."answerText",
-           c."createdAt"
-         FROM "citations" c
-         JOIN "answers" a ON a.id = c."answerId"
-         JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
-         JOIN "prompts" p ON p.id = pr."promptId"
-         JOIN "engines" e ON e.id = pr."engineId"
-         WHERE pr."workspaceId" = $1
-           ${domain ? `AND c."domain" LIKE $2` : ''}
-           AND pr."status" = 'SUCCESS'
-           AND 'demo' = ANY(p."tags")
-         ORDER BY c."createdAt" DESC
-         LIMIT $3`,
+        query,
         domain ? [workspaceId, `%${domain}%`, limit] : [workspaceId, limit]
       );
       
