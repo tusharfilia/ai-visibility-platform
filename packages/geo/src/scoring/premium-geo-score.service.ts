@@ -522,8 +522,9 @@ export class PremiumGEOScoreService {
       const structuralScore = await this.structuralScoring.calculateStructuralScore(workspaceId);
 
       const schemaTypes = schemaAudit.schemaTypes || [];
-      const schemaCompleteness = schemaTypes.length > 0 ? (schemaTypes.length / 5) * 100 : 0; // Max 5 schema types
-      const structuredDataQuality = structuralScore.totalScore || 0;
+      const schemaTypeNames = schemaTypes.map((st: any) => typeof st === 'string' ? st : st.type).filter(Boolean);
+      const schemaCompleteness = schemaTypeNames.length > 0 ? (schemaTypeNames.length / 5) * 100 : 0; // Max 5 schema types
+      const structuredDataQuality = structuralScore.overall || 0;
 
       // Calculate score
       let score = schemaCompleteness * 0.5; // 50% from schema completeness
