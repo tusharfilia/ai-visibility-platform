@@ -54,32 +54,35 @@ async function bootstrap() {
         const { execSync } = require('child_process');
         const schemaDir = path.dirname(schemaPath);
         try {
-          execSync('npx prisma migrate deploy', {
+          // Try using pnpm filter first (most reliable in monorepo)
+          execSync(`pnpm --filter @ai-visibility/db exec prisma migrate deploy --schema=${schemaPath}`, {
             stdio: 'inherit',
-            cwd: schemaDir,
+            cwd: process.cwd(),
             env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
           });
           console.error('✅ Database migrations completed successfully');
         } catch (migrateError) {
           console.error('⚠️  Migration command failed, trying alternative...');
-          // Fallback: try with specific Prisma version to match package.json
           try {
+            // Fallback: try with npx and specific version
             execSync(`npx --yes prisma@5.7.0 migrate deploy --schema=${schemaPath}`, {
               stdio: 'inherit',
               env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
             });
             console.error('✅ Database migrations completed successfully');
           } catch (fallbackError) {
-            // Last resort: try using pnpm exec if available
+            // Last resort: try direct prisma command
             try {
-              execSync(`pnpm exec prisma migrate deploy --schema=${schemaPath}`, {
+              execSync(`prisma migrate deploy --schema=${schemaPath}`, {
                 stdio: 'inherit',
-                cwd: process.cwd(),
+                cwd: schemaDir,
                 env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
               });
               console.error('✅ Database migrations completed successfully');
             } catch (finalError) {
-              throw finalError;
+              console.error('⚠️  All migration attempts failed. Migrations may need to be run manually.');
+              console.error('💡 Run manually: pnpm --filter @ai-visibility/db exec prisma migrate deploy');
+              // Don't throw - allow app to start without migrations
             }
           }
         }

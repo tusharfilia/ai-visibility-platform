@@ -12,7 +12,7 @@ export class GeminiProvider extends BaseLLMProvider {
       throw new Error('Google AI API key is required');
     }
     this.client = new GoogleGenerativeAI(config.apiKey);
-    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-pro'; // Stable model for v1 API
+    const modelName = process.env.GEMINI_MODEL || 'gemini-pro'; // Using stable gemini-pro model
     this.model = this.client.getGenerativeModel({ model: modelName });
   }
 
