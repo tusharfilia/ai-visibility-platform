@@ -7,6 +7,7 @@ import { EngineKey, Sentiment, EngineAnswer } from '@ai-visibility/shared';
 // Provider configuration
 export interface ProviderConfig {
   apiKey?: string;
+  apiKeys?: string[]; // For key rotation (e.g., OpenAI with multiple keys)
   baseUrl?: string;
   endpoint?: string; // For Azure OpenAI (Copilot)
   timeout?: number;

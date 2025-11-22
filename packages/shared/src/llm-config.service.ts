@@ -5,6 +5,7 @@ export interface LLMConfig {
   provider: 'openai' | 'anthropic' | 'gemini';
   model: string;
   apiKey: string;
+  apiKeys?: string[]; // For key rotation (e.g., OpenAI with multiple keys)
   endpoint?: string;
 }
 
@@ -40,10 +41,31 @@ export class LLMConfigService {
       
       case 'openai':
       default:
+        // Support multiple OpenAI keys for rotation (comma-separated or individual env vars)
+        const openaiKeys: string[] = [];
+        
+        // Method 1: Check for comma-separated OPENAI_API_KEY
+        const singleKey = this.configService.get<string>('OPENAI_API_KEY');
+        if (singleKey && singleKey.includes(',')) {
+          openaiKeys.push(...singleKey.split(',').map(k => k.trim()).filter(k => k.length > 0));
+        } else if (singleKey) {
+          openaiKeys.push(singleKey);
+        }
+        
+        // Method 2: Check for individual keys (OPENAI_API_KEY_1, OPENAI_API_KEY_2, etc.)
+        for (let i = 1; i <= 10; i++) {
+          const key = this.configService.get<string>(`OPENAI_API_KEY_${i}`);
+          if (key && key.length > 0 && !openaiKeys.includes(key)) {
+            openaiKeys.push(key);
+          }
+        }
+        
+        // Use first key as apiKey for backward compatibility, and all keys as apiKeys array
         return {
           provider: 'openai',
           model: defaultModel || 'gpt-4',
-          apiKey: this.configService.get<string>('OPENAI_API_KEY')!,
+          apiKey: openaiKeys.length > 0 ? openaiKeys.join(',') : this.configService.get<string>('OPENAI_API_KEY')!,
+          apiKeys: openaiKeys.length > 0 ? openaiKeys : undefined,
         };
     }
   }

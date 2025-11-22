@@ -62,7 +62,10 @@ export class LLMRouterService {
       case 'openai':
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { OpenAIProvider } = require('@ai-visibility/providers');
-        return new OpenAIProvider({ apiKey: config.apiKey });
+        return new OpenAIProvider({ 
+          apiKey: config.apiKey,
+          apiKeys: (config as any).apiKeys, // Pass apiKeys array if available
+        });
       
       case 'anthropic':
         // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -97,10 +100,30 @@ export class LLMRouterService {
   private async getProviderConfig(provider: string): Promise<LLMConfig> {
     switch (provider) {
       case 'openai':
+        // Support multiple OpenAI keys for rotation
+        const openaiKeys: string[] = [];
+        
+        // Method 1: Check for comma-separated OPENAI_API_KEY
+        const singleKey = process.env.OPENAI_API_KEY;
+        if (singleKey && singleKey.includes(',')) {
+          openaiKeys.push(...singleKey.split(',').map(k => k.trim()).filter(k => k.length > 0));
+        } else if (singleKey) {
+          openaiKeys.push(singleKey);
+        }
+        
+        // Method 2: Check for individual keys (OPENAI_API_KEY_1, OPENAI_API_KEY_2, etc.)
+        for (let i = 1; i <= 10; i++) {
+          const key = process.env[`OPENAI_API_KEY_${i}`];
+          if (key && key.length > 0 && !openaiKeys.includes(key)) {
+            openaiKeys.push(key);
+          }
+        }
+        
         return {
           provider: 'openai',
           model: 'gpt-4',
-          apiKey: process.env.OPENAI_API_KEY!,
+          apiKey: openaiKeys.length > 0 ? openaiKeys.join(',') : process.env.OPENAI_API_KEY!,
+          apiKeys: openaiKeys.length > 0 ? openaiKeys : undefined,
         };
       
       case 'anthropic':
