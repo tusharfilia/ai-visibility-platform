@@ -365,7 +365,7 @@ Return JSON array:
         type: 'weakness',
         category: 'visibility',
         title: 'Low Overall Prompt Visibility',
-        description: `Average visibility is ${(avgVisibility * 100).toFixed(0))}% across all prompts`,
+        description: `Average visibility is ${(avgVisibility * 100).toFixed(0)}% across all prompts`,
         reasoning: 'Low visibility across prompts indicates systemic issues with positioning, citations, or trust signals',
         impact: 'high',
         confidence: 0.9,
