@@ -62,8 +62,8 @@ async function bootstrap() {
           console.error('✅ Database migrations completed successfully');
         } catch (migrateError) {
           console.error('⚠️  Migration command failed, trying alternative...');
-          // Fallback: try with full path to prisma
-          execSync(`npx --yes prisma@latest migrate deploy --schema=${schemaPath}`, {
+          // Fallback: try with pinned Prisma version to match package.json
+          execSync(`npx --yes prisma@^5.7.0 migrate deploy --schema=${schemaPath}`, {
             stdio: 'inherit',
             env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
           });
