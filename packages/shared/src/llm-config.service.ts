@@ -27,14 +27,14 @@ export class LLMConfigService {
       case 'anthropic':
         return {
           provider: 'anthropic',
-          model: defaultModel || 'claude-3-opus-20240229',
+          model: defaultModel || 'claude-3-5-sonnet-20241022', // Updated to latest model
           apiKey: this.configService.get<string>('ANTHROPIC_API_KEY')!,
         };
       
       case 'gemini':
         return {
           provider: 'gemini',
-          model: defaultModel || 'gemini-pro',
+          model: defaultModel || 'gemini-1.5-pro', // Updated to latest model
           apiKey: this.configService.get<string>('GOOGLE_AI_API_KEY')!,
         };
       
@@ -116,12 +116,12 @@ export class LLMConfigService {
       },
       {
         provider: 'anthropic',
-        models: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
+        models: ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
         description: 'Anthropic Claude models - excellent for long-form content',
       },
       {
         provider: 'gemini',
-        models: ['gemini-pro', 'gemini-pro-vision'],
+        models: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro', 'gemini-pro-vision'],
         description: 'Google Gemini models - cost-effective with good performance',
       },
     ];
@@ -143,11 +143,14 @@ export class LLMConfigService {
         'gpt-3.5-turbo': { prompt: 0.001, completion: 0.002 },
       },
       anthropic: {
+        'claude-3-5-sonnet-20241022': { prompt: 0.003, completion: 0.015 }, // Latest model, same pricing as sonnet
         'claude-3-opus-20240229': { prompt: 0.015, completion: 0.075 },
         'claude-3-sonnet-20240229': { prompt: 0.003, completion: 0.015 },
         'claude-3-haiku-20240307': { prompt: 0.00025, completion: 0.00125 },
       },
       gemini: {
+        'gemini-1.5-pro': { prompt: 0.00125, completion: 0.005 }, // Latest model
+        'gemini-1.5-flash': { prompt: 0.000075, completion: 0.0003 }, // Faster, cheaper model
         'gemini-pro': { prompt: 0.0005, completion: 0.0015 },
         'gemini-pro-vision': { prompt: 0.0005, completion: 0.0015 },
       },

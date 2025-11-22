@@ -106,14 +106,14 @@ export class LLMRouterService {
       case 'anthropic':
         return {
           provider: 'anthropic',
-          model: 'claude-3-opus-20240229',
+          model: 'claude-3-5-sonnet-20241022', // Updated to latest model
           apiKey: process.env.ANTHROPIC_API_KEY!,
         };
       
       case 'gemini':
         return {
           provider: 'gemini',
-          model: 'gemini-pro',
+          model: 'gemini-1.5-pro', // Updated to latest model
           apiKey: process.env.GOOGLE_AI_API_KEY!,
         };
       
