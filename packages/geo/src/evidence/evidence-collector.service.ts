@@ -73,7 +73,7 @@ export class EvidenceCollectorService {
            pr.id AS "promptRunId",
            a.id AS "answerId",
            e."key" AS "engine",
-           a."answerText",
+           a."rawText" AS "answerText",
            pr."createdAt"
          FROM "prompt_runs" pr
          JOIN "prompts" p ON p.id = pr."promptId"
@@ -142,7 +142,7 @@ export class EvidenceCollectorService {
            c."url",
            p."text" AS "promptText",
            e."key" AS "engine",
-           a."answerText",
+           a."rawText" AS "answerText",
            c."createdAt"
          FROM "citations" c
          JOIN "answers" a ON a.id = c."answerId"
@@ -207,7 +207,7 @@ export class EvidenceCollectorService {
         `SELECT
            p."text" AS "promptText",
            e."key" AS "engine",
-           a."answerText",
+           a."rawText" AS "answerText",
            ROW_NUMBER() OVER (PARTITION BY pr.id ORDER BY m."createdAt") AS "position",
            m."sentiment"
          FROM "mentions" m

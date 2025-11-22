@@ -77,9 +77,9 @@ export class DirectoryPresenceAnalyzerService {
       // Get citations that are from directories
       const citationsResult = await this.dbPool.query(`
         SELECT c.*, pr."workspaceId"
-        FROM "Citation" c
-        INNER JOIN "Answer" a ON c."answerId" = a.id
-        INNER JOIN "PromptRun" pr ON a."promptRunId" = pr.id
+        FROM "citations" c
+        INNER JOIN "answers" a ON c."answerId" = a.id
+        INNER JOIN "prompt_runs" pr ON a."promptRunId" = pr.id
         WHERE pr."workspaceId" = $1 AND c."sourceType" = 'directory'
       `, [workspaceId]);
 

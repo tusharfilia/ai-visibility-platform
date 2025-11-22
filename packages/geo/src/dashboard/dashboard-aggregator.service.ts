@@ -328,13 +328,13 @@ export class DashboardAggregatorService {
    */
   private async getCitationsForEngine(workspaceId: string, engine: EngineKey): Promise<any[]> {
     const result = await this.dbPool.query(`
-      SELECT c.*, pr."engineKey"
-      FROM "Citation" c
-      INNER JOIN "Answer" a ON c."answerId" = a.id
-      INNER JOIN "PromptRun" pr ON a."promptRunId" = pr.id
-      INNER JOIN "Engine" e ON pr."engineId" = e.id
+      SELECT c.*, pr."workspaceId"
+      FROM "citations" c
+      INNER JOIN "answers" a ON c."answerId" = a.id
+      INNER JOIN "prompt_runs" pr ON a."promptRunId" = pr.id
+      INNER JOIN "engines" e ON pr."engineId" = e.id
       WHERE pr."workspaceId" = $1
-      AND e.key = $2
+      AND e."key" = $2
       ORDER BY c."rank" ASC NULLS LAST
       LIMIT 50
     `, [workspaceId, engine]);
@@ -347,13 +347,13 @@ export class DashboardAggregatorService {
    */
   private async getMentionsForEngine(workspaceId: string, engine: EngineKey): Promise<any[]> {
     const result = await this.dbPool.query(`
-      SELECT m.*, pr."engineKey"
-      FROM "Mention" m
-      INNER JOIN "Answer" a ON m."answerId" = a.id
-      INNER JOIN "PromptRun" pr ON a."promptRunId" = pr.id
-      INNER JOIN "Engine" e ON pr."engineId" = e.id
+      SELECT m.*, pr."workspaceId"
+      FROM "mentions" m
+      INNER JOIN "answers" a ON m."answerId" = a.id
+      INNER JOIN "prompt_runs" pr ON a."promptRunId" = pr.id
+      INNER JOIN "engines" e ON pr."engineId" = e.id
       WHERE pr."workspaceId" = $1
-      AND e.key = $2
+      AND e."key" = $2
       LIMIT 100
     `, [workspaceId, engine]);
 

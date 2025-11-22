@@ -516,9 +516,9 @@ export class EvidenceGraphBuilderService {
     // Get citations via Answer -> PromptRun -> Workspace chain
     const result = await this.dbPool!.query(`
       SELECT c.*, pr."workspaceId"
-      FROM "Citation" c
-      INNER JOIN "Answer" a ON c."answerId" = a.id
-      INNER JOIN "PromptRun" pr ON a."promptRunId" = pr.id
+      FROM "citations" c
+      INNER JOIN "answers" a ON c."answerId" = a.id
+      INNER JOIN "prompt_runs" pr ON a."promptRunId" = pr.id
       WHERE pr."workspaceId" = $1
       ORDER BY c."rank" ASC NULLS LAST
     `, [workspaceId]);
@@ -532,9 +532,9 @@ export class EvidenceGraphBuilderService {
   private async getMentions(workspaceId: string): Promise<any[]> {
     const result = await this.dbPool!.query(`
       SELECT m.*, pr."workspaceId"
-      FROM "Mention" m
-      INNER JOIN "Answer" a ON m."answerId" = a.id
-      INNER JOIN "PromptRun" pr ON a."promptRunId" = pr.id
+      FROM "mentions" m
+      INNER JOIN "answers" a ON m."answerId" = a.id
+      INNER JOIN "prompt_runs" pr ON a."promptRunId" = pr.id
       WHERE pr."workspaceId" = $1
     `, [workspaceId]);
 

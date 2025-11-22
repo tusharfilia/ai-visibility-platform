@@ -41,7 +41,7 @@ export class PremiumCitationService {
              c."url",
              p."text" AS "promptText",
              e."key" AS "engine",
-             a."answerText",
+             a."rawText" AS "answerText",
              c."createdAt"
            FROM "citations" c
            JOIN "answers" a ON a.id = c."answerId"
@@ -60,7 +60,7 @@ export class PremiumCitationService {
              c."url",
              p."text" AS "promptText",
              e."key" AS "engine",
-             a."answerText",
+             a."rawText" AS "answerText",
              c."createdAt"
            FROM "citations" c
            JOIN "answers" a ON a.id = c."answerId"
