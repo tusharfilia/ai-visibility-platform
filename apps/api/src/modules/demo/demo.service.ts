@@ -1937,7 +1937,7 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
           workspaceId,
           premiumSummary,
           premiumCompetitors,
-          engines.map(e => e.key)
+          engines.map((e: { key: string }) => e.key)
         );
         allInsights.push(...summaryDiagnostics.insights);
         allStrengths.push(...summaryDiagnostics.strengths);
