@@ -62,12 +62,26 @@ async function bootstrap() {
           console.error('✅ Database migrations completed successfully');
         } catch (migrateError) {
           console.error('⚠️  Migration command failed, trying alternative...');
-          // Fallback: try with pinned Prisma version to match package.json
-          execSync(`npx --yes prisma@^5.7.0 migrate deploy --schema=${schemaPath}`, {
-            stdio: 'inherit',
-            env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-          });
-          console.error('✅ Database migrations completed successfully');
+          // Fallback: try with specific Prisma version to match package.json
+          try {
+            execSync(`npx --yes prisma@5.7.0 migrate deploy --schema=${schemaPath}`, {
+              stdio: 'inherit',
+              env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+            });
+            console.error('✅ Database migrations completed successfully');
+          } catch (fallbackError) {
+            // Last resort: try using pnpm exec if available
+            try {
+              execSync(`pnpm exec prisma migrate deploy --schema=${schemaPath}`, {
+                stdio: 'inherit',
+                cwd: process.cwd(),
+                env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+              });
+              console.error('✅ Database migrations completed successfully');
+            } catch (finalError) {
+              throw finalError;
+            }
+          }
         }
       } else {
         console.error('⚠️  Prisma schema not found, skipping migrations');
