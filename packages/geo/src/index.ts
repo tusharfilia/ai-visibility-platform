@@ -60,7 +60,9 @@ export * from './competitors/competitor-detector.service';
 export * from './sov/share-of-voice-calculator.service';
 
 // Diagnostic insights services
-export * from './insights/diagnostic-insights.service';
+// Export DiagnosticInsightsService but not DiagnosticInsight interface (use the one from diagnostic.types.ts)
+// Note: The DiagnosticInsight in diagnostic-insights.service.ts is the old format and should not be exported
+export { DiagnosticInsightsService, type DiagnosticInsightsResult } from './insights/diagnostic-insights.service';
 
 // Engine bias simulation services
 export * from './scoring/engine-bias-simulator.service';

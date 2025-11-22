@@ -99,10 +99,11 @@ export interface DiagnosticBreakdown {
 
 /**
  * Enhanced PremiumResponse with diagnostic intelligence
+ * Note: EvidenceItem is defined in premium-response.types.ts to avoid circular dependencies
  */
 export interface DiagnosticPremiumResponse<T> {
   data: T;
-  evidence: EvidenceItem[];
+  evidence: any[]; // EvidenceItem[] - defined in premium-response.types.ts
   confidence: number;
   warnings: string[];
   explanation: string;

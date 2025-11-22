@@ -2,6 +2,17 @@
  * Standardized premium response types with evidence, confidence, warnings
  */
 
+// Import diagnostic types first so they're available for use below
+import type {
+  DiagnosticInsight,
+  DiagnosticRecommendation,
+  EngineReasoning,
+  VisibilityOpportunity,
+  ThreatAssessment,
+  CompetitiveThreat,
+  DiagnosticBreakdown,
+} from './diagnostic.types';
+
 export interface PremiumResponse<T> {
   data: T;
   evidence: EvidenceItem[];
@@ -9,16 +20,7 @@ export interface PremiumResponse<T> {
   warnings: string[];
   explanation: string;
   // Diagnostic intelligence layer (always present for premium analysis)
-  diagnostics: {
-    insights: DiagnosticInsight[];
-    strengths: DiagnosticInsight[];
-    weaknesses: DiagnosticInsight[];
-    risks: ThreatAssessment[];
-    recommendations: DiagnosticRecommendation[];
-    engineReasoning: EngineReasoning[];
-    opportunities: VisibilityOpportunity[];
-    competitiveThreats: CompetitiveThreat[];
-  };
+  diagnostics: DiagnosticBreakdown;
   metadata?: {
     generatedAt: Date;
     serviceVersion?: string;
@@ -27,7 +29,7 @@ export interface PremiumResponse<T> {
   };
 }
 
-// Import diagnostic types
+// Re-export diagnostic types for convenience
 export * from './diagnostic.types';
 
 export interface EvidenceItem {
