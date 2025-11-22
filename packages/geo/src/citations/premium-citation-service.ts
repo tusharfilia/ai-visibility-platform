@@ -2,6 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import { CitationClassifierService } from './citation-classifier.service';
 import { PremiumCitation } from '../types/premium-response.types';
+import { DiagnosticIntelligenceService } from '../diagnostics/diagnostic-intelligence.service';
+import {
+  DiagnosticInsight,
+  DiagnosticRecommendation,
+} from '../types/diagnostic.types';
 
 @Injectable()
 export class PremiumCitationService {
@@ -10,6 +15,7 @@ export class PremiumCitationService {
 
   constructor(
     private readonly citationClassifier: CitationClassifierService,
+    private readonly diagnosticIntelligence: DiagnosticIntelligenceService,
   ) {
     this.dbPool = new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -278,6 +284,207 @@ export class PremiumCitationService {
     }
 
     return confidence;
+  }
+
+  /**
+   * Generate diagnostic intelligence for citations
+   */
+  async generateCitationDiagnostics(
+    workspaceId: string,
+    citations: PremiumCitation[]
+  ): Promise<{
+    insights: DiagnosticInsight[];
+    recommendations: DiagnosticRecommendation[];
+  }> {
+    const insights: DiagnosticInsight[] = [];
+
+    // Analyze citation count
+    if (citations.length < 10) {
+      insights.push({
+        type: 'weakness',
+        category: 'trust',
+        title: 'Low Citation Count',
+        description: `Only ${citations.length} citations found, below optimal threshold`,
+        reasoning: 'Low citation count reduces trust signals and EEAT scores, limiting AI engine confidence',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: [`Total citations: ${citations.length}`, 'Recommended: 20+ citations'],
+      });
+    } else if (citations.length >= 30) {
+      insights.push({
+        type: 'strength',
+        category: 'trust',
+        title: 'Strong Citation Profile',
+        description: `${citations.length} citations found, indicating strong web presence`,
+        reasoning: 'High citation count improves trust signals and EEAT scores, boosting AI engine confidence',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: [`Total citations: ${citations.length}`],
+      });
+    }
+
+    // Analyze licensed publisher citations
+    const licensedCitations = citations.filter(c => c.classification.isLicensed);
+    const licensedRatio = citations.length > 0 ? licensedCitations.length / citations.length : 0;
+    
+    if (licensedRatio < 0.2 && citations.length > 0) {
+      insights.push({
+        type: 'weakness',
+        category: 'trust',
+        title: 'Low Licensed Publisher Citations',
+        description: `Only ${(licensedRatio * 100).toFixed(0)}% of citations are from licensed publishers`,
+        reasoning: 'Licensed publisher citations are highly valued by AI engines for authoritativeness',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: [
+          `Licensed: ${licensedCitations.length}`,
+          `Total: ${citations.length}`,
+          'Recommended: 30%+ licensed publisher citations',
+        ],
+      });
+    } else if (licensedRatio >= 0.3) {
+      insights.push({
+        type: 'strength',
+        category: 'trust',
+        title: 'Strong Licensed Publisher Presence',
+        description: `${(licensedRatio * 100).toFixed(0)}% of citations are from licensed publishers`,
+        reasoning: 'High licensed publisher ratio significantly boosts authoritativeness and trust signals',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: [`Licensed: ${licensedCitations.length}/${citations.length}`],
+      });
+    }
+
+    // Analyze citation categories
+    const categoryCounts = citations.reduce((acc, c) => {
+      acc[c.category] = (acc[c.category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const hasNews = categoryCounts['news'] > 0;
+    const hasReviews = categoryCounts['review'] > 0;
+    const hasDirectories = categoryCounts['directory'] > 0;
+
+    if (!hasNews && citations.length > 0) {
+      insights.push({
+        type: 'weakness',
+        category: 'trust',
+        title: 'Missing News Citations',
+        description: 'No news citations found',
+        reasoning: 'News citations demonstrate media coverage and significantly boost authoritativeness',
+        impact: 'high',
+        confidence: 0.8,
+        evidence: ['No news citations detected'],
+      });
+    }
+
+    if (!hasReviews && citations.length > 0) {
+      insights.push({
+        type: 'weakness',
+        category: 'trust',
+        title: 'Missing Review Platform Citations',
+        description: 'No review platform citations found',
+        reasoning: 'Review citations show customer feedback and social proof, important for trust signals',
+        impact: 'medium',
+        confidence: 0.7,
+        evidence: ['No review citations detected'],
+      });
+    }
+
+    // Analyze citation authority
+    const avgConfidence = citations.length > 0
+      ? citations.reduce((sum, c) => sum + c.evidence.confidence, 0) / citations.length
+      : 0;
+
+    if (avgConfidence < 0.7 && citations.length > 0) {
+      insights.push({
+        type: 'weakness',
+        category: 'trust',
+        title: 'Low Average Citation Authority',
+        description: `Average citation confidence is ${(avgConfidence * 100).toFixed(0)}%`,
+        reasoning: 'Low citation authority reduces trust signals and EEAT scores',
+        impact: 'medium',
+        confidence: 0.8,
+        evidence: [`Average confidence: ${(avgConfidence * 100).toFixed(0)}%`],
+      });
+    }
+
+    // Analyze engine distribution
+    const engineCounts = citations.reduce((acc, c) => {
+      acc[c.foundInEngine] = (acc[c.foundInEngine] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const engines = Object.keys(engineCounts);
+    if (engines.length < 3 && citations.length > 0) {
+      insights.push({
+        type: 'weakness',
+        category: 'visibility',
+        title: 'Limited Engine Citation Coverage',
+        description: `Citations only found on ${engines.length} engine(s)`,
+        reasoning: 'Limited engine coverage reduces overall visibility and trust signal distribution',
+        impact: 'medium',
+        confidence: 0.7,
+        evidence: [`Engines: ${engines.join(', ')}`, 'Recommended: Citations on all 3 engines'],
+        affectedEngines: engines,
+      });
+    }
+
+    // Generate recommendations
+    const recommendations = await this.diagnosticIntelligence.generateRecommendations(workspaceId, insights, {
+      category: 'citations',
+    });
+
+    // Add citation-specific recommendations
+    if (citations.length < 10) {
+      recommendations.push({
+        id: `citation-count-${Date.now()}`,
+        title: 'Build More Citations',
+        description: `Increase citation count from ${citations.length} to target 20+`,
+        category: 'citations',
+        priority: 'high',
+        difficulty: 'medium',
+        expectedImpact: {
+          trustGain: Math.min(30, (20 - citations.length) * 3),
+          description: `Expected ${Math.min(30, (20 - citations.length) * 3)}% trust signal improvement`,
+        },
+        steps: [
+          'Build relationships with licensed publishers',
+          'Create shareable, newsworthy content',
+          'Improve directory listings',
+          'Engage with industry publications',
+        ],
+        relatedInsights: insights.filter(i => i.type === 'weakness').map((_, idx) => `insight-${idx}`),
+        estimatedTime: '4-12 weeks',
+        evidence: [`Current: ${citations.length} citations`, 'Target: 20+ citations'],
+      });
+    }
+
+    if (licensedRatio < 0.2 && citations.length > 0) {
+      recommendations.push({
+        id: `licensed-citations-${Date.now()}`,
+        title: 'Increase Licensed Publisher Citations',
+        description: `Increase licensed publisher citations from ${(licensedRatio * 100).toFixed(0)}% to 30%+`,
+        category: 'citations',
+        priority: 'high',
+        difficulty: 'hard',
+        expectedImpact: {
+          trustGain: 25,
+          description: 'Expected 25% improvement in authoritativeness score',
+        },
+        steps: [
+          'Identify licensed publishers in your industry',
+          'Create newsworthy content for press releases',
+          'Build media relationships',
+          'Pitch story angles to journalists',
+        ],
+        relatedInsights: insights.filter(i => i.title.includes('Licensed')).map((_, idx) => `insight-${idx}`),
+        estimatedTime: '8-16 weeks',
+        evidence: [`Current: ${(licensedRatio * 100).toFixed(0)}% licensed`, 'Target: 30%+ licensed'],
+      });
+    }
+
+    return { insights, recommendations };
   }
 }
 

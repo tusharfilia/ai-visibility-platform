@@ -5,9 +5,14 @@ import { EvidenceBackedShareOfVoiceService } from '../sov/evidence-backed-sov.se
 import { EvidenceCollectorService } from '../evidence/evidence-collector.service';
 import { SchemaAuditorService } from '../structural/schema-auditor';
 import { StructuralScoringService } from '../structural/structural-scoring.service';
+import { DiagnosticIntelligenceService } from '../diagnostics/diagnostic-intelligence.service';
 import { Pool } from 'pg';
 import { PremiumGEOScore } from '../types/premium-response.types';
 import { applyIndustryWeights } from '../config/industry-weights.config';
+import {
+  DiagnosticInsight,
+  DiagnosticRecommendation,
+} from '../types/diagnostic.types';
 
 // Types moved to premium-response.types.ts
 
@@ -23,6 +28,7 @@ export class PremiumGEOScoreService {
     private readonly evidenceCollector: EvidenceCollectorService,
     private readonly schemaAuditor: SchemaAuditorService,
     private readonly structuralScoring: StructuralScoringService,
+    private readonly diagnosticIntelligence: DiagnosticIntelligenceService,
   ) {
     this.dbPool = new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -589,6 +595,193 @@ export class PremiumGEOScoreService {
         domainLower.includes('reuters.com') || domainLower.includes('bbc.com')) return 'news';
     if (domainLower.includes('blog') || domainLower.includes('medium.com')) return 'blog';
     return 'other';
+  }
+
+  /**
+   * Generate diagnostic intelligence for GEO score breakdown
+   */
+  async generateGEOScoreDiagnostics(
+    workspaceId: string,
+    geoScore: PremiumGEOScore,
+    industry?: string
+  ): Promise<{
+    insights: DiagnosticInsight[];
+    recommendations: DiagnosticRecommendation[];
+    priorityImprovements: Array<{
+      category: string;
+      currentScore: number;
+      maxScore: number;
+      priority: 'high' | 'medium' | 'low';
+      expectedImpact: number;
+      steps: string[];
+    }>;
+  }> {
+    const insights: DiagnosticInsight[] = [];
+    const priorityImprovements: Array<{
+      category: string;
+      currentScore: number;
+      maxScore: number;
+      priority: 'high' | 'medium' | 'low';
+      expectedImpact: number;
+      steps: string[];
+    }> = [];
+
+    // Analyze each sub-score
+    const subScores = [
+      { name: 'AI Visibility', data: geoScore.breakdown.aiVisibility, weight: geoScore.breakdown.aiVisibility.weight },
+      { name: 'EEAT', data: geoScore.breakdown.eeat, weight: geoScore.breakdown.eeat.weight },
+      { name: 'Citations', data: geoScore.breakdown.citations, weight: geoScore.breakdown.citations.weight },
+      { name: 'Competitor Comparison', data: geoScore.breakdown.competitorComparison, weight: geoScore.breakdown.competitorComparison.weight },
+      { name: 'Schema/Technical', data: geoScore.breakdown.schemaTechnical, weight: geoScore.breakdown.schemaTechnical.weight },
+    ];
+
+    for (const subScore of subScores) {
+      const score = subScore.data.score;
+      const maxPoints = subScore.weight * 100;
+      const currentPoints = subScore.data.points;
+      const gap = maxPoints - currentPoints;
+
+      // Generate insight based on score
+      if (score < 50) {
+        insights.push({
+          type: 'weakness',
+          category: this.mapScoreToCategory(subScore.name),
+          title: `Low ${subScore.name} Score`,
+          description: `${subScore.name} score is ${score}/100, missing ${gap.toFixed(0)} potential points`,
+          reasoning: `Low ${subScore.name} score reduces overall GEO score by ${(gap / 100 * 100).toFixed(0)} points. ${subScore.data.explanation}`,
+          impact: gap > 20 ? 'high' : gap > 10 ? 'medium' : 'low',
+          confidence: 0.9,
+          evidence: subScore.data.evidence,
+        });
+      } else if (score >= 80) {
+        insights.push({
+          type: 'strength',
+          category: this.mapScoreToCategory(subScore.name),
+          title: `Strong ${subScore.name} Score`,
+          description: `${subScore.name} score is ${score}/100, contributing ${currentPoints.toFixed(0)} points`,
+          reasoning: `Strong ${subScore.name} score is a key strength. ${subScore.data.explanation}`,
+          impact: 'high',
+          confidence: 0.9,
+          evidence: subScore.data.evidence,
+        });
+      }
+
+      // Calculate priority improvement
+      if (score < 80 && gap > 5) {
+        const priority = gap > 20 ? 'high' : gap > 10 ? 'medium' : 'low';
+        priorityImprovements.push({
+          category: subScore.name,
+          currentScore: score,
+          maxScore: 100,
+          priority,
+          expectedImpact: gap, // Points that could be gained
+          steps: this.generateImprovementSteps(subScore.name, subScore.data),
+        });
+      }
+    }
+
+    // Generate recommendations
+    const recommendations = await this.diagnosticIntelligence.generateRecommendations(workspaceId, insights, {
+      category: 'geo_score',
+      currentScore: geoScore.total,
+      maxScore: 100,
+    });
+
+    // Add score-specific recommendations
+    for (const improvement of priorityImprovements.filter(i => i.priority === 'high')) {
+      recommendations.push({
+        id: `geo-score-${improvement.category.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+        title: `Improve ${improvement.category} Score`,
+        description: `Increase ${improvement.category} from ${improvement.currentScore} to target 80+`,
+        category: this.mapCategoryToRecommendation(improvement.category),
+        priority: improvement.priority,
+        difficulty: improvement.expectedImpact > 20 ? 'hard' : improvement.expectedImpact > 10 ? 'medium' : 'easy',
+        expectedImpact: {
+          scoreImprovement: Math.round(improvement.expectedImpact),
+          description: `Expected ${Math.round(improvement.expectedImpact)} point improvement to GEO score`,
+        },
+        steps: improvement.steps,
+        relatedInsights: insights.filter(i => i.title.includes(improvement.category)).map((_, idx) => `insight-${idx}`),
+        estimatedTime: improvement.expectedImpact > 20 ? '4-8 weeks' : improvement.expectedImpact > 10 ? '2-4 weeks' : '1-2 weeks',
+        evidence: [`Current score: ${improvement.currentScore}/100`, `Potential gain: ${improvement.expectedImpact.toFixed(0)} points`],
+      });
+    }
+
+    // Add industry weight explanation if applicable
+    if (industry) {
+      insights.push({
+        type: 'opportunity',
+        category: 'technical',
+        title: 'Industry-Specific Weighting Applied',
+        description: `Score weights adjusted for ${industry} industry`,
+        reasoning: `Industry-specific weights optimize scoring for ${industry} characteristics`,
+        impact: 'medium',
+        confidence: 0.8,
+        evidence: [`Industry: ${industry}`, `Weights: Visibility ${(geoScore.breakdown.aiVisibility.weight * 100).toFixed(0)}%, EEAT ${(geoScore.breakdown.eeat.weight * 100).toFixed(0)}%, Citations ${(geoScore.breakdown.citations.weight * 100).toFixed(0)}%`],
+      });
+    }
+
+    return { insights, recommendations, priorityImprovements };
+  }
+
+  private mapScoreToCategory(scoreName: string): DiagnosticInsight['category'] {
+    const mapping: Record<string, DiagnosticInsight['category']> = {
+      'AI Visibility': 'visibility',
+      'EEAT': 'trust',
+      'Citations': 'trust',
+      'Competitor Comparison': 'competition',
+      'Schema/Technical': 'technical',
+    };
+    return mapping[scoreName] || 'technical';
+  }
+
+  private mapCategoryToRecommendation(category: string): DiagnosticRecommendation['category'] {
+    const mapping: Record<string, DiagnosticRecommendation['category']> = {
+      'AI Visibility': 'content',
+      'EEAT': 'trust',
+      'Citations': 'citations',
+      'Competitor Comparison': 'positioning',
+      'Schema/Technical': 'schema',
+    };
+    return mapping[category] || 'technical';
+  }
+
+  private generateImprovementSteps(category: string, data: any): string[] {
+    const steps: string[] = [];
+
+    switch (category) {
+      case 'AI Visibility':
+        steps.push('Increase prompt coverage across all engines');
+        steps.push('Improve mention frequency in AI responses');
+        steps.push('Optimize content for high-value prompts');
+        break;
+      case 'EEAT':
+        steps.push('Build authoritativeness through citations');
+        steps.push('Improve expertise signals');
+        steps.push('Strengthen trustworthiness markers');
+        break;
+      case 'Citations':
+        steps.push('Build relationships with licensed publishers');
+        steps.push('Create shareable, citable content');
+        steps.push('Improve directory listings');
+        break;
+      case 'Competitor Comparison':
+        steps.push('Analyze competitor strategies');
+        steps.push('Improve share of voice');
+        steps.push('Optimize for competitive prompts');
+        break;
+      case 'Schema/Technical':
+        steps.push('Add comprehensive schema.org markup');
+        steps.push('Improve structured data quality');
+        steps.push('Fix technical SEO issues');
+        break;
+    }
+
+    if (data.missing && data.missing.length > 0) {
+      steps.push(`Address missing: ${data.missing.slice(0, 2).join(', ')}`);
+    }
+
+    return steps;
   }
 }
 

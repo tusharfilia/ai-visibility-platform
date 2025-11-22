@@ -2,8 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { LLMRouterService } from '@ai-visibility/shared';
 import { IndustryDetectorService } from '../industry/industry-detector.service';
 import { EvidenceCollectorService } from '../evidence/evidence-collector.service';
+import { DiagnosticIntelligenceService } from '../diagnostics/diagnostic-intelligence.service';
 import { Pool } from 'pg';
 import { PremiumCompetitor } from '../types/premium-response.types';
+import {
+  CompetitiveThreat,
+  DiagnosticInsight,
+  DiagnosticRecommendation,
+} from '../types/diagnostic.types';
 
 @Injectable()
 export class PremiumCompetitorDetectorService {
@@ -14,6 +20,7 @@ export class PremiumCompetitorDetectorService {
     private readonly llmRouter: LLMRouterService,
     private readonly industryDetector: IndustryDetectorService,
     private readonly evidenceCollector: EvidenceCollectorService,
+    private readonly diagnosticIntelligence: DiagnosticIntelligenceService,
   ) {
     this.dbPool = new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -421,6 +428,124 @@ Focus on REAL competitors that would appear in AI search results for industry qu
       bestPosition: 0,
       worstPosition: 0,
     };
+  }
+
+  /**
+   * Generate competitive threat analysis
+   */
+  async generateCompetitiveThreats(
+    workspaceId: string,
+    competitors: PremiumCompetitor[],
+    ownVisibility: number
+  ): Promise<CompetitiveThreat[]> {
+    return this.diagnosticIntelligence.generateCompetitiveThreats(workspaceId, competitors, ownVisibility);
+  }
+
+  /**
+   * Generate diagnostic insights for competitors
+   */
+  async generateCompetitorDiagnostics(
+    workspaceId: string,
+    competitors: PremiumCompetitor[],
+    ownVisibility: number
+  ): Promise<{
+    insights: DiagnosticInsight[];
+    threats: CompetitiveThreat[];
+    recommendations: DiagnosticRecommendation[];
+  }> {
+    const insights: DiagnosticInsight[] = [];
+    const threats = await this.generateCompetitiveThreats(workspaceId, competitors, ownVisibility);
+
+    // Analyze competitor dominance
+    const highVisibilityCompetitors = competitors.filter(c => c.visibility.overallVisibility > ownVisibility);
+    if (highVisibilityCompetitors.length > 0) {
+      insights.push({
+        type: 'threat',
+        category: 'competition',
+        title: 'Competitors Outperforming',
+        description: `${highVisibilityCompetitors.length} competitor(s) have higher visibility`,
+        reasoning: 'Higher competitor visibility reduces your share of voice and recommendation frequency',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: highVisibilityCompetitors.map(c => 
+          `${c.brandName}: ${c.visibility.overallVisibility}% vs your ${ownVisibility}%`
+        ),
+        relatedCompetitors: highVisibilityCompetitors.map(c => c.domain),
+      });
+    }
+
+    // Analyze citation advantage
+    const highCitationCompetitors = competitors.filter(c => c.evidence.citationCount > 20);
+    if (highCitationCompetitors.length > 0) {
+      insights.push({
+        type: 'weakness',
+        category: 'trust',
+        title: 'Competitors Have Citation Advantage',
+        description: `${highCitationCompetitors.length} competitor(s) have significantly more citations`,
+        reasoning: 'More citations improve trust signals and EEAT scores, giving competitors an advantage',
+        impact: 'high',
+        confidence: 0.8,
+        evidence: highCitationCompetitors.map(c => 
+          `${c.brandName}: ${c.evidence.citationCount} citations`
+        ),
+        relatedCompetitors: highCitationCompetitors.map(c => c.domain),
+      });
+    }
+
+    // Analyze visibility gaps by engine
+    for (const competitor of competitors) {
+      const engineGaps = competitor.visibility.perEngine.filter(e => e.visible);
+      if (engineGaps.length > 0) {
+        insights.push({
+          type: 'threat',
+          category: 'visibility',
+          title: `${competitor.brandName} Visible on ${engineGaps.length} Engine(s)`,
+          description: `Competitor appears on ${engineGaps.map(e => e.engine).join(', ')}`,
+          reasoning: 'Competitor visibility on multiple engines reduces your opportunities',
+          impact: 'medium',
+          confidence: 0.7,
+          evidence: engineGaps.map(e => `${e.engine}: ${e.promptsVisible}/${e.promptsTested} prompts`),
+          relatedCompetitors: [competitor.domain],
+          affectedEngines: engineGaps.map(e => e.engine),
+        });
+      }
+    }
+
+    // Generate recommendations
+    const recommendations = await this.diagnosticIntelligence.generateRecommendations(workspaceId, insights, {
+      category: 'competitors',
+    });
+
+    // Add competitor-specific recommendations
+    if (highVisibilityCompetitors.length > 0) {
+      recommendations.push({
+        id: `competitor-threat-${Date.now()}`,
+        title: 'Address Competitive Visibility Gap',
+        description: `Focus on closing visibility gap with ${highVisibilityCompetitors.length} high-performing competitor(s)`,
+        category: 'positioning',
+        priority: 'high',
+        difficulty: 'hard',
+        expectedImpact: {
+          visibilityGain: Math.round(
+            highVisibilityCompetitors.reduce((sum, c) => 
+              sum + (c.visibility.overallVisibility - ownVisibility), 0
+            ) / highVisibilityCompetitors.length
+          ),
+          description: 'Expected visibility improvement to match or exceed competitors',
+        },
+        steps: [
+          'Analyze competitor citation strategies',
+          'Improve own citation quality and quantity',
+          'Optimize for high-value prompts where competitors appear',
+          'Strengthen trust signals and EEAT factors',
+        ],
+        relatedInsights: insights.filter(i => i.type === 'threat').map((_, idx) => `insight-${idx}`),
+        estimatedTime: '4-8 weeks',
+        evidence: highVisibilityCompetitors.map(c => `${c.brandName}: ${c.visibility.overallVisibility}% visibility`),
+      });
+    }
+
+    return { insights, threats, recommendations };
   }
 }
 

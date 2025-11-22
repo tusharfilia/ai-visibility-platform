@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import { EvidenceCollectorService, ShareOfVoiceEvidence } from '../evidence/evidence-collector.service';
+import { DiagnosticIntelligenceService } from '../diagnostics/diagnostic-intelligence.service';
+import {
+  DiagnosticInsight,
+  DiagnosticRecommendation,
+} from '../types/diagnostic.types';
 
 export interface EvidenceBackedShareOfVoice {
   entity: string;
@@ -39,6 +44,7 @@ export class EvidenceBackedShareOfVoiceService {
 
   constructor(
     private readonly evidenceCollector: EvidenceCollectorService,
+    private readonly diagnosticIntelligence: DiagnosticIntelligenceService,
   ) {
     this.dbPool = new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -67,7 +73,7 @@ export class EvidenceBackedShareOfVoiceService {
            p."text" AS "promptText",
            e."key" AS "engine",
            m."sentiment",
-           ROW_NUMBER() OVER (PARTITION BY pr.id, e.id ORDER BY m."createdAt") AS "position"
+           ROW_NUMBER() OVER (PARTITION BY pr.id, e.id ORDER BY a."createdAt", m."position") AS "position"
          FROM "mentions" m
          JOIN "answers" a ON a.id = m."answerId"
          JOIN "prompt_runs" pr ON pr.id = a."promptRunId"
@@ -237,6 +243,160 @@ export class EvidenceBackedShareOfVoiceService {
     engine?: string
   ): Promise<ShareOfVoiceEvidence[]> {
     return this.evidenceCollector.collectShareOfVoiceEvidence(workspaceId, entity);
+  }
+
+  /**
+   * Generate diagnostic intelligence for Share of Voice
+   */
+  async generateSOVDiagnostics(
+    workspaceId: string,
+    sovData: EvidenceBackedShareOfVoice[],
+    brandName: string,
+    competitors?: string[]
+  ): Promise<{
+    insights: DiagnosticInsight[];
+    recommendations: DiagnosticRecommendation[];
+  }> {
+    const insights: DiagnosticInsight[] = [];
+    const brandSOV = sovData.find(s => s.entity.toLowerCase() === brandName.toLowerCase());
+    
+    if (!brandSOV) {
+      return { insights, recommendations: [] };
+    }
+
+    // Analyze share percentage
+    if (brandSOV.sharePercentage < 30) {
+      insights.push({
+        type: 'weakness',
+        category: 'visibility',
+        title: 'Low Share of Voice',
+        description: `Your share of voice is ${brandSOV.sharePercentage}%, below optimal threshold`,
+        reasoning: 'Low share of voice means competitors are appearing more frequently in AI responses, reducing your visibility',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: [`Share: ${brandSOV.sharePercentage}%`, `Total mentions: ${brandSOV.totalMentions}`],
+      });
+    } else if (brandSOV.sharePercentage >= 50) {
+      insights.push({
+        type: 'strength',
+        category: 'visibility',
+        title: 'Strong Share of Voice',
+        description: `Your share of voice is ${brandSOV.sharePercentage}%, indicating strong visibility`,
+        reasoning: 'High share of voice means you appear frequently in AI responses, improving recommendation likelihood',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: [`Share: ${brandSOV.sharePercentage}%`, `Total mentions: ${brandSOV.totalMentions}`],
+      });
+    }
+
+    // Analyze engine distribution
+    const enginesWithLowVisibility = brandSOV.perEngine.filter(e => e.sharePercentage < 20);
+    if (enginesWithLowVisibility.length > 0) {
+      insights.push({
+        type: 'weakness',
+        category: 'visibility',
+        title: 'Low Visibility on Some Engines',
+        description: `Low share of voice on ${enginesWithLowVisibility.length} engine(s)`,
+        reasoning: 'Uneven engine distribution reduces overall visibility and recommendation opportunities',
+        impact: 'medium',
+        confidence: 0.8,
+        evidence: enginesWithLowVisibility.map(e => `${e.engine}: ${e.sharePercentage}%`),
+        affectedEngines: enginesWithLowVisibility.map(e => e.engine),
+      });
+    }
+
+    // Analyze sentiment
+    const totalSentiment = brandSOV.sentiment.positive + brandSOV.sentiment.neutral + brandSOV.sentiment.negative;
+    if (totalSentiment > 0) {
+      const positiveRatio = brandSOV.sentiment.positive / totalSentiment;
+      if (positiveRatio < 0.5) {
+        insights.push({
+          type: 'weakness',
+          category: 'trust',
+          title: 'Low Positive Sentiment',
+          description: `Only ${(positiveRatio * 100).toFixed(0)}% of mentions are positive`,
+          reasoning: 'Low positive sentiment may reduce trust signals and recommendation frequency',
+          impact: 'medium',
+          confidence: 0.7,
+          evidence: [
+            `Positive: ${brandSOV.sentiment.positive}`,
+            `Neutral: ${brandSOV.sentiment.neutral}`,
+            `Negative: ${brandSOV.sentiment.negative}`,
+          ],
+        });
+      }
+    }
+
+    // Analyze prompt distribution
+    const promptsWithNoVisibility = brandSOV.perPrompt.filter(p => p.mentions === 0);
+    if (promptsWithNoVisibility.length > 0) {
+      insights.push({
+        type: 'opportunity',
+        category: 'visibility',
+        title: 'Missing Visibility on High-Value Prompts',
+        description: `Not appearing in ${promptsWithNoVisibility.length} prompt(s)`,
+        reasoning: 'Missing visibility on prompts represents opportunities to improve share of voice',
+        impact: 'high',
+        confidence: 0.8,
+        evidence: promptsWithNoVisibility.map(p => p.prompt),
+      });
+    }
+
+    // Compare with competitors
+    if (competitors && competitors.length > 0) {
+      const competitorSOVs = sovData.filter(s => 
+        competitors.some(c => s.entity.toLowerCase().includes(c.toLowerCase()))
+      );
+      const higherSOVCompetitors = competitorSOVs.filter(c => c.sharePercentage > brandSOV.sharePercentage);
+      
+      if (higherSOVCompetitors.length > 0) {
+        insights.push({
+          type: 'threat',
+          category: 'competition',
+          title: 'Competitors Have Higher Share of Voice',
+          description: `${higherSOVCompetitors.length} competitor(s) have higher share of voice`,
+          reasoning: 'Competitors with higher share of voice are more likely to be recommended by AI engines',
+          impact: 'high',
+          confidence: 0.9,
+          evidence: higherSOVCompetitors.map(c => `${c.entity}: ${c.sharePercentage}% vs your ${brandSOV.sharePercentage}%`),
+          relatedCompetitors: higherSOVCompetitors.map(c => c.entity),
+        });
+      }
+    }
+
+    // Generate recommendations
+    const recommendations = await this.diagnosticIntelligence.generateRecommendations(workspaceId, insights, {
+      category: 'share_of_voice',
+      currentScore: brandSOV.sharePercentage,
+      maxScore: 100,
+    });
+
+    // Add SOV-specific recommendations
+    if (brandSOV.sharePercentage < 30) {
+      recommendations.push({
+        id: `sov-improvement-${Date.now()}`,
+        title: 'Increase Share of Voice',
+        description: `Improve share of voice from ${brandSOV.sharePercentage}% to target 40%+`,
+        category: 'content',
+        priority: 'high',
+        difficulty: 'medium',
+        expectedImpact: {
+          visibilityGain: Math.max(10, 40 - brandSOV.sharePercentage),
+          description: `Expected ${Math.max(10, 40 - brandSOV.sharePercentage)}% increase in share of voice`,
+        },
+        steps: [
+          'Optimize content for high-value prompts where you\'re missing',
+          'Build more authoritative citations',
+          'Improve schema markup for better entity recognition',
+          'Create content addressing competitor-controlled prompts',
+        ],
+        relatedInsights: insights.filter(i => i.type === 'weakness' || i.type === 'opportunity').map((_, idx) => `insight-${idx}`),
+        estimatedTime: '4-8 weeks',
+        evidence: [`Current share: ${brandSOV.sharePercentage}%`, `Target: 40%+`],
+      });
+    }
+
+    return { insights, recommendations };
   }
 }
 

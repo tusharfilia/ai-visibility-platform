@@ -18,6 +18,7 @@ import {
   EvidenceGraphBuilderService,
   // Premium services
   IndustryDetectorService,
+  DiagnosticIntelligenceService,
   PremiumBusinessSummaryService,
   EvidenceBackedPromptGeneratorService,
   PremiumCompetitorDetectorService,
@@ -65,16 +66,17 @@ import { DemoService } from './demo.service';
     IntentClustererService,  // Depends on LLMRouterService
     DiagnosticInsightsService,  // Depends on SchemaAuditorService, StructuralScoringService, TrustSignalAggregator, ShareOfVoiceCalculatorService
     
-    // Premium services
+    // Premium services (order matters - DiagnosticIntelligenceService must be before services that depend on it)
     IndustryDetectorService,  // Depends on LLMRouterService, SchemaAuditorService, PageStructureAnalyzerService
-    PremiumBusinessSummaryService,  // Depends on LLMRouterService, IndustryDetectorService, EntityExtractorService, SchemaAuditorService
-    EvidenceBackedPromptGeneratorService,  // Depends on LLMRouterService, IndustryDetectorService, EvidenceCollectorService
-    PremiumCompetitorDetectorService,  // Depends on LLMRouterService, IndustryDetectorService, EvidenceCollectorService
-    EvidenceBackedShareOfVoiceService,  // Depends on PrismaService, EvidenceCollectorService
-    PremiumCitationService,  // Depends on CitationClassifierService
+    DiagnosticIntelligenceService,  // Depends on LLMRouterService (for diagnostic intelligence generation) - MUST be before services that use it
+    EvidenceCollectorService,  // Depends on PrismaService (via constructor) - needed by other premium services
+    PremiumBusinessSummaryService,  // Depends on LLMRouterService, IndustryDetectorService, EntityExtractorService, SchemaAuditorService, DiagnosticIntelligenceService
+    EvidenceBackedPromptGeneratorService,  // Depends on LLMRouterService, IndustryDetectorService, EvidenceCollectorService, DiagnosticIntelligenceService
+    PremiumCompetitorDetectorService,  // Depends on LLMRouterService, IndustryDetectorService, EvidenceCollectorService, DiagnosticIntelligenceService
+    EvidenceBackedShareOfVoiceService,  // Depends on PrismaService, EvidenceCollectorService, DiagnosticIntelligenceService
+    PremiumCitationService,  // Depends on CitationClassifierService, DiagnosticIntelligenceService
     EEATCalculatorService,  // Depends on EvidenceGraphBuilderService
-    PremiumGEOScoreService,  // Depends on LLMRouterService, EEATCalculatorService, EvidenceBackedShareOfVoiceService, EvidenceCollectorService, SchemaAuditorService, StructuralScoringService
-    EvidenceCollectorService,  // Depends on PrismaService (via constructor)
+    PremiumGEOScoreService,  // Depends on LLMRouterService, EEATCalculatorService, EvidenceBackedShareOfVoiceService, EvidenceCollectorService, SchemaAuditorService, StructuralScoringService, DiagnosticIntelligenceService
     
     // Demo service (depends on all above)
     DemoService,

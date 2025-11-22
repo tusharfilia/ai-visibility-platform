@@ -2,6 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { LLMRouterService } from '@ai-visibility/shared';
 import { IndustryDetectorService, IndustryContext } from '../industry/industry-detector.service';
 import { EvidenceCollectorService, PromptEvidence } from '../evidence/evidence-collector.service';
+import { DiagnosticIntelligenceService } from '../diagnostics/diagnostic-intelligence.service';
+import {
+  VisibilityOpportunity,
+  DiagnosticInsight,
+  DiagnosticRecommendation,
+} from '../types/diagnostic.types';
 
 export interface EvidenceBackedPrompt {
   text: string;
@@ -39,6 +45,7 @@ export class EvidenceBackedPromptGeneratorService {
     private readonly llmRouter: LLMRouterService,
     private readonly industryDetector: IndustryDetectorService,
     private readonly evidenceCollector: EvidenceCollectorService,
+    private readonly diagnosticIntelligence: DiagnosticIntelligenceService,
   ) {}
 
   /**
@@ -255,6 +262,176 @@ Return JSON array:
     };
 
     return templates[intent] || templates.BEST;
+  }
+
+  /**
+   * Generate visibility opportunities from prompts
+   */
+  async generatePromptOpportunities(
+    workspaceId: string,
+    prompts: EvidenceBackedPrompt[],
+    competitors?: any[]
+  ): Promise<VisibilityOpportunity[]> {
+    const opportunities: VisibilityOpportunity[] = [];
+
+    for (const prompt of prompts) {
+      const visibilityScore = prompt.evidence?.visibilityScore || 0;
+      const currentVisibility = visibilityScore / 100; // Normalize to 0-1
+      const opportunityGap = 1 - currentVisibility;
+
+      // Calculate competitor control
+      const competitorCount = prompt.evidence?.competitorsFound?.length || 0;
+      const competitorControl = Math.min(1, competitorCount / 5); // Normalize by max 5 competitors
+
+      // Calculate commercial value (weighted by commercial intent and industry relevance)
+      const commercialValue = (prompt.commercialIntent * 0.6 + prompt.industryRelevance * 0.4);
+
+      opportunities.push({
+        prompt: prompt.text,
+        intent: prompt.intent,
+        commercialValue,
+        industryRelevance: prompt.industryRelevance,
+        currentVisibility,
+        opportunityGap,
+        competitorControl,
+        recommendedAction: this.generatePromptAction(prompt, currentVisibility, competitorControl),
+        expectedImpact: this.calculateExpectedImpact(prompt, opportunityGap),
+        engines: prompt.evidence?.hasBeenTested ? ['PERPLEXITY', 'AIO', 'BRAVE'] : [],
+      });
+    }
+
+    // Sort by opportunity (commercial value * opportunity gap)
+    return opportunities.sort((a, b) => {
+      const scoreA = a.commercialValue * a.opportunityGap;
+      const scoreB = b.commercialValue * b.opportunityGap;
+      return scoreB - scoreA;
+    });
+  }
+
+  /**
+   * Generate diagnostic insights for prompts
+   */
+  async generatePromptDiagnostics(
+    workspaceId: string,
+    prompts: EvidenceBackedPrompt[],
+    opportunities: VisibilityOpportunity[]
+  ): Promise<{
+    insights: DiagnosticInsight[];
+    recommendations: DiagnosticRecommendation[];
+  }> {
+    const insights: DiagnosticInsight[] = [];
+
+    // Analyze prompt performance
+    const highValuePrompts = opportunities.filter(o => o.commercialValue > 0.7);
+    const lowVisibilityPrompts = opportunities.filter(o => o.currentVisibility < 0.3);
+    const competitorControlled = opportunities.filter(o => o.competitorControl > 0.6);
+
+    // High-value, low-visibility = opportunity
+    const missedOpportunities = opportunities.filter(
+      o => o.commercialValue > 0.7 && o.currentVisibility < 0.3
+    );
+
+    if (missedOpportunities.length > 0) {
+      insights.push({
+        type: 'opportunity',
+        category: 'visibility',
+        title: 'High-Value Prompt Opportunities',
+        description: `${missedOpportunities.length} high-value prompts have low visibility`,
+        reasoning: 'These prompts have strong commercial intent but low current visibility, representing significant opportunity',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: missedOpportunities.map(o => `${o.prompt}: ${(o.opportunityGap * 100).toFixed(0)}% gap`),
+      });
+    }
+
+    // Competitor-controlled prompts = threat
+    if (competitorControlled.length > 0) {
+      insights.push({
+        type: 'threat',
+        category: 'competition',
+        title: 'Competitor-Controlled Prompts',
+        description: `${competitorControlled.length} prompts are dominated by competitors`,
+        reasoning: 'Competitors are winning visibility on these prompts, reducing your share of voice',
+        impact: 'high',
+        confidence: 0.8,
+        evidence: competitorControlled.map(o => `${o.prompt}: ${(o.competitorControl * 100).toFixed(0)}% competitor control`),
+      });
+    }
+
+    // Low visibility across all prompts = weakness
+    const avgVisibility = opportunities.reduce((sum, o) => sum + o.currentVisibility, 0) / opportunities.length;
+    if (avgVisibility < 0.3) {
+      insights.push({
+        type: 'weakness',
+        category: 'visibility',
+        title: 'Low Overall Prompt Visibility',
+        description: `Average visibility is ${(avgVisibility * 100).toFixed(0))}% across all prompts`,
+        reasoning: 'Low visibility across prompts indicates systemic issues with positioning, citations, or trust signals',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: [`Average visibility: ${(avgVisibility * 100).toFixed(0)}%`, `${lowVisibilityPrompts.length} prompts below 30% visibility`],
+      });
+    }
+
+    // Generate recommendations
+    const recommendations = await this.diagnosticIntelligence.generateRecommendations(workspaceId, insights, {
+      category: 'prompts',
+    });
+
+    // Add prompt-specific recommendations
+    if (missedOpportunities.length > 0) {
+      recommendations.push({
+        id: `prompt-opportunity-${Date.now()}`,
+        title: 'Optimize High-Value, Low-Visibility Prompts',
+        description: `Focus on improving visibility for ${missedOpportunities.length} high-value prompts`,
+        category: 'content',
+        priority: 'high',
+        difficulty: 'medium',
+        expectedImpact: {
+          visibilityGain: Math.round(missedOpportunities.reduce((sum, o) => sum + o.opportunityGap, 0) / missedOpportunities.length * 100),
+          description: `Expected ${Math.round(missedOpportunities.reduce((sum, o) => sum + o.opportunityGap, 0) / missedOpportunities.length * 100)}% visibility gain`,
+        },
+        steps: [
+          'Identify content gaps for high-value prompts',
+          'Create targeted content addressing these prompts',
+          'Build citations from authoritative sources',
+          'Optimize schema markup for prompt intent',
+        ],
+        relatedInsights: insights.filter(i => i.type === 'opportunity').map((_, idx) => `insight-${idx}`),
+        estimatedTime: '2-4 weeks',
+        evidence: missedOpportunities.map(o => o.prompt),
+      });
+    }
+
+    return { insights, recommendations };
+  }
+
+  private generatePromptAction(
+    prompt: EvidenceBackedPrompt,
+    currentVisibility: number,
+    competitorControl: number
+  ): string {
+    if (currentVisibility < 0.3) {
+      return `Improve visibility for "${prompt.text}" - currently below 30%`;
+    }
+    if (competitorControl > 0.6) {
+      return `Compete for "${prompt.text}" - competitors dominate`;
+    }
+    return `Maintain visibility for "${prompt.text}"`;
+  }
+
+  private calculateExpectedImpact(
+    prompt: EvidenceBackedPrompt,
+    opportunityGap: number
+  ): string {
+    const potentialGain = opportunityGap * 100;
+    if (potentialGain > 50) {
+      return `High impact: ${potentialGain.toFixed(0)}% visibility gain possible`;
+    }
+    if (potentialGain > 25) {
+      return `Medium impact: ${potentialGain.toFixed(0)}% visibility gain possible`;
+    }
+    return `Low impact: ${potentialGain.toFixed(0)}% visibility gain possible`;
   }
 }
 

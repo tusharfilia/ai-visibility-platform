@@ -8,6 +8,17 @@ export interface PremiumResponse<T> {
   confidence: number; // 0-1
   warnings: string[];
   explanation: string;
+  // Diagnostic intelligence layer (always present for premium analysis)
+  diagnostics: {
+    insights: DiagnosticInsight[];
+    strengths: DiagnosticInsight[];
+    weaknesses: DiagnosticInsight[];
+    risks: ThreatAssessment[];
+    recommendations: DiagnosticRecommendation[];
+    engineReasoning: EngineReasoning[];
+    opportunities: VisibilityOpportunity[];
+    competitiveThreats: CompetitiveThreat[];
+  };
   metadata?: {
     generatedAt: Date;
     serviceVersion?: string;
@@ -15,6 +26,9 @@ export interface PremiumResponse<T> {
     missingData?: string[];
   };
 }
+
+// Import diagnostic types
+export * from './diagnostic.types';
 
 export interface EvidenceItem {
   type: 'sov' | 'citation' | 'visibility' | 'prompt-test' | 'competitor' | 'eeat' | 'schema';

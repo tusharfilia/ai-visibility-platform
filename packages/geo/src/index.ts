@@ -84,6 +84,10 @@ export { PremiumGEOScoreService } from './scoring/premium-geo-score.service';
 
 // Premium types
 export * from './types/premium-response.types';
+export * from './types/diagnostic.types';
+
+// Diagnostic intelligence services
+export { DiagnosticIntelligenceService } from './diagnostics/diagnostic-intelligence.service';
 
 // Industry weights config
 export * from './config/industry-weights.config';

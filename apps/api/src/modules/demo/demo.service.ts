@@ -1920,7 +1920,98 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
         allWarnings.push(...premiumGEOScore.warnings);
       }
 
-      // Build premium response
+      // STEP 8: Generate Diagnostic Intelligence (NEW)
+      this.logger.log(`[Premium] Step 8: Generating diagnostic intelligence`);
+      const allInsights: any[] = [];
+      const allStrengths: any[] = [];
+      const allWeaknesses: any[] = [];
+      const allRisks: any[] = [];
+      const allRecommendations: any[] = [];
+      const allEngineReasoning: any[] = [];
+      const allOpportunities: any[] = [];
+      const allCompetitiveThreats: any[] = [];
+
+      try {
+        // Generate summary diagnostics
+        const summaryDiagnostics = await this.premiumSummary.generateSummaryDiagnostics(
+          workspaceId,
+          premiumSummary,
+          premiumCompetitors,
+          engines.map(e => e.key)
+        );
+        allInsights.push(...summaryDiagnostics.insights);
+        allStrengths.push(...summaryDiagnostics.strengths);
+        allWeaknesses.push(...summaryDiagnostics.weaknesses);
+        allRisks.push(...summaryDiagnostics.risks);
+        allRecommendations.push(...summaryDiagnostics.recommendations);
+        allEngineReasoning.push(...summaryDiagnostics.engineReasoning);
+
+        // Generate prompt opportunities and diagnostics
+        const promptOpportunities = await this.evidenceBackedPrompts.generatePromptOpportunities(
+          workspaceId,
+          premiumPrompts,
+          premiumCompetitors
+        );
+        allOpportunities.push(...promptOpportunities);
+
+        const promptDiagnostics = await this.evidenceBackedPrompts.generatePromptDiagnostics(
+          workspaceId,
+          premiumPrompts,
+          promptOpportunities
+        );
+        allInsights.push(...promptDiagnostics.insights);
+        allRecommendations.push(...promptDiagnostics.recommendations);
+
+        // Generate competitor diagnostics
+        const ownVisibility = premiumSOV.find(s => s.entity.toLowerCase() === brand.toLowerCase())?.sharePercentage || 0;
+        const competitorDiagnostics = await this.premiumCompetitors.generateCompetitorDiagnostics(
+          workspaceId,
+          premiumCompetitors,
+          ownVisibility
+        );
+        allInsights.push(...competitorDiagnostics.insights);
+        allCompetitiveThreats.push(...competitorDiagnostics.threats);
+        allRecommendations.push(...competitorDiagnostics.recommendations);
+
+        // Generate GEO score diagnostics
+        if (premiumGEOScore) {
+          const geoScoreDiagnostics = await this.premiumGEOScore.generateGEOScoreDiagnostics(
+            workspaceId,
+            premiumGEOScore,
+            industry
+          );
+          allInsights.push(...geoScoreDiagnostics.insights);
+          allRecommendations.push(...geoScoreDiagnostics.recommendations);
+        }
+
+        // Generate Share of Voice diagnostics
+        if (premiumSOV.length > 0) {
+          const competitorBrands = premiumCompetitors.map(c => c.brandName);
+          const sovDiagnostics = await this.evidenceBackedSOV.generateSOVDiagnostics(
+            workspaceId,
+            premiumSOV,
+            brand,
+            competitorBrands
+          );
+          allInsights.push(...sovDiagnostics.insights);
+          allRecommendations.push(...sovDiagnostics.recommendations);
+        }
+
+        // Generate Citation diagnostics
+        if (premiumCitations.length > 0) {
+          const citationDiagnostics = await this.premiumCitations.generateCitationDiagnostics(
+            workspaceId,
+            premiumCitations
+          );
+          allInsights.push(...citationDiagnostics.insights);
+          allRecommendations.push(...citationDiagnostics.recommendations);
+        }
+      } catch (error) {
+        this.logger.warn(`Diagnostic intelligence generation failed: ${error instanceof Error ? error.message : String(error)}`);
+        // Continue without diagnostics rather than failing
+      }
+
+      // Build premium response with diagnostic intelligence
       const response: PremiumResponse<any> = {
         data: {
           demoRunId,
@@ -1970,6 +2061,17 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
           `${premiumPrompts.length} industry-specific prompts generated. ` +
           `${premiumCompetitors.length} competitors detected. ` +
           (premiumGEOScore ? `GEO Score: ${premiumGEOScore.total}/100. ` : 'Analysis in progress. '),
+        // Diagnostic intelligence layer
+        diagnostics: {
+          insights: allInsights,
+          strengths: allStrengths,
+          weaknesses: allWeaknesses,
+          risks: allRisks,
+          recommendations: allRecommendations,
+          engineReasoning: allEngineReasoning,
+          opportunities: allOpportunities,
+          competitiveThreats: allCompetitiveThreats,
+        },
         metadata: {
           generatedAt: new Date(),
           industry,

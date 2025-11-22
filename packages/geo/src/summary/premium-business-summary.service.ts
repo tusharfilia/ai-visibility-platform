@@ -3,6 +3,13 @@ import { LLMRouterService } from '@ai-visibility/shared';
 import { IndustryDetectorService, IndustryContext } from '../industry/industry-detector.service';
 import { EntityExtractorService } from '../entity/entity-extractor.service';
 import { SchemaAuditorService } from '../structural/schema-auditor';
+import { DiagnosticIntelligenceService } from '../diagnostics/diagnostic-intelligence.service';
+import {
+  DiagnosticInsight,
+  DiagnosticRecommendation,
+  EngineReasoning,
+  ThreatAssessment,
+} from '../types/diagnostic.types';
 
 export interface PremiumBusinessSummary {
   summary: string; // LLM-optimized paragraph for AI panels
@@ -41,6 +48,7 @@ export class PremiumBusinessSummaryService {
     private readonly industryDetector: IndustryDetectorService,
     private readonly entityExtractor: EntityExtractorService,
     private readonly schemaAuditor: SchemaAuditorService,
+    private readonly diagnosticIntelligence: DiagnosticIntelligenceService,
   ) {}
 
   /**
@@ -209,6 +217,152 @@ Be specific, accurate, and evidence-based. Avoid generic statements.`;
         evidence,
       };
     }
+  }
+
+  /**
+   * Generate diagnostic intelligence for business summary
+   */
+  async generateSummaryDiagnostics(
+    workspaceId: string,
+    summary: PremiumBusinessSummary,
+    competitors?: any[],
+    engines: string[] = ['PERPLEXITY', 'AIO', 'BRAVE']
+  ): Promise<{
+    insights: DiagnosticInsight[];
+    strengths: DiagnosticInsight[];
+    weaknesses: DiagnosticInsight[];
+    risks: ThreatAssessment[];
+    recommendations: DiagnosticRecommendation[];
+    engineReasoning: EngineReasoning[];
+  }> {
+    // Generate insights
+    const insights = await this.diagnosticIntelligence.generateInsights(workspaceId, {
+      category: 'business_summary',
+      data: summary,
+      competitors,
+      engines,
+    });
+
+    // Separate strengths and weaknesses
+    const strengths = insights.filter(i => i.type === 'strength');
+    const weaknesses = insights.filter(i => i.type === 'weakness');
+
+    // Generate additional insights based on summary data
+    const additionalInsights = this.generateSummarySpecificInsights(summary);
+    insights.push(...additionalInsights);
+
+    // Generate recommendations
+    const recommendations = await this.diagnosticIntelligence.generateRecommendations(workspaceId, insights, {
+      category: 'business_summary',
+      currentScore: summary.confidence * 100,
+      maxScore: 100,
+    });
+
+    // Generate engine reasoning
+    const engineReasoningPromises = engines.map(engine =>
+      this.diagnosticIntelligence.generateEngineReasoning(workspaceId, engine, {
+        businessSummary: summary.summary,
+        visibility: summary.confidence > 0.5,
+        competitors,
+      })
+    );
+    const engineReasoning = await Promise.all(engineReasoningPromises);
+
+    // Generate threat assessments
+    const risks = await this.diagnosticIntelligence.generateThreatAssessments(workspaceId, {
+      competitors: competitors || [],
+      visibility: { overallVisibility: summary.confidence * 100 },
+      prompts: [],
+      citations: [],
+    });
+
+    return {
+      insights,
+      strengths,
+      weaknesses,
+      risks,
+      recommendations,
+      engineReasoning,
+    };
+  }
+
+  /**
+   * Generate summary-specific insights
+   */
+  private generateSummarySpecificInsights(summary: PremiumBusinessSummary): DiagnosticInsight[] {
+    const insights: DiagnosticInsight[] = [];
+
+    // Check for missing signals
+    if (summary.aiEnginePerspective.missingSignals.length > 0) {
+      insights.push({
+        type: 'weakness',
+        category: 'positioning',
+        title: 'Missing Key Signals',
+        description: `AI engines are missing ${summary.aiEnginePerspective.missingSignals.length} key signals`,
+        reasoning: 'Missing signals reduce AI engine understanding and visibility',
+        impact: 'high',
+        confidence: 0.9,
+        evidence: summary.aiEnginePerspective.missingSignals,
+      });
+    }
+
+    // Check for red flags
+    if (summary.structuredSummary.redFlags && summary.structuredSummary.redFlags.length > 0) {
+      insights.push({
+        type: 'risk',
+        category: 'trust',
+        title: 'Potential Red Flags Detected',
+        description: `${summary.structuredSummary.redFlags.length} potential issue(s) identified`,
+        reasoning: 'Red flags may reduce trust signals and visibility',
+        impact: 'medium',
+        confidence: 0.8,
+        evidence: summary.structuredSummary.redFlags,
+      });
+    }
+
+    // Check market position
+    if (summary.marketPosition.position === 'unknown' || summary.marketPosition.confidence < 0.5) {
+      insights.push({
+        type: 'weakness',
+        category: 'positioning',
+        title: 'Unclear Market Position',
+        description: 'Market position is unclear or low confidence',
+        reasoning: 'Unclear positioning makes it harder for AI engines to categorize and recommend',
+        impact: 'medium',
+        confidence: 0.7,
+        evidence: [`Position: ${summary.marketPosition.position}`, `Confidence: ${(summary.marketPosition.confidence * 100).toFixed(0)}%`],
+      });
+    }
+
+    // Check for strong positioning
+    if (summary.marketPosition.position === 'leader' && summary.marketPosition.confidence > 0.7) {
+      insights.push({
+        type: 'strength',
+        category: 'positioning',
+        title: 'Strong Market Position',
+        description: 'Business is positioned as a market leader',
+        reasoning: 'Strong positioning improves AI engine recommendations',
+        impact: 'high',
+        confidence: summary.marketPosition.confidence,
+        evidence: [summary.marketPosition.reasoning],
+      });
+    }
+
+    // Check trust factors
+    if (summary.structuredSummary.trustFactors.length >= 3) {
+      insights.push({
+        type: 'strength',
+        category: 'trust',
+        title: 'Strong Trust Signals',
+        description: `Business has ${summary.structuredSummary.trustFactors.length} trust factors`,
+        reasoning: 'Multiple trust factors improve EEAT scores and engine confidence',
+        impact: 'high',
+        confidence: 0.8,
+        evidence: summary.structuredSummary.trustFactors,
+      });
+    }
+
+    return insights;
   }
 }
 

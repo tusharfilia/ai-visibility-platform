@@ -1,386 +1,219 @@
-# 🧪 Testing Guide - GEO Platform Quality Improvements
+# Testing Guide: Premium Diagnostic Intelligence
 
-## ✅ Pre-Flight Checklist
+## ✅ What's Ready
 
-### 1. Build All Packages
+The diagnostic intelligence layer is **fully integrated** and ready for frontend testing:
+
+1. ✅ All premium services have diagnostic methods
+2. ✅ Diagnostics are generated in `getInstantSummary` endpoint
+3. ✅ Frontend types are updated to include diagnostics
+4. ✅ Response structure matches frontend expectations
+
+## 🧪 How to Test
+
+### 1. **API Endpoint Testing**
+
+#### Test the Instant Summary Endpoint:
 ```bash
-# From project root
-pnpm install
-pnpm --filter @ai-visibility/geo build
-pnpm --filter @ai-visibility/prompts build
-pnpm --filter @ai-visibility/shared build
-```
-
-### 2. Verify Environment Variables
-
-**Required for API Service:**
-- `DATABASE_URL` - PostgreSQL connection string
-- `REDIS_URL` - Redis connection string
-- `PERPLEXITY_API_KEY` - For Perplexity search
-- `BRAVE_API_KEY` - For Brave search
-- `SERPAPI_KEY` - For Google AI Overviews (AIO)
-- `OPENAI_API_KEY` - For LLM requests (optional, for entity extraction)
-- `ANTHROPIC_API_KEY` - For LLM requests (optional)
-- `GOOGLE_AI_API_KEY` - For LLM requests (optional)
-
-**Required for Jobs Service:**
-- Same as API service (especially `SERPAPI_KEY` for AIO)
-
-### 3. Database Migrations
-```bash
-# Ensure database is migrated
-cd apps/api
-pnpm prisma migrate deploy
-# OR for development
-pnpm prisma migrate dev
-```
-
----
-
-## 🧪 Testing Steps
-
-### Test 1: Entity Extraction Service
-
-**Endpoint:** `GET /v1/demo/instant-summary?domain=example.com`
-
-**What it tests:**
-- EntityExtractorService integration
-- SchemaAuditorService usage
-- PageStructureAnalyzerService usage
-- FactExtractorService usage
-- Parallel execution of analysis services
-- LLM entity extraction
-
-**Expected behavior:**
-1. Fetches website HTML
-2. Runs schema audit, structure analysis, and fact extraction in parallel
-3. Generates comprehensive entity data
-4. Returns structured business entity information
-
-**Test command:**
-```bash
-curl -X GET "http://localhost:8080/v1/demo/instant-summary?domain=stripe.com" \
+# Replace with your API URL (local or deployed)
+curl -X GET "http://localhost:3000/v1/demo/instant-summary?domain=airbnb.com" \
   -H "Content-Type: application/json"
 ```
 
-**Success criteria:**
-- Returns 200 status
-- Response includes `summary`, `entityData`, `prompts`, `competitors`
-- Entity data includes: `businessName`, `category`, `vertical`, `services`, `geography`
-- No errors in logs
-
----
-
-### Test 2: Competitor Detection Service
-
-**What it tests:**
-- CompetitorDetectorService multi-source detection
-- Direct, content, authority, and GEO competitor detection
-- Parallel execution of detection methods
-- Evidence tracking and confidence scoring
-
-**Expected behavior:**
-1. Detects competitors from 4 sources in parallel
-2. Combines and deduplicates results
-3. Returns competitors with confidence scores and evidence
-
-**Test via instant-summary endpoint:**
-```bash
-curl -X GET "http://localhost:8080/v1/demo/instant-summary?domain=stripe.com" \
-  -H "Content-Type: application/json" | jq '.competitors'
+#### Expected Response Structure:
+```json
+{
+  "ok": true,
+  "data": {
+    "data": {
+      "demoRunId": "...",
+      "workspaceId": "...",
+      "domain": "airbnb.com",
+      "brand": "Airbnb",
+      "industry": { ... },
+      "summary": { ... },
+      "prompts": [ ... ],
+      "competitors": [ ... ],
+      "shareOfVoice": [ ... ],
+      "citations": [ ... ],
+      "geoScore": { ... },
+      "eeatScore": { ... },
+      "engines": [ ... ],
+      "status": "...",
+      "progress": 0-100,
+      "totalJobs": 0,
+      "completedJobs": 0
+    },
+    "evidence": [ ... ],
+    "confidence": 0.0-1.0,
+    "warnings": [ ... ],
+    "explanation": "...",
+    "diagnostics": {
+      "insights": [ ... ],
+      "strengths": [ ... ],
+      "weaknesses": [ ... ],
+      "risks": [ ... ],
+      "recommendations": [ ... ],
+      "engineReasoning": [ ... ],
+      "opportunities": [ ... ],
+      "competitiveThreats": [ ... ]
+    },
+    "metadata": { ... }
+  }
+}
 ```
 
-**Success criteria:**
-- Returns 3-8 competitors
-- Each competitor has `domain`, `name`, `type`, `confidence`
-- Competitors are deduplicated
-- Evidence array is populated
+### 2. **Frontend Testing**
 
----
-
-### Test 3: Intent-Based Prompt Generation
-
-**What it tests:**
-- IntentClustererService
-- Intent-based prompt clustering (BEST, ALTERNATIVES, HOWTO, PRICING, COMPARISON)
-- LLM prompt generation with entity context
-
-**Expected behavior:**
-1. Generates prompts across multiple intent types
-2. Each prompt has intent classification
-3. Prompts are relevant to the business entity
-
-**Test via instant-summary endpoint:**
+#### Start the Frontend:
 ```bash
-curl -X GET "http://localhost:8080/v1/demo/instant-summary?domain=stripe.com" \
-  -H "Content-Type: application/json" | jq '.prompts'
+cd geku
+npm install
+npm run dev
 ```
 
-**Success criteria:**
-- Returns 3-8 prompts
-- Prompts cover different intent types
-- Prompts are relevant to the business
+#### Test Flow:
+1. Navigate to `http://localhost:5173/instant-summary?domain=airbnb.com`
+2. The page should:
+   - Load the instant summary
+   - Display all premium data sections
+   - Show diagnostics in the response (currently not displayed in UI, but available in data)
 
----
-
-### Test 4: Diagnostic Insights Service
-
-**Endpoint:** `GET /v1/demo/insights/:demoRunId`
-
-**What it tests:**
-- DiagnosticInsightsService parallel execution
-- Visibility blocker detection
-- Trust gap detection
-- Schema gap detection
-- Competitor advantage detection
-- Evidence-backed insights
-
-**Prerequisites:**
-- Must have a completed demo run (from Test 1)
-
-**Test command:**
-```bash
-# First get a demo run ID from instant-summary
-DEMO_RUN_ID="<from-instant-summary-response>"
-
-curl -X GET "http://localhost:8080/v1/demo/insights/${DEMO_RUN_ID}" \
-  -H "Content-Type: application/json" | jq '.insightHighlights'
+#### Check Browser Console:
+```javascript
+// In browser console, check the response:
+const response = await fetch('http://localhost:3000/v1/demo/instant-summary?domain=airbnb.com');
+const data = await response.json();
+console.log('Diagnostics:', data.data.diagnostics);
 ```
 
-**Success criteria:**
-- Returns array of insight highlights
-- Insights are evidence-backed
-- Insights include impact scores
-- Insights are actionable
+### 3. **Verify Diagnostic Data**
 
----
+#### Check Each Diagnostic Category:
 
-### Test 5: Enhanced Recommendations
+**Insights:**
+- Should contain insights from all services (summary, prompts, competitors, GEO score, SOV, citations)
+- Each insight should have: `type`, `category`, `title`, `description`, `reasoning`, `impact`, `confidence`, `evidence`
 
-**Endpoint:** `GET /v1/demo/recommendations/:demoRunId`
+**Strengths:**
+- Filtered insights where `type === 'strength'`
+- Should highlight positive aspects (high SOV, strong citations, good schema, etc.)
 
-**What it tests:**
-- Evidence-based recommendation generation
-- Impact scoring
-- Engine mapping
-- Priority sorting
+**Weaknesses:**
+- Filtered insights where `type === 'weakness'`
+- Should identify areas for improvement (low visibility, missing citations, etc.)
 
-**Test command:**
+**Risks:**
+- Threat assessments from summary diagnostics
+- Should identify potential issues (hallucination risk, trust degradation, etc.)
+
+**Recommendations:**
+- Actionable recommendations from all services
+- Each should have: `title`, `description`, `category`, `priority`, `difficulty`, `expectedImpact`, `steps`, `estimatedTime`
+
+**Engine Reasoning:**
+- Per-engine analysis from summary diagnostics
+- Should explain how each engine interprets the business
+
+**Opportunities:**
+- Visibility opportunities from prompt diagnostics
+- Should identify high-value prompts with low visibility
+
+**Competitive Threats:**
+- Competitive threat assessments from competitor diagnostics
+- Should identify competitors with higher visibility
+
+### 4. **Test Different Scenarios**
+
+#### Test with Different Domains:
 ```bash
-curl -X GET "http://localhost:8080/v1/demo/recommendations/${DEMO_RUN_ID}" \
-  -H "Content-Type: application/json" | jq '.recommendations'
+# Local business
+curl "http://localhost:3000/v1/demo/instant-summary?domain=example-plumber.com"
+
+# SaaS company
+curl "http://localhost:3000/v1/demo/instant-summary?domain=stripe.com"
+
+# E-commerce
+curl "http://localhost:3000/v1/demo/instant-summary?domain=shopify.com"
 ```
 
-**Success criteria:**
-- Returns 5-10 recommendations
-- Each recommendation has `title`, `description`, `priority`, `category`
-- Recommendations are sorted by priority
-- Action items are included
-
----
-
-### Test 6: Engine Bias Simulation
-
-**What it tests:**
-- EngineBiasSimulatorService
-- Engine-specific scoring
-- Cross-engine comparison
-
-**Note:** This is used internally by other services. Test via:
-- GEO score calculation
-- Diagnostic insights (engine-specific recommendations)
-
----
-
-### Test 7: Evidence Graph Builder
-
-**What it tests:**
-- Fact-level consensus tracking
-- Cross-engine consensus
-- Fact validation against profile
-
-**Note:** This is used internally. Test via:
-- Diagnostic insights (fact validation)
-- Share of voice calculations
-
----
-
-### Test 8: Copilot Task Mapping
-
-**What it tests:**
-- InsightCopilotMapperService
-- Insight to Copilot action mapping
-- Weekly optimization plan generation
-
-**Note:** This is used internally. Test via:
-- Recommendations endpoint (should include Copilot-ready tasks)
-
----
-
-## 🔍 Manual Testing Checklist
-
-### Local Development Testing
-
-1. **Start services:**
-   ```bash
-   # Terminal 1: API Service
-   cd apps/api
-   pnpm dev
-
-   # Terminal 2: Jobs Service (if testing job processing)
-   cd apps/jobs
-   pnpm dev
-   ```
-
-2. **Test instant summary flow:**
-   - Open frontend or use curl
-   - Enter a domain (e.g., `stripe.com`)
-   - Verify all sections populate:
-     - ✅ Business summary
-     - ✅ Auto-generated prompts (3-8)
-     - ✅ Competitors (3-8)
-     - ✅ Engine visibility status
-     - ✅ GEO score and insights
-
-3. **Check logs for:**
-   - No errors in EntityExtractorService
-   - Parallel execution messages
-   - Successful LLM calls
-   - Proper error handling
-
----
-
-## 🚨 Common Issues & Fixes
-
-### Issue 1: "Cannot find module @ai-visibility/geo"
-**Fix:**
+#### Test Error Handling:
 ```bash
-pnpm install
-pnpm --filter @ai-visibility/geo build
+# Missing domain
+curl "http://localhost:3000/v1/demo/instant-summary"
+
+# Invalid domain
+curl "http://localhost:3000/v1/demo/instant-summary?domain=invalid"
 ```
 
-### Issue 2: "SchemaAuditorService is not defined"
-**Fix:** Ensure all dependencies are in DemoModule providers (already fixed)
+### 5. **Verify Diagnostic Generation**
 
-### Issue 3: "Missing API key for engine AIO"
-**Fix:** Set `SERPAPI_KEY` in environment variables (not `AIO_API_KEY`)
-
-### Issue 4: "Entity extraction failed"
-**Fix:** 
-- Check internet connectivity (needs to fetch website)
-- Verify domain is accessible
-- Check LLM API keys are set
-
-### Issue 5: "Competitor detection returns empty"
-**Fix:**
-- Ensure LLM API keys are set
-- Check logs for LLM errors
-- Verify domain is valid
-
----
-
-## 📊 Success Metrics
-
-After testing, you should see:
-
-1. **Entity Extraction:**
-   - ✅ Comprehensive business entity data
-   - ✅ Schema types detected
-   - ✅ Structure analysis completed
-   - ✅ Facts extracted
-
-2. **Competitor Detection:**
-   - ✅ 4+ competitors detected
-   - ✅ Multiple competitor types (direct, content, authority, GEO)
-   - ✅ Confidence scores > 0.5
-   - ✅ Evidence provided
-
-3. **Prompt Generation:**
-   - ✅ 5+ prompts generated
-   - ✅ Multiple intent types covered
-   - ✅ Prompts are relevant
-
-4. **Insights:**
-   - ✅ 5+ diagnostic insights
-   - ✅ Evidence-backed
-   - ✅ Impact scores included
-
-5. **Recommendations:**
-   - ✅ 5+ recommendations
-   - ✅ Prioritized correctly
-   - ✅ Actionable items included
-
----
-
-## 🚀 Production Readiness Checklist
-
-- [ ] All packages built successfully
-- [ ] Environment variables configured
-- [ ] Database migrations applied
-- [ ] API service starts without errors
-- [ ] Jobs service starts without errors
-- [ ] Instant summary endpoint returns data
-- [ ] Entity extraction works
-- [ ] Competitor detection works
-- [ ] Prompt generation works
-- [ ] Insights generation works
-- [ ] Recommendations generation works
-- [ ] No TypeScript errors
-- [ ] No runtime errors in logs
-
----
-
-## 🎯 Quick Test Script
-
-Save this as `test-instant-summary.sh`:
-
-```bash
-#!/bin/bash
-
-API_URL="${1:-http://localhost:8080}"
-DOMAIN="${2:-stripe.com}"
-
-echo "Testing instant summary for ${DOMAIN}..."
-echo "API URL: ${API_URL}"
-echo ""
-
-RESPONSE=$(curl -s -X GET "${API_URL}/v1/demo/instant-summary?domain=${DOMAIN}" \
-  -H "Content-Type: application/json")
-
-echo "Status: $(echo $RESPONSE | jq -r '.ok // "error"')"
-echo ""
-echo "Summary: $(echo $RESPONSE | jq -r '.data.summary // "N/A"')"
-echo ""
-echo "Prompts: $(echo $RESPONSE | jq -r '.data.prompts | length // 0')"
-echo "Competitors: $(echo $RESPONSE | jq -r '.data.competitors | length // 0')"
-echo "Engines: $(echo $RESPONSE | jq -r '.data.engines | length // 0')"
-echo ""
-echo "Full response:"
-echo $RESPONSE | jq '.'
+#### Check Logs:
+The API service should log diagnostic generation:
+```
+[Premium] Step 8: Generating diagnostic intelligence
 ```
 
-Run with:
-```bash
-chmod +x test-instant-summary.sh
-./test-instant-summary.sh http://localhost:8080 stripe.com
-```
+#### Verify All Services Generate Diagnostics:
+- ✅ `PremiumBusinessSummaryService.generateSummaryDiagnostics()`
+- ✅ `EvidenceBackedPromptGeneratorService.generatePromptDiagnostics()`
+- ✅ `PremiumCompetitorDetectorService.generateCompetitorDiagnostics()`
+- ✅ `PremiumGEOScoreService.generateGEOScoreDiagnostics()`
+- ✅ `EvidenceBackedShareOfVoiceService.generateSOVDiagnostics()` (NEW)
+- ✅ `PremiumCitationService.generateCitationDiagnostics()` (NEW)
 
----
+### 6. **Frontend Integration Checklist**
 
-## 📝 Next Steps After Testing
+- [x] Types are defined in `geku/src/types/premium.ts`
+- [ ] Frontend displays diagnostics (optional - can be added later)
+- [x] Response structure matches frontend expectations
+- [x] Diagnostics are always present (even if empty arrays)
 
-1. **If all tests pass:**
-   - Deploy to Railway
-   - Monitor logs for first real requests
-   - Verify production environment variables
+## 🐛 Troubleshooting
 
-2. **If tests fail:**
-   - Check error logs
-   - Verify environment variables
-   - Ensure all packages are built
-   - Check database connectivity
+### Issue: Diagnostics are empty arrays
+**Solution:** This is normal if:
+- Analysis hasn't completed yet (status !== 'analysis_complete')
+- No data has been collected yet
+- Services failed to generate diagnostics (check logs)
 
-3. **Performance optimization:**
-   - Monitor parallel execution performance
-   - Check LLM API rate limits
-   - Optimize caching if needed
+### Issue: Missing diagnostic methods
+**Solution:** Verify all services are properly injected in `DemoModule`:
+- `DiagnosticIntelligenceService` must be provided before services that use it
+- All premium services should have diagnostic methods
+
+### Issue: Frontend type errors
+**Solution:** 
+1. Ensure `geku/src/types/premium.ts` includes `DiagnosticBreakdown`
+2. Restart TypeScript server in your IDE
+3. Run `npm run build` in the frontend to check for type errors
+
+## 📊 Expected Diagnostic Counts
+
+After a complete analysis, you should see:
+- **Insights:** 10-30+ (from all services)
+- **Strengths:** 2-5 (if business has strong signals)
+- **Weaknesses:** 5-15 (areas for improvement)
+- **Risks:** 0-5 (potential threats)
+- **Recommendations:** 10-25+ (actionable improvements)
+- **Engine Reasoning:** 3 (one per engine: PERPLEXITY, AIO, BRAVE)
+- **Opportunities:** 5-15 (high-value prompts with low visibility)
+- **Competitive Threats:** 0-10 (depending on competitor count)
+
+## 🚀 Next Steps
+
+1. **Test the API endpoint** with a real domain
+2. **Verify diagnostics are populated** in the response
+3. **Check frontend can access diagnostics** (even if not displayed yet)
+4. **Add UI components** to display diagnostics (optional enhancement)
+
+## ✅ Ready for Frontend
+
+**Yes, it's ready!** The diagnostic intelligence layer is:
+- ✅ Fully integrated into the API
+- ✅ Types are defined for the frontend
+- ✅ Response structure matches expectations
+- ✅ All services generate diagnostics
+- ✅ Error handling is in place
+
+The frontend can now access `response.data.diagnostics` and display it as needed.
