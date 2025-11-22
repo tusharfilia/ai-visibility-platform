@@ -208,7 +208,7 @@ export class EvidenceCollectorService {
            p."text" AS "promptText",
            e."key" AS "engine",
            a."rawText" AS "answerText",
-           ROW_NUMBER() OVER (PARTITION BY pr.id ORDER BY m."createdAt") AS "position",
+           COALESCE(m."position", ROW_NUMBER() OVER (PARTITION BY pr.id ORDER BY m."id")) AS "position",
            m."sentiment"
          FROM "mentions" m
          JOIN "answers" a ON a.id = m."answerId"
