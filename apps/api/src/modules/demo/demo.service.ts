@@ -1892,6 +1892,39 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
       let premiumGEOScore: PremiumGEOScore | null = null;
       let eeatScore: any = null;
 
+      // Always calculate GEO Score (works with partial data)
+      this.logger.log(`[Premium] Calculating GEO Score for ${brand}`);
+      try {
+        premiumGEOScore = await this.premiumGEOScore.calculatePremiumGEOScore(
+          workspaceId,
+          normalized.href,
+          brand,
+          premiumCompetitors.map(c => c.brandName),
+          industry
+        );
+        
+        this.logger.log(`[Premium] GEO Score calculated: ${premiumGEOScore.total}/100`);
+        overallConfidence = Math.min(overallConfidence, premiumGEOScore.confidence);
+        allWarnings.push(...premiumGEOScore.warnings);
+      } catch (error) {
+        this.logger.error(`GEO Score calculation failed: ${error instanceof Error ? error.message : String(error)}`);
+        // Create a default GEO score structure if calculation fails
+        premiumGEOScore = {
+          total: 0,
+          breakdown: {
+            aiVisibility: { score: 0, weight: 0.35, points: 0, details: { perEngine: [], perPrompt: [] }, evidence: [], explanation: 'GEO Score calculation failed', missing: ['GEO Score calculation failed'] },
+            eeat: { score: 0, weight: 0.25, points: 0, breakdown: { expertise: 0, authoritativeness: 0, trustworthiness: 0, experience: 0 }, evidence: [], explanation: 'GEO Score calculation failed', missing: ['GEO Score calculation failed'] },
+            citations: { score: 0, weight: 0.15, points: 0, details: { totalCitations: 0, licensedPublisherCitations: 0, averageAuthority: 0, citationCategories: {} }, evidence: [], explanation: 'GEO Score calculation failed', missing: ['GEO Score calculation failed'] },
+            competitorComparison: { score: 0, weight: 0.15, points: 0, details: { shareOfVoice: 0, competitorCount: 0, relativePosition: 0 }, evidence: [], explanation: 'GEO Score calculation failed', missing: ['GEO Score calculation failed'] },
+            schemaTechnical: { score: 0, weight: 0.10, points: 0, details: { schemaTypes: [], schemaCompleteness: 0, structuredDataQuality: 0 }, evidence: [], explanation: 'GEO Score calculation failed', missing: ['GEO Score calculation failed'] },
+          },
+          confidence: 0.1,
+          warnings: ['GEO Score calculation failed'],
+          recommendations: [],
+        };
+        allWarnings.push('GEO Score calculation failed - using default structure');
+      }
+
       if (currentStatus === 'analysis_complete' || statusResult.data.completedJobs > 0) {
         // Calculate Share of Voice with Evidence
         const allEntities = [brand, ...premiumCompetitors.map(c => c.brandName)];
@@ -1906,18 +1939,6 @@ Return a JSON array of 3 to 6 competitor domains (only the domain, e.g., "paypal
         } catch (error) {
           this.logger.warn(`EEAT calculation failed: ${error instanceof Error ? error.message : String(error)}`);
         }
-        
-        // Calculate Premium GEO Score
-        premiumGEOScore = await this.premiumGEOScore.calculatePremiumGEOScore(
-          workspaceId,
-          normalized.href,
-          brand,
-          premiumCompetitors.map(c => c.brandName),
-          industry
-        );
-        
-        overallConfidence = Math.min(overallConfidence, premiumGEOScore.confidence);
-        allWarnings.push(...premiumGEOScore.warnings);
       }
 
       // STEP 8: Generate Diagnostic Intelligence (NEW)
