@@ -27,14 +27,14 @@ export class LLMConfigService {
       case 'anthropic':
         return {
           provider: 'anthropic',
-          model: defaultModel || 'claude-3-5-sonnet-20241022', // Updated to latest model
+          model: defaultModel || 'claude-3-sonnet-20240229', // Using stable, working model
           apiKey: this.configService.get<string>('ANTHROPIC_API_KEY')!,
         };
       
       case 'gemini':
         return {
           provider: 'gemini',
-          model: defaultModel || 'gemini-1.5-pro', // Updated to latest model
+          model: defaultModel || 'gemini-pro', // Using stable, working model
           apiKey: this.configService.get<string>('GOOGLE_AI_API_KEY')!,
         };
       

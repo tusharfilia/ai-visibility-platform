@@ -259,7 +259,7 @@ export class AioProvider extends BaseProvider {
       response.mentions,
       response.citations,
       {
-        model: 'gemini-1.5-pro', // Updated to latest model
+        model: 'gemini-pro', // Using stable, working model
         tokens: Math.floor(Math.random() * 500) + 200,
         latency: Math.random() * 800 + 300,
         region: 'us-east-1',

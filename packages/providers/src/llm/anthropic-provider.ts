@@ -15,7 +15,7 @@ export class AnthropicProvider extends BaseLLMProvider {
   async query(prompt: string, options: any = {}): Promise<LLMResponse> {
     try {
       const response = await this.client.messages.create({
-        model: options.model || 'claude-3-5-sonnet-20241022', // Updated to latest model
+        model: options.model || 'claude-3-sonnet-20240229', // Using stable, working model
         max_tokens: options.maxTokens || 1000,
         temperature: options.temperature || 0.7,
         messages: [

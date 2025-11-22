@@ -12,7 +12,7 @@ export class GeminiProvider extends BaseLLMProvider {
       throw new Error('Google AI API key is required');
     }
     this.client = new GoogleGenerativeAI(config.apiKey);
-    this.model = this.client.getGenerativeModel({ model: 'gemini-1.5-pro' }); // Updated to latest model
+    this.model = this.client.getGenerativeModel({ model: 'gemini-pro' }); // Using stable, working model
   }
 
   async query(prompt: string, options: any = {}): Promise<LLMResponse> {
